@@ -1,0 +1,24 @@
+{
+  "name": "@video-site/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@video-site/db": "workspace:*",
+    "@video-site/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@video-site/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
