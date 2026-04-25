@@ -49,3 +49,7 @@ coverage
 .cache
 tmp
 temp
+
+# Video storage (local dev)
+storage/
+.claude/
