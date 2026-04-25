@@ -125,7 +125,7 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
         <Button
           variant="link"
           onClick={onSwitchToSignUp}
-          className="text-indigo-600 hover:text-indigo-800"
+          className="text-primary hover:text-primary/80"
         >
           Need an account? Sign Up
         </Button>
