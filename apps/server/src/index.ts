@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
 import { errorHandler } from "./middleware/error-handler";
+import { streamingRoutes } from "./routes/streaming";
 import { handleTusRequest } from "./routes/upload";
 import { videoRoutes } from "./routes/video";
 import type { AppVariables } from "./types";
@@ -49,6 +50,7 @@ app.onError(errorHandler);
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/api/videos", videoRoutes);
+app.route("/api/stream", streamingRoutes);
 
 app.all("/api/uploads", (c) => handleTusRequest(c.req.raw));
 app.all("/api/uploads/*", (c) => handleTusRequest(c.req.raw));

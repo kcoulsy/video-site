@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -11,42 +12,37 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import { Button } from "@video-site/ui/components/button";
+import { env } from "@video-site/env/web";
 
 import { VideoPlayer } from "@/components/video-player";
+import Loader from "@/components/loader";
+import { ApiError, apiClient } from "@/lib/api-client";
 import { formatDate, formatViewCount } from "@/lib/format";
 
 export const Route = createFileRoute("/watch/$videoId")({
   component: WatchPage,
 });
 
-// Mock — replace with loader fetching GET /api/videos/:id
-const MOCK_VIDEO = {
-  id: "video-1",
-  title: "Building a Full-Stack Video Streaming Platform from Scratch",
-  description: `In this comprehensive tutorial, we'll walk through building a complete video streaming platform using modern technologies. We'll cover everything from setting up the monorepo structure with Turborepo to implementing DASH streaming with FFmpeg.
+interface VideoResponse {
+  id: string;
+  title: string;
+  description: string | null;
+  status: "uploading" | "uploaded" | "processing" | "ready" | "failed";
+  visibility: "public" | "unlisted" | "private";
+  duration: number | null;
+  viewCount: number;
+  likeCount: number;
+  dislikeCount: number;
+  createdAt: string;
+  streamUrl: string | null;
+  thumbnailUrl: string | null;
+  user: { id: string; name: string; image: string | null };
+}
 
-Topics covered:
-- Project architecture and monorepo setup
-- Database schema design with Drizzle ORM
-- Video upload with tus resumable uploads
-- FFmpeg transcoding pipeline
-- DASH adaptive bitrate streaming
-- Frontend with TanStack Start and React
-
-This is part 1 of a multi-part series. Make sure to subscribe for updates!`,
-  streamUrl: null as string | null,
-  thumbnailUrl: null as string | null,
-  viewCount: 156000,
-  likeCount: 4200,
-  dislikeCount: 120,
-  createdAt: new Date(Date.now() - 2592000000).toISOString(),
-  user: {
-    id: "user-1",
-    name: "Alex Turner",
-    image: null as string | null,
-    subscriberCount: 12400,
-  },
-};
+function absoluteUrl(path: string | null): string | undefined {
+  if (!path) return undefined;
+  return `${env.VITE_SERVER_URL}${path}`;
+}
 
 function WatchPage() {
   const { videoId } = Route.useParams();
@@ -55,7 +51,11 @@ function WatchPage() {
   const [descExpanded, setDescExpanded] = useState(false);
   const viewReported = useRef(false);
 
-  // Cinema mode: toggle data attribute on <html>
+  const { data: video, isLoading, error } = useQuery<VideoResponse>({
+    queryKey: ["video", videoId],
+    queryFn: () => apiClient<VideoResponse>(`/api/videos/${videoId}`),
+  });
+
   useEffect(() => {
     if (cinemaMode) {
       document.documentElement.setAttribute("data-cinema", "");
@@ -67,18 +67,45 @@ function WatchPage() {
     };
   }, [cinemaMode]);
 
+  useEffect(() => {
+    viewReported.current = false;
+  }, [videoId]);
+
   const handleTimeUpdate = (time: number) => {
     if (!viewReported.current && time >= 5) {
       viewReported.current = true;
-      // TODO: POST /api/videos/${videoId}/view
+      apiClient(`/api/videos/${videoId}/view`, { method: "POST" }).catch(() => {
+        // best-effort — silently ignore
+      });
     }
   };
 
-  const video = MOCK_VIDEO;
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+
+  if (error || !video) {
+    const status = error instanceof ApiError ? error.status : 0;
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-semibold">
+          {status === 404 ? "Video not found" : "Something went wrong"}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {status === 404
+            ? "This video may have been removed or is private."
+            : "Please try again in a moment."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
-      {/* Cinema overlay */}
       {cinemaMode && (
         <div
           className="fixed inset-0 z-[45] bg-black/90 animate-fade-in"
@@ -89,44 +116,35 @@ function WatchPage() {
       <div
         className={`transition-all duration-500 ${cinemaMode ? "relative z-[50]" : ""}`}
       >
-        {/* Player */}
         <div
           className={
-            cinemaMode
-              ? "w-full px-0"
-              : "mx-auto max-w-5xl px-4 pt-4"
+            cinemaMode ? "w-full px-0" : "mx-auto max-w-5xl px-4 pt-4"
           }
         >
           <div className={cinemaMode ? "mx-auto max-w-[1400px]" : ""}>
             <VideoPlayer
-              manifestUrl={video.streamUrl || undefined}
-              thumbnailUrl={video.thumbnailUrl}
+              manifestUrl={absoluteUrl(video.streamUrl)}
+              thumbnailUrl={absoluteUrl(video.thumbnailUrl) ?? null}
               onTimeUpdate={handleTimeUpdate}
             />
           </div>
         </div>
 
-        {/* Video info */}
         <div
           className={`mx-auto max-w-5xl px-4 py-4 ${cinemaMode ? "opacity-60 transition-opacity hover:opacity-100" : ""}`}
         >
           <h1 className="text-xl font-semibold leading-snug">{video.title}</h1>
 
-          {/* Meta row */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
               {formatViewCount(video.viewCount)} views &middot;{" "}
               {formatDate(video.createdAt)}
             </p>
 
-            {/* Actions */}
             <div className="flex items-center gap-1.5">
-              {/* Like / Dislike */}
               <div className="flex items-center overflow-hidden rounded-full bg-secondary">
                 <button
-                  onClick={() =>
-                    setLiked(liked === "like" ? null : "like")
-                  }
+                  onClick={() => setLiked(liked === "like" ? null : "like")}
                   className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
                     liked === "like"
                       ? "text-primary"
@@ -166,7 +184,6 @@ function WatchPage() {
                 <span className="hidden sm:inline">Share</span>
               </Button>
 
-              {/* Cinema mode toggle */}
               <Button
                 variant={cinemaMode ? "default" : "secondary"}
                 size="sm"
@@ -188,7 +205,6 @@ function WatchPage() {
             </div>
           </div>
 
-          {/* Channel + description card */}
           <div className="mt-4 rounded-xl bg-secondary/50 p-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
@@ -206,39 +222,37 @@ function WatchPage() {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold">{video.user.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatViewCount(video.user.subscriberCount)} subscribers
-                </p>
               </div>
               <Button size="sm" className="rounded-full">
                 Subscribe
               </Button>
             </div>
 
-            <div className="mt-3">
-              <div className={descExpanded ? "" : "line-clamp-3"}>
-                <p className="whitespace-pre-line text-sm text-foreground/80">
-                  {video.description}
-                </p>
+            {video.description ? (
+              <div className="mt-3">
+                <div className={descExpanded ? "" : "line-clamp-3"}>
+                  <p className="whitespace-pre-line text-sm text-foreground/80">
+                    {video.description}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDescExpanded(!descExpanded)}
+                  className="mt-2 flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {descExpanded ? (
+                    <>
+                      Show less <ChevronUp className="h-4 w-4" />
+                    </>
+                  ) : (
+                    <>
+                      Show more <ChevronDown className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
               </div>
-              <button
-                onClick={() => setDescExpanded(!descExpanded)}
-                className="mt-2 flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {descExpanded ? (
-                  <>
-                    Show less <ChevronUp className="h-4 w-4" />
-                  </>
-                ) : (
-                  <>
-                    Show more <ChevronDown className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </div>
+            ) : null}
           </div>
 
-          {/* Comments placeholder */}
           <div className="mb-12 mt-6">
             <div className="mb-4 flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />

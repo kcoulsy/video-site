@@ -8,9 +8,35 @@ import { z } from "zod";
 
 import { ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
 import { cleanupQueue, thumbnailQueue, transcodeQueue } from "../lib/queue";
+import { getRedisClient } from "../lib/redis";
 import { storage } from "../lib/storage";
 import { requireAuth } from "../middleware/auth";
 import type { AppVariables } from "../types";
+
+function streamUrlFor(videoId: string, status: string): string | null {
+  return status === "ready" ? `/api/stream/${videoId}/manifest.mpd` : null;
+}
+
+function thumbnailUrlFor(
+  videoId: string,
+  thumbnailPath: string | null,
+): string | null {
+  return thumbnailPath ? `/api/stream/${videoId}/thumbnail` : null;
+}
+
+function hashIpUa(c: {
+  req: { raw: Request; header: (name: string) => string | undefined };
+}): string {
+  const ip =
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    c.req.header("x-real-ip") ??
+    "unknown";
+  const ua = c.req.header("user-agent") ?? "unknown";
+  return new Bun.CryptoHasher("sha256")
+    .update(`${ip}|${ua}`)
+    .digest("hex")
+    .slice(0, 32);
+}
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
 
@@ -149,6 +175,7 @@ videoRoutes.get("/", async (c) => {
     id: r.id,
     title: r.title,
     thumbnailPath: r.thumbnailPath,
+    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath),
     duration: r.duration,
     viewCount: r.viewCount,
     createdAt: r.createdAt,
@@ -185,8 +212,51 @@ videoRoutes.get("/:id", async (c) => {
 
   return c.json({
     ...row.v,
+    streamUrl: streamUrlFor(row.v.id, row.v.status),
+    thumbnailUrl: thumbnailUrlFor(row.v.id, row.v.thumbnailPath),
     user: { id: row.v.userId, name: row.userName, image: row.userImage },
   });
+});
+
+videoRoutes.post("/:id/view", async (c) => {
+  const videoId = c.req.param("id");
+
+  const [row] = await db
+    .select({
+      visibility: video.visibility,
+      status: video.status,
+      userId: video.userId,
+    })
+    .from(video)
+    .where(eq(video.id, videoId))
+    .limit(1);
+
+  if (!row || row.status !== "ready") {
+    throw new NotFoundError("Video");
+  }
+
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+
+  if (row.visibility === "private" && session?.user.id !== row.userId) {
+    throw new NotFoundError("Video");
+  }
+
+  const viewerKey = session
+    ? `view:${videoId}:user:${session.user.id}`
+    : `view:${videoId}:anon:${hashIpUa(c)}`;
+
+  const redis = getRedisClient();
+  const wasSet = await redis.set(viewerKey, "1", "EX", 86400, "NX");
+  if (!wasSet) {
+    return c.json({ counted: false });
+  }
+
+  await db
+    .update(video)
+    .set({ viewCount: sql`${video.viewCount} + 1` })
+    .where(eq(video.id, videoId));
+
+  return c.json({ counted: true });
 });
 
 videoRoutes.patch("/:id", requireAuth, async (c) => {

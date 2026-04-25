@@ -27,7 +27,7 @@ export function VideoPlayer({
     let cancelled = false;
 
     import("dashjs")
-      .then(({ default: dashjs }) => {
+      .then((dashjs) => {
         if (cancelled || !videoRef.current) return;
 
         const player = dashjs.MediaPlayer().create();
@@ -38,7 +38,7 @@ export function VideoPlayer({
             abr: { autoSwitchBitrate: { video: true, audio: true } },
             buffer: {
               fastSwitchEnabled: true,
-              stableBufferTime: 12,
+              bufferTimeDefault: 12,
               bufferTimeAtTopQuality: 30,
             },
           },
