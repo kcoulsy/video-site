@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
+import { cleanupQueue, thumbnailQueue, transcodeQueue } from "../lib/queue";
 import { storage } from "../lib/storage";
 import { requireAuth } from "../middleware/auth";
 import type { AppVariables } from "../types";
@@ -95,10 +96,11 @@ videoRoutes.get("/my", requireAuth, async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  const [{ count }] = await db
+  const countResult = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(video)
     .where(eq(video.userId, currentUser.id));
+  const count = countResult[0]?.count ?? 0;
 
   return c.json({ items, page, limit, total: count });
 });
@@ -230,7 +232,80 @@ videoRoutes.delete("/:id", requireAuth, async (c) => {
   }
 
   await db.delete(video).where(eq(video.id, id));
-  await storage.deleteVideoFiles(id);
+  await cleanupQueue.add("delete-video", { type: "delete-video", videoId: id });
+
+  return c.json({ ok: true });
+});
+
+videoRoutes.get("/:id/status", requireAuth, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+
+  const [row] = await db
+    .select({
+      userId: video.userId,
+      status: video.status,
+      processingError: video.processingError,
+    })
+    .from(video)
+    .where(eq(video.id, id))
+    .limit(1);
+
+  if (!row) {
+    throw new NotFoundError("Video");
+  }
+  if (row.userId !== currentUser.id) {
+    throw new ForbiddenError();
+  }
+
+  let progress: unknown = null;
+  if (row.status === "processing") {
+    const job = await transcodeQueue.getJob(id);
+    progress = job?.progress ?? null;
+  }
+
+  return c.json({
+    status: row.status,
+    progress,
+    error: row.processingError,
+  });
+});
+
+videoRoutes.post("/:id/thumbnail", requireAuth, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+
+  const [existing] = await db
+    .select({ userId: video.userId })
+    .from(video)
+    .where(eq(video.id, id))
+    .limit(1);
+  if (!existing) {
+    throw new NotFoundError("Video");
+  }
+  if (existing.userId !== currentUser.id) {
+    throw new ForbiddenError();
+  }
+
+  const body = await c.req.parseBody();
+  const file = body["thumbnail"];
+  if (!(file instanceof File)) {
+    throw new ValidationError("No thumbnail file provided");
+  }
+  if (!file.type.startsWith("image/")) {
+    throw new ValidationError("File must be an image");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new ValidationError("Thumbnail must be under 5MB");
+  }
+
+  const tempPath = storage.resolve("temp", `thumb-${id}-${Date.now()}`);
+  await Bun.write(tempPath, file);
+
+  await thumbnailQueue.add("thumbnail", {
+    videoId: id,
+    thumbnailSourcePath: tempPath,
+  });
 
   return c.json({ ok: true });
 });

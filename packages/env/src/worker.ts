@@ -10,6 +10,10 @@ export const env = createEnv({
     FFMPEG_PATH: z.string().default("ffmpeg"),
     FFPROBE_PATH: z.string().default("ffprobe"),
     CONCURRENCY: z.coerce.number().default(2),
+    DELETE_RAW_AFTER_TRANSCODE: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   },
   runtimeEnv: process.env,

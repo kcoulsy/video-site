@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   HeadContent,
   Outlet,
@@ -6,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { Toaster } from "@video-site/ui/components/sonner";
+import { useState } from "react";
 
 import Header from "../components/header";
 
@@ -35,20 +37,34 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 });
 
 function RootDocument() {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 30 * 1000,
+            refetchOnWindowFocus: false,
+          },
+        },
+      }),
+  );
+
   return (
     <html lang="en" className="dark">
       <head>
         <HeadContent />
       </head>
       <body className="min-h-svh antialiased">
-        <div className="flex min-h-svh flex-col">
-          <Header />
-          <main className="flex-1">
-            <Outlet />
-          </main>
-        </div>
-        <Toaster richColors />
-        <TanStackRouterDevtools position="bottom-left" />
+        <QueryClientProvider client={queryClient}>
+          <div className="flex min-h-svh flex-col">
+            <Header />
+            <main className="flex-1">
+              <Outlet />
+            </main>
+          </div>
+          <Toaster richColors />
+          <TanStackRouterDevtools position="bottom-left" />
+        </QueryClientProvider>
         <Scripts />
       </body>
     </html>

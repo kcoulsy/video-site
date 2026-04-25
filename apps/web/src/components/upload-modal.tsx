@@ -1,17 +1,27 @@
-import { useCallback, useRef, useState } from "react";
-import { Eye, EyeOff, Film, Loader2, Upload, X } from "lucide-react";
+import { env } from "@video-site/env/web";
 import { Button } from "@video-site/ui/components/button";
 import { Input } from "@video-site/ui/components/input";
 import { Label } from "@video-site/ui/components/label";
+import { Eye, EyeOff, Film, Loader2, Upload, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import * as tus from "tus-js-client";
 
+import { ApiError, apiClient } from "@/lib/api-client";
 import { formatFileSize } from "@/lib/format";
+
+interface CreateVideoResponse {
+  id: string;
+  uploadUrl: string;
+}
 
 interface UploadModalProps {
   open: boolean;
   onClose: () => void;
+  onUploaded?: (videoId: string) => void;
 }
 
-export function UploadModal({ open, onClose }: UploadModalProps) {
+export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -23,6 +33,25 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
   const [progress, setProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<tus.Upload | null>(null);
+
+  const reset = useCallback(() => {
+    setFile(null);
+    setTitle("");
+    setDescription("");
+    setTags("");
+    setVisibility("public");
+    setUploading(false);
+    setProgress(0);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      uploadRef.current?.abort();
+      uploadRef.current = null;
+      reset();
+    }
+  }, [open, reset]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -53,15 +82,66 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
       e.preventDefault();
       if (!file) return;
       setUploading(true);
-      // TODO: Replace with tus resumable upload (Phase 2)
-      for (let i = 0; i <= 100; i += 10) {
-        setProgress(i);
-        await new Promise((r) => setTimeout(r, 200));
+      setProgress(0);
+
+      let videoId: string;
+      try {
+        const created = await apiClient<CreateVideoResponse>("/api/videos", {
+          method: "POST",
+          body: JSON.stringify({
+            title: title.trim(),
+            description: description.trim(),
+            visibility,
+            tags: tags
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean),
+            filename: file.name,
+            mimeType: file.type || "video/mp4",
+            fileSize: file.size,
+          }),
+        });
+        videoId = created.id;
+      } catch (err) {
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : "Failed to create video record";
+        toast.error(msg);
+        setUploading(false);
+        return;
       }
-      setUploading(false);
-      onClose();
+
+      await new Promise<void>((resolve, reject) => {
+        const upload = new tus.Upload(file, {
+          endpoint: `${env.VITE_SERVER_URL}/api/uploads`,
+          retryDelays: [0, 1000, 3000, 5000],
+          chunkSize: 8 * 1024 * 1024,
+          metadata: {
+            videoId,
+            filename: file.name,
+            filetype: file.type || "video/mp4",
+          },
+          onError: (err) => reject(err),
+          onProgress: (bytesUploaded, bytesTotal) => {
+            setProgress(Math.round((bytesUploaded / bytesTotal) * 100));
+          },
+          onSuccess: () => resolve(),
+        });
+        uploadRef.current = upload;
+        upload.start();
+      })
+        .then(() => {
+          toast.success("Upload complete — processing started");
+          onUploaded?.(videoId);
+          onClose();
+        })
+        .catch((err: Error) => {
+          toast.error(`Upload failed: ${err.message}`);
+          setUploading(false);
+        });
     },
-    [file, onClose],
+    [file, title, description, tags, visibility, onClose, onUploaded],
   );
 
   if (!open) return null;
@@ -70,7 +150,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={uploading ? undefined : onClose}
       />
 
       <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl animate-fade-slide-up">
@@ -78,14 +158,14 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
           <h2 className="text-xl font-semibold">Upload Video</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            disabled={uploading}
+            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Drop zone */}
           {!file ? (
             <div
               onDragOver={(e) => {
@@ -127,22 +207,25 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                   {formatFileSize(file.size)}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setFile(null)}
-                className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              {!uploading && (
+                <button
+                  type="button"
+                  onClick={() => setFile(null)}
+                  className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           )}
 
-          {/* Upload progress */}
           {uploading && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Uploading...</span>
-                <span className="font-medium text-primary">{progress}%</span>
+                <span className="font-medium text-primary tabular-nums">
+                  {progress}%
+                </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-secondary">
                 <div
@@ -153,7 +236,6 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
             </div>
           )}
 
-          {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="upload-title">Title</Label>
             <Input
@@ -161,11 +243,11 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Give your video a title"
+              disabled={uploading}
               required
             />
           </div>
 
-          {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="upload-desc">Description</Label>
             <textarea
@@ -174,11 +256,11 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Tell viewers about your video"
               rows={4}
-              className="w-full resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20"
+              disabled={uploading}
+              className="w-full resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
             />
           </div>
 
-          {/* Tags */}
           <div className="space-y-2">
             <Label htmlFor="upload-tags">Tags</Label>
             <Input
@@ -186,10 +268,10 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="gaming, tutorial, vlog (comma separated)"
+              disabled={uploading}
             />
           </div>
 
-          {/* Visibility */}
           <div className="space-y-2">
             <Label>Visibility</Label>
             <div className="flex gap-2">
@@ -198,7 +280,8 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
                   key={v}
                   type="button"
                   onClick={() => setVisibility(v)}
-                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm capitalize transition-colors ${
+                  disabled={uploading}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm capitalize transition-colors disabled:opacity-50 ${
                     visibility === v
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border text-muted-foreground hover:border-muted-foreground"
@@ -216,7 +299,12 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={uploading}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={!file || !title.trim() || uploading}>

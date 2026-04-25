@@ -1,10 +1,12 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  AlertCircle,
   CheckCircle,
-  Clock,
-  CloudUpload,
   Edit2,
   ExternalLink,
   Eye,
@@ -14,6 +16,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
 import {
   DropdownMenu,
@@ -22,9 +25,18 @@ import {
   DropdownMenuTrigger,
 } from "@video-site/ui/components/dropdown-menu";
 
-import { getUser } from "@/functions/get-user";
 import { UploadModal } from "@/components/upload-modal";
-import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/format";
+import {
+  VideoStatusBadge,
+  type VideoStatus,
+} from "@/components/video-status-badge";
+import { getUser } from "@/functions/get-user";
+import { ApiError, apiClient } from "@/lib/api-client";
+import {
+  formatDuration,
+  formatRelativeTime,
+  formatViewCount,
+} from "@/lib/format";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -39,114 +51,45 @@ export const Route = createFileRoute("/dashboard")({
   },
 });
 
-type VideoStatus = "uploading" | "uploaded" | "processing" | "ready" | "failed";
-
 interface DashboardVideo {
   id: string;
   title: string;
-  thumbnailUrl: string | null;
+  thumbnailPath: string | null;
   status: VideoStatus;
   visibility: "public" | "unlisted" | "private";
   duration: number | null;
   viewCount: number;
   likeCount: number;
   createdAt: string;
-  processingProgress?: number;
+  processingError: string | null;
 }
 
-// Mock data — replace with GET /api/videos?mine=true
-const MOCK_VIDEOS: DashboardVideo[] = [
-  {
-    id: "v1",
-    title: "Building a Full-Stack App with TanStack Start",
-    thumbnailUrl: null,
-    status: "ready",
-    visibility: "public",
-    duration: 2100,
-    viewCount: 12400,
-    likeCount: 340,
-    createdAt: new Date(Date.now() - 2592000000).toISOString(),
-  },
-  {
-    id: "v2",
-    title: "Advanced TypeScript Patterns",
-    thumbnailUrl: null,
-    status: "processing",
-    visibility: "public",
-    duration: null,
-    viewCount: 0,
-    likeCount: 0,
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    processingProgress: 65,
-  },
-  {
-    id: "v3",
-    title: "React 19 Deep Dive - Untitled Draft",
-    thumbnailUrl: null,
-    status: "uploading",
-    visibility: "private",
-    duration: null,
-    viewCount: 0,
-    likeCount: 0,
-    createdAt: new Date(Date.now() - 1800000).toISOString(),
-    processingProgress: 42,
-  },
-  {
-    id: "v4",
-    title: "Failed Upload Test",
-    thumbnailUrl: null,
-    status: "failed",
-    visibility: "private",
-    duration: null,
-    viewCount: 0,
-    likeCount: 0,
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
-
-const STATUS_CONFIG: Record<
-  VideoStatus,
-  { label: string; icon: React.ReactNode; className: string }
-> = {
-  uploading: {
-    label: "Uploading",
-    icon: <CloudUpload className="h-3.5 w-3.5" />,
-    className: "text-blue-400 bg-blue-400/10",
-  },
-  uploaded: {
-    label: "Uploaded",
-    icon: <Clock className="h-3.5 w-3.5" />,
-    className: "text-yellow-400 bg-yellow-400/10",
-  },
-  processing: {
-    label: "Processing",
-    icon: <Loader2 className="h-3.5 w-3.5 animate-spin" />,
-    className: "text-amber-400 bg-amber-400/10",
-  },
-  ready: {
-    label: "Ready",
-    icon: <CheckCircle className="h-3.5 w-3.5" />,
-    className: "text-emerald-400 bg-emerald-400/10",
-  },
-  failed: {
-    label: "Failed",
-    icon: <AlertCircle className="h-3.5 w-3.5" />,
-    className: "text-red-400 bg-red-400/10",
-  },
-};
+interface MyVideosResponse {
+  items: DashboardVideo[];
+  page: number;
+  limit: number;
+  total: number;
+}
 
 function DashboardPage() {
   const { session } = Route.useRouteContext();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const queryClient = useQueryClient();
 
-  const readyCount = MOCK_VIDEOS.filter((v) => v.status === "ready").length;
-  const processingCount = MOCK_VIDEOS.filter(
+  const { data, isLoading } = useQuery<MyVideosResponse>({
+    queryKey: ["videos", "my"],
+    queryFn: () => apiClient<MyVideosResponse>("/api/videos/my"),
+  });
+
+  const videos = data?.items ?? [];
+  const readyCount = videos.filter((v) => v.status === "ready").length;
+  const processingCount = videos.filter(
     (v) => v.status === "processing" || v.status === "uploading",
   ).length;
+  const totalViews = videos.reduce((sum, v) => sum + v.viewCount, 0);
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-6">
-      {/* Page header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Dashboard</h1>
@@ -160,13 +103,16 @@ function DashboardPage() {
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { label: "Total Videos", value: String(MOCK_VIDEOS.length), Icon: Film },
-          { label: "Total Views", value: formatViewCount(12400), Icon: Eye },
+          { label: "Total Videos", value: String(videos.length), Icon: Film },
+          { label: "Total Views", value: formatViewCount(totalViews), Icon: Eye },
           { label: "Ready", value: String(readyCount), Icon: CheckCircle },
-          { label: "Processing", value: String(processingCount), Icon: Loader2 },
+          {
+            label: "Processing",
+            value: String(processingCount),
+            Icon: Loader2,
+          },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -183,13 +129,16 @@ function DashboardPage() {
         ))}
       </div>
 
-      {/* Video list */}
       <div className="overflow-hidden rounded-xl border border-border">
         <div className="border-b border-border bg-card/50 px-4 py-3">
           <h2 className="text-sm font-medium">Your Videos</h2>
         </div>
 
-        {MOCK_VIDEOS.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : videos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Film className="h-12 w-12 text-muted-foreground/20" />
             <p className="mt-4 text-sm text-muted-foreground">No videos yet</p>
@@ -204,76 +153,127 @@ function DashboardPage() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {MOCK_VIDEOS.map((video, i) => (
-              <VideoRow key={video.id} video={video} index={i} />
+            {videos.map((video, i) => (
+              <VideoRow
+                key={video.id}
+                video={video}
+                index={i}
+                onDeleted={() => {
+                  void queryClient.invalidateQueries({
+                    queryKey: ["videos", "my"],
+                  });
+                }}
+              />
             ))}
           </div>
         )}
       </div>
 
-      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
+      <UploadModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onUploaded={() => {
+          void queryClient.invalidateQueries({ queryKey: ["videos", "my"] });
+        }}
+      />
     </div>
   );
+}
+
+interface StatusResponse {
+  status: VideoStatus;
+  progress: { stage: string; percent: number } | null;
+  error: string | null;
+}
+
+function useVideoStatus(videoId: string, status: VideoStatus) {
+  const queryClient = useQueryClient();
+  const isActive = status === "uploaded" || status === "processing";
+
+  return useQuery<StatusResponse>({
+    queryKey: ["video-status", videoId],
+    queryFn: async () => {
+      const result = await apiClient<StatusResponse>(
+        `/api/videos/${videoId}/status`,
+      );
+      if (result.status === "ready" || result.status === "failed") {
+        void queryClient.invalidateQueries({ queryKey: ["videos", "my"] });
+      }
+      return result;
+    },
+    enabled: isActive,
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === "ready" || s === "failed" ? false : 3000;
+    },
+  });
 }
 
 function VideoRow({
   video,
   index,
+  onDeleted,
 }: {
   video: DashboardVideo;
   index: number;
+  onDeleted: () => void;
 }) {
-  const status = STATUS_CONFIG[video.status];
+  const liveStatus = useVideoStatus(video.id, video.status);
+  const status = liveStatus.data?.status ?? video.status;
+  const progress = liveStatus.data?.progress?.percent ?? null;
+  const errorMessage = liveStatus.data?.error ?? video.processingError;
+
+  const deleteMutation = useMutation({
+    mutationFn: () =>
+      apiClient(`/api/videos/${video.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      toast.success("Video deleted");
+      onDeleted();
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : "Failed to delete";
+      toast.error(msg);
+    },
+  });
 
   return (
     <div
       className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-secondary/30 animate-fade-slide-up"
       style={{ animationDelay: `${index * 40}ms` }}
     >
-      {/* Thumbnail */}
       <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-secondary">
-        {video.thumbnailUrl ? (
-          <img
-            src={video.thumbnailUrl}
-            alt={video.title}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-            <Film className="h-6 w-6 text-muted-foreground/20" />
-          </div>
-        )}
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
+          <Film className="h-6 w-6 text-muted-foreground/20" />
+        </div>
         {video.duration != null && (
           <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">
             {formatDuration(video.duration)}
           </span>
         )}
-        {(video.status === "processing" || video.status === "uploading") &&
-          video.processingProgress != null && (
+        {(status === "processing" || status === "uploading") &&
+          progress != null && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-              <span className="text-xs font-medium text-white">
-                {video.processingProgress}%
+              <span className="text-xs font-medium text-white tabular-nums">
+                {Math.round(progress)}%
               </span>
             </div>
           )}
       </div>
 
-      {/* Info */}
       <div className="min-w-0 flex-1">
         <h3 className="truncate text-sm font-medium">{video.title}</h3>
         <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${status.className}`}
-          >
-            {status.icon}
-            {status.label}
-          </span>
+          <VideoStatusBadge status={status} progressPercent={progress} />
           <span className="capitalize">{video.visibility}</span>
           <span>{formatRelativeTime(video.createdAt)}</span>
         </div>
+        {status === "failed" && errorMessage ? (
+          <p className="mt-1 truncate text-xs text-red-400/80">
+            {errorMessage}
+          </p>
+        ) : null}
       </div>
 
-      {/* Stats */}
       <div className="hidden items-center gap-6 text-sm text-muted-foreground sm:flex">
         <div className="text-right">
           <p className="font-medium text-foreground">
@@ -287,14 +287,17 @@ function VideoRow({
         </div>
       </div>
 
-      {/* Actions */}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="sm" />}>
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="bg-card">
-          {video.status === "ready" && (
-            <DropdownMenuItem>
+          {status === "ready" && (
+            <DropdownMenuItem
+              render={
+                <Link to="/watch/$videoId" params={{ videoId: video.id }} />
+              }
+            >
               <ExternalLink className="mr-2 h-4 w-4" />
               View
             </DropdownMenuItem>
@@ -303,7 +306,10 @@ function VideoRow({
             <Edit2 className="mr-2 h-4 w-4" />
             Edit
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive">
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => deleteMutation.mutate()}
+          >
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </DropdownMenuItem>
