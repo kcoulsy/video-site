@@ -4,12 +4,7 @@ import { Queue, Worker } from "bullmq";
 import { processCleanup } from "./processors/cleanup";
 import { processThumbnail } from "./processors/thumbnail";
 import { processTranscode } from "./processors/transcode";
-import {
-  CLEANUP_QUEUE,
-  THUMBNAIL_QUEUE,
-  TRANSCODE_QUEUE,
-  connection,
-} from "./queues";
+import { CLEANUP_QUEUE, THUMBNAIL_QUEUE, TRANSCODE_QUEUE, connection } from "./queues";
 
 const transcodeWorker = new Worker(TRANSCODE_QUEUE, processTranscode, {
   connection,
@@ -64,11 +59,7 @@ await cleanupQueue.add(
 
 async function shutdown() {
   console.log("shutting down workers...");
-  await Promise.all([
-    transcodeWorker.close(),
-    thumbnailWorker.close(),
-    cleanupWorker.close(),
-  ]);
+  await Promise.all([transcodeWorker.close(), thumbnailWorker.close(), cleanupWorker.close()]);
   await cleanupQueue.close();
   await connection.quit();
   process.exit(0);
@@ -77,6 +68,4 @@ async function shutdown() {
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
-console.log(
-  `worker started (transcode concurrency: ${env.CONCURRENCY}, thumbnail: 2, cleanup: 1)`,
-);
+console.log(`worker started (transcode concurrency: ${env.CONCURRENCY}, thumbnail: 2, cleanup: 1)`);

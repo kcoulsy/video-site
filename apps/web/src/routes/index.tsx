@@ -37,17 +37,14 @@ function HomePage() {
 
   const { data, isLoading } = useQuery<FeedResponse>({
     queryKey: ["videos", "feed", sort],
-    queryFn: () =>
-      apiClient<FeedResponse>(`/api/videos?sort=${sort}&page=1&limit=24`),
+    queryFn: () => apiClient<FeedResponse>(`/api/videos?sort=${sort}&page=1&limit=24`),
   });
 
   const videos: VideoCardProps[] =
     data?.items.map((v) => ({
       id: v.id,
       title: v.title,
-      thumbnailUrl: v.thumbnailUrl
-        ? `${env.VITE_SERVER_URL}${v.thumbnailUrl}`
-        : null,
+      thumbnailUrl: v.thumbnailUrl ? `${env.VITE_SERVER_URL}${v.thumbnailUrl}` : null,
       duration: v.duration,
       viewCount: v.viewCount,
       createdAt: v.createdAt,

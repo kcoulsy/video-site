@@ -15,30 +15,23 @@ Create the video database table, implement tus-based chunked/resumable uploads o
 ### File: `packages/db/src/schema/video.ts` (new)
 
 ```typescript
-import {
-  pgTable, text, timestamp, integer, bigint,
-  pgEnum, index,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, bigint, pgEnum, index } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 export const videoStatusEnum = pgEnum("video_status", [
-  "uploading",     // tus upload in progress
-  "uploaded",      // raw file on disk, awaiting processing
-  "processing",    // FFmpeg worker is transcoding
-  "ready",         // DASH output available
-  "failed",        // processing failed
+  "uploading", // tus upload in progress
+  "uploaded", // raw file on disk, awaiting processing
+  "processing", // FFmpeg worker is transcoding
+  "ready", // DASH output available
+  "failed", // processing failed
 ]);
 
-export const videoVisibilityEnum = pgEnum("video_visibility", [
-  "public",
-  "unlisted",
-  "private",
-]);
+export const videoVisibilityEnum = pgEnum("video_visibility", ["public", "unlisted", "private"]);
 
 export const video = pgTable(
   "video",
   {
-    id: text("id").primaryKey(),  // nanoid
+    id: text("id").primaryKey(), // nanoid
     title: text("title").notNull(),
     description: text("description").default(""),
     userId: text("user_id")
@@ -51,14 +44,14 @@ export const video = pgTable(
     // File metadata
     originalFilename: text("original_filename"),
     mimeType: text("mime_type"),
-    fileSize: bigint("file_size", { mode: "number" }),  // bytes
-    duration: integer("duration"),   // seconds, set by ffprobe in Phase 3
-    width: integer("width"),         // pixels, set by ffprobe
-    height: integer("height"),       // pixels, set by ffprobe
+    fileSize: bigint("file_size", { mode: "number" }), // bytes
+    duration: integer("duration"), // seconds, set by ffprobe in Phase 3
+    width: integer("width"), // pixels, set by ffprobe
+    height: integer("height"), // pixels, set by ffprobe
 
     // Storage paths (relative to STORAGE_PATH)
     rawPath: text("raw_path"),
-    manifestPath: text("manifest_path"),   // path to .mpd
+    manifestPath: text("manifest_path"), // path to .mpd
     thumbnailPath: text("thumbnail_path"),
 
     // Tus tracking
@@ -93,6 +86,7 @@ export const video = pgTable(
 ```
 
 **Conventions followed**:
+
 - `text("id").primaryKey()` — string IDs, matching auth tables
 - camelCase JS / snake_case DB columns
 - Indexes in 3rd table argument as array
@@ -143,6 +137,7 @@ export const videoRelations = relations(video, ({ one }) => ({
 ### File: `packages/db/src/schema/index.ts` (modify)
 
 Add exports:
+
 ```typescript
 export * from "./video";
 export * from "./relations";
@@ -157,17 +152,20 @@ Ensure `auth.ts` re-export still works (it now only exports tables, not relation
 ### Package: `packages/db`
 
 Add `nanoid` as a dependency:
+
 ```
 pnpm -F @video-site/db add nanoid
 ```
 
 Create a helper in `packages/db/src/id.ts`:
+
 ```typescript
 import { nanoid } from "nanoid";
 export const generateId = () => nanoid(21);
 ```
 
 Export from `packages/db/src/index.ts`:
+
 ```typescript
 export { generateId } from "./id";
 ```
@@ -213,6 +211,7 @@ export class ValidationError extends AppError {
 ### File: `apps/server/src/middleware/error-handler.ts` (new)
 
 Global Hono error handler registered on the app:
+
 ```typescript
 import { AppError } from "../lib/errors";
 
@@ -229,6 +228,7 @@ export function errorHandler(err: Error, c: Context) {
 ### File: `apps/server/src/types.ts` (new)
 
 Type-safe Hono context variables:
+
 ```typescript
 import type { User, Session } from "better-auth";
 
@@ -274,9 +274,11 @@ Mounted at `/api/videos` in the main app.
 **Endpoints**:
 
 ### `POST /api/videos` (auth required)
+
 Create a video record. Called BEFORE the tus upload starts — the client needs the `videoId` to associate the upload.
 
 Request body:
+
 ```json
 {
   "title": "My Video",
@@ -290,14 +292,16 @@ Request body:
 ```
 
 Validation:
+
 - `title`: required, 1-200 characters
 - `description`: optional, max 5000 characters
 - `visibility`: one of "public", "unlisted", "private"
 - `tags`: optional array, max 20 tags, each max 50 chars
-- `fileSize`: must be <= 500 * 1024 * 1024 (500MB)
+- `fileSize`: must be <= 500 _ 1024 _ 1024 (500MB)
 - `mimeType`: must start with `video/`
 
 Response:
+
 ```json
 {
   "id": "abc123",
@@ -306,14 +310,17 @@ Response:
 ```
 
 ### `GET /api/videos/my` (auth required)
+
 List the authenticated user's videos in ALL statuses. Paginated. Used for the dashboard.
 
 **Important**: This route MUST be registered before `GET /api/videos/:id` — otherwise Hono matches "my" as an `:id` parameter and returns 404.
 
 ### `GET /api/videos` (public)
+
 List videos. Only returns `status: "ready"` and `visibility: "public"` videos.
 
 Query params:
+
 - `page` (default 1)
 - `limit` (default 24, max 50)
 - `sort`: "newest" (default), "oldest", "popular" (by viewCount)
@@ -321,15 +328,18 @@ Query params:
 Response includes: id, title, thumbnailPath (as URL), duration, viewCount, createdAt, user (id, name, image).
 
 ### `GET /api/videos/:id` (public)
+
 Single video details. Returns 404 for non-existent or private videos (unless owner). Includes all fields plus user info.
 
 ### `PATCH /api/videos/:id` (auth, owner only)
+
 Update title, description, visibility, tags. Validate ownership — the `userId` on the video must match the authenticated user.
 
 ### `DELETE /api/videos/:id` (auth, owner only)
+
 Delete the video record and all associated files via `storage.deleteVideoFiles(id)`. Validate ownership.
 
-*(Moved above — registered before `/:id` to avoid route conflict.)*
+_(Moved above — registered before `/:id` to avoid route conflict.)_
 
 ---
 
@@ -338,6 +348,7 @@ Delete the video record and all associated files via `storage.deleteVideoFiles(i
 ### File: `apps/server/src/routes/upload.ts` (new)
 
 ### Dependencies to install:
+
 ```
 pnpm -F apps/server add @tus/server @tus/file-store
 ```
@@ -420,7 +431,7 @@ cors({
     "Location",
   ],
   credentials: true,
-})
+});
 ```
 
 ---
@@ -455,19 +466,12 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiClient<T>(
-  path: string,
-  options?: RequestInit,
-): Promise<T> {
+export async function apiClient<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: HeadersInit = { ...options?.headers };
 
   // Only set Content-Type for JSON bodies. Let fetch auto-set it for
   // FormData (multipart uploads) and Blob (sendBeacon payloads).
-  if (
-    options?.body &&
-    typeof options.body === "string" &&
-    !("Content-Type" in headers)
-  ) {
+  if (options?.body && typeof options.body === "string" && !("Content-Type" in headers)) {
     (headers as Record<string, string>)["Content-Type"] = "application/json";
   }
 
@@ -488,6 +492,7 @@ export async function apiClient<T>(
 ## 9. Frontend: Upload Page
 
 ### Dependencies to install:
+
 ```
 pnpm -F apps/web add tus-js-client
 ```
@@ -521,6 +526,7 @@ The `UploadPage` component renders the `UploadForm`.
 Two-phase upload flow:
 
 **Phase A — Metadata entry**:
+
 - TanStack Form with fields: title (required), description (optional), visibility (dropdown: public/unlisted/private), tags (comma-separated input)
 - File selection via `UploadDropzone` component
 - Client-side validation:
@@ -530,9 +536,11 @@ Two-phase upload flow:
   - Title 1-200 chars
 
 **Phase B — Upload execution**:
+
 - On form submit:
   1. `POST /api/videos` with metadata -> get `videoId`
   2. Start tus upload with `tus-js-client`:
+
      ```typescript
      import * as tus from "tus-js-client";
 
@@ -557,12 +565,14 @@ Two-phase upload flow:
      });
      upload.start();
      ```
+
   3. Show `UploadProgress` component during upload
   4. On success, show "Processing..." status (Phase 3 adds polling)
 
 ### File: `apps/web/src/components/upload-dropzone.tsx` (new)
 
 Drag-and-drop file selection zone:
+
 - Large dashed-border area
 - Drag events: `onDragOver`, `onDragLeave`, `onDrop`
 - Hidden `<input type="file" accept="video/*">` triggered by click
@@ -573,6 +583,7 @@ Drag-and-drop file selection zone:
 ### File: `apps/web/src/components/upload-progress.tsx` (new)
 
 Progress display during upload:
+
 - Progress bar (percentage)
 - Bytes uploaded / total (formatted, e.g., "125 MB / 500 MB")
 - Upload speed calculation (bytes per second, displayed as MB/s)
@@ -630,34 +641,34 @@ function getVideoDuration(file: File): Promise<number> {
 
 ## Files Summary
 
-| Action | File |
-|--------|------|
-| Create | `packages/db/src/schema/video.ts` |
-| Create | `packages/db/src/schema/relations.ts` |
-| Create | `packages/db/src/id.ts` |
-| Create | `apps/server/src/lib/errors.ts` |
-| Create | `apps/server/src/middleware/error-handler.ts` |
-| Create | `apps/server/src/middleware/auth.ts` |
-| Create | `apps/server/src/types.ts` |
-| Create | `apps/server/src/routes/video.ts` |
-| Create | `apps/server/src/routes/upload.ts` |
-| Create | `apps/web/src/lib/api-client.ts` |
-| Create | `apps/web/src/routes/upload.tsx` |
-| Create | `apps/web/src/components/upload-form.tsx` |
-| Create | `apps/web/src/components/upload-dropzone.tsx` |
-| Create | `apps/web/src/components/upload-progress.tsx` |
-| Modify | `packages/db/src/schema/auth.ts` (remove relations) |
-| Modify | `packages/db/src/schema/index.ts` (add exports) |
-| Modify | `packages/db/src/index.ts` (add generateId export) |
+| Action | File                                                           |
+| ------ | -------------------------------------------------------------- |
+| Create | `packages/db/src/schema/video.ts`                              |
+| Create | `packages/db/src/schema/relations.ts`                          |
+| Create | `packages/db/src/id.ts`                                        |
+| Create | `apps/server/src/lib/errors.ts`                                |
+| Create | `apps/server/src/middleware/error-handler.ts`                  |
+| Create | `apps/server/src/middleware/auth.ts`                           |
+| Create | `apps/server/src/types.ts`                                     |
+| Create | `apps/server/src/routes/video.ts`                              |
+| Create | `apps/server/src/routes/upload.ts`                             |
+| Create | `apps/web/src/lib/api-client.ts`                               |
+| Create | `apps/web/src/routes/upload.tsx`                               |
+| Create | `apps/web/src/components/upload-form.tsx`                      |
+| Create | `apps/web/src/components/upload-dropzone.tsx`                  |
+| Create | `apps/web/src/components/upload-progress.tsx`                  |
+| Modify | `packages/db/src/schema/auth.ts` (remove relations)            |
+| Modify | `packages/db/src/schema/index.ts` (add exports)                |
+| Modify | `packages/db/src/index.ts` (add generateId export)             |
 | Modify | `apps/server/src/index.ts` (mount routes, CORS, error handler) |
-| Modify | `apps/web/src/components/header.tsx` (add Upload button) |
+| Modify | `apps/web/src/components/header.tsx` (add Upload button)       |
 
 ## Dependencies to Install
 
-| Package | Workspace |
-|---------|-----------|
-| `nanoid` | `packages/db` |
-| `@tus/server` | `apps/server` |
-| `@tus/file-store` | `apps/server` |
+| Package               | Workspace     |
+| --------------------- | ------------- |
+| `nanoid`              | `packages/db` |
+| `@tus/server`         | `apps/server` |
+| `@tus/file-store`     | `apps/server` |
 | `@video-site/storage` | `apps/server` |
-| `tus-js-client` | `apps/web` |
+| `tus-js-client`       | `apps/web`    |

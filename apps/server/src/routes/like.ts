@@ -11,11 +11,7 @@ import type { AppVariables } from "../types";
 export const likeRoutes = new Hono<{ Variables: AppVariables }>();
 
 async function ensureVideoExists(videoId: string) {
-  const [row] = await db
-    .select({ id: video.id })
-    .from(video)
-    .where(eq(video.id, videoId))
-    .limit(1);
+  const [row] = await db.select({ id: video.id }).from(video).where(eq(video.id, videoId)).limit(1);
   if (!row) {
     throw new NotFoundError("Video");
   }
@@ -46,9 +42,7 @@ likeRoutes.post("/:videoId/like", requireAuth, async (c) => {
     });
 
     if (!existing) {
-      await tx
-        .insert(videoLike)
-        .values({ userId, videoId, type: "like" });
+      await tx.insert(videoLike).values({ userId, videoId, type: "like" });
       await tx
         .update(video)
         .set({ likeCount: sql`${video.likeCount} + 1` })
@@ -57,9 +51,7 @@ likeRoutes.post("/:videoId/like", requireAuth, async (c) => {
     } else if (existing.type === "like") {
       await tx
         .delete(videoLike)
-        .where(
-          and(eq(videoLike.userId, userId), eq(videoLike.videoId, videoId)),
-        );
+        .where(and(eq(videoLike.userId, userId), eq(videoLike.videoId, videoId)));
       await tx
         .update(video)
         .set({ likeCount: sql`GREATEST(${video.likeCount} - 1, 0)` })
@@ -69,9 +61,7 @@ likeRoutes.post("/:videoId/like", requireAuth, async (c) => {
       await tx
         .update(videoLike)
         .set({ type: "like", createdAt: new Date() })
-        .where(
-          and(eq(videoLike.userId, userId), eq(videoLike.videoId, videoId)),
-        );
+        .where(and(eq(videoLike.userId, userId), eq(videoLike.videoId, videoId)));
       await tx
         .update(video)
         .set({
@@ -100,9 +90,7 @@ likeRoutes.post("/:videoId/dislike", requireAuth, async (c) => {
     });
 
     if (!existing) {
-      await tx
-        .insert(videoLike)
-        .values({ userId, videoId, type: "dislike" });
+      await tx.insert(videoLike).values({ userId, videoId, type: "dislike" });
       await tx
         .update(video)
         .set({ dislikeCount: sql`${video.dislikeCount} + 1` })
@@ -111,9 +99,7 @@ likeRoutes.post("/:videoId/dislike", requireAuth, async (c) => {
     } else if (existing.type === "dislike") {
       await tx
         .delete(videoLike)
-        .where(
-          and(eq(videoLike.userId, userId), eq(videoLike.videoId, videoId)),
-        );
+        .where(and(eq(videoLike.userId, userId), eq(videoLike.videoId, videoId)));
       await tx
         .update(video)
         .set({ dislikeCount: sql`GREATEST(${video.dislikeCount} - 1, 0)` })
@@ -123,9 +109,7 @@ likeRoutes.post("/:videoId/dislike", requireAuth, async (c) => {
       await tx
         .update(videoLike)
         .set({ type: "dislike", createdAt: new Date() })
-        .where(
-          and(eq(videoLike.userId, userId), eq(videoLike.videoId, videoId)),
-        );
+        .where(and(eq(videoLike.userId, userId), eq(videoLike.videoId, videoId)));
       await tx
         .update(video)
         .set({

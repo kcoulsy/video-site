@@ -2,13 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Grid3x3, List, Play, Search, SearchX } from "lucide-react";
 
-import { VideoCard, type VideoCardProps } from "@/components/video-card";
+import type { VideoCardProps } from "@/components/video-card";
 import { VideoGrid } from "@/components/video-grid";
-import {
-  formatDuration,
-  formatRelativeTime,
-  formatViewCount,
-} from "@/lib/format";
+import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/format";
 
 export const Route = createFileRoute("/search")({
   component: SearchPage,
@@ -35,15 +31,10 @@ const MOCK_RESULTS: VideoCardProps[] = [
   viewCount: [12400, 89200, 3400, 156000, 45600, 234000, 7800, 1200][i]!,
   createdAt: new Date(
     Date.now() -
-      [
-        86400000, 172800000, 604800000, 2592000000, 259200000, 3600000, 7200000,
-        1209600000,
-      ][i]!,
+      [86400000, 172800000, 604800000, 2592000000, 259200000, 3600000, 7200000, 1209600000][i]!,
   ).toISOString(),
   user: {
-    name: ["Alex Turner", "Sarah Chen", "Mike Rodriguez", "Emma Wilson"][
-      i % 4
-    ]!,
+    name: ["Alex Turner", "Sarah Chen", "Mike Rodriguez", "Emma Wilson"][i % 4]!,
     image: null,
   },
 }));
@@ -60,8 +51,7 @@ function SearchPage() {
       {q ? (
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-medium">
-            Results for{" "}
-            <span className="text-primary">&ldquo;{q}&rdquo;</span>
+            Results for <span className="text-primary">&ldquo;{q}&rdquo;</span>
           </h1>
           <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
             <button
@@ -124,11 +114,7 @@ function SearchListItem(props: VideoCardProps) {
     >
       <div className="relative aspect-video w-64 shrink-0 overflow-hidden rounded-lg bg-secondary">
         {props.thumbnailUrl ? (
-          <img
-            src={props.thumbnailUrl}
-            alt={props.title}
-            className="h-full w-full object-cover"
-          />
+          <img src={props.thumbnailUrl} alt={props.title} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
             <Play className="h-8 w-8 text-muted-foreground/30" />
@@ -145,12 +131,9 @@ function SearchListItem(props: VideoCardProps) {
         <h3 className="line-clamp-2 text-base font-medium transition-colors group-hover:text-primary">
           {props.title}
         </h3>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          {props.user.name}
-        </p>
+        <p className="mt-1.5 text-sm text-muted-foreground">{props.user.name}</p>
         <p className="text-sm text-muted-foreground">
-          {formatViewCount(props.viewCount)} views &middot;{" "}
-          {formatRelativeTime(props.createdAt)}
+          {formatViewCount(props.viewCount)} views &middot; {formatRelativeTime(props.createdAt)}
         </p>
       </div>
     </Link>

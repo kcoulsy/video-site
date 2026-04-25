@@ -1,17 +1,6 @@
-import {
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  CloudUpload,
-  Loader2,
-} from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, CloudUpload, Loader2 } from "lucide-react";
 
-export type VideoStatus =
-  | "uploading"
-  | "uploaded"
-  | "processing"
-  | "ready"
-  | "failed";
+export type VideoStatus = "uploading" | "uploaded" | "processing" | "ready" | "failed";
 
 const STATUS_CONFIG: Record<
   VideoStatus,
@@ -49,10 +38,7 @@ interface VideoStatusBadgeProps {
   progressPercent?: number | null;
 }
 
-export function VideoStatusBadge({
-  status,
-  progressPercent,
-}: VideoStatusBadgeProps) {
+export function VideoStatusBadge({ status, progressPercent }: VideoStatusBadgeProps) {
   const config = STATUS_CONFIG[status];
   const showProgress =
     (status === "processing" || status === "uploading") &&

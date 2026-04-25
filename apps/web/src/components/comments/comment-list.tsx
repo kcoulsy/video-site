@@ -11,20 +11,14 @@ interface CommentListProps {
   currentUserId?: string;
 }
 
-export function CommentList({
-  videoId,
-  sort,
-  currentUserId,
-}: CommentListProps) {
+export function CommentList({ videoId, sort, currentUserId }: CommentListProps) {
   const query = useInfiniteQuery<CommentsPage>({
     queryKey: ["comments", videoId, "top", sort],
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams();
       params.set("sort", sort);
       if (pageParam) params.set("cursor", String(pageParam));
-      return apiClient<CommentsPage>(
-        `/api/videos/${videoId}/comments?${params.toString()}`,
-      );
+      return apiClient<CommentsPage>(`/api/videos/${videoId}/comments?${params.toString()}`);
     },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
@@ -48,18 +42,14 @@ export function CommentList({
   }
 
   if (query.error) {
-    return (
-      <p className="text-sm text-muted-foreground">Failed to load comments.</p>
-    );
+    return <p className="text-sm text-muted-foreground">Failed to load comments.</p>;
   }
 
   const comments = query.data?.pages.flatMap((p) => p.comments) ?? [];
 
   if (comments.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        No comments yet. Be the first to comment.
-      </p>
+      <p className="text-sm text-muted-foreground">No comments yet. Be the first to comment.</p>
     );
   }
 

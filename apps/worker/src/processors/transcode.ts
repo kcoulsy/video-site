@@ -95,9 +95,7 @@ function transcodeToDash(
       cmd = cmd.outputOptions("-c:a", "aac", "-b:a", "128k", "-ar", "44100");
     }
 
-    const adaptationSets = hasAudio
-      ? "id=0,streams=v id=1,streams=a"
-      : "id=0,streams=v";
+    const adaptationSets = hasAudio ? "id=0,streams=v id=1,streams=a" : "id=0,streams=v";
 
     cmd = cmd.outputOptions(
       "-f",
@@ -156,9 +154,7 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
       throw new Error("Could not determine duration or resolution");
     }
     if (duration > MAX_DURATION_SECONDS) {
-      throw new Error(
-        `Video exceeds maximum duration of ${MAX_DURATION_SECONDS / 60} minutes`,
-      );
+      throw new Error(`Video exceeds maximum duration of ${MAX_DURATION_SECONDS / 60} minutes`);
     }
 
     await db
@@ -174,16 +170,11 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
     await mkdir(thumbnailDir, { recursive: true });
     await extractThumbnail(rawPath, thumbnailFile, duration * 0.25);
 
-    await db
-      .update(video)
-      .set({ thumbnailPath: thumbnailFile })
-      .where(eq(video.id, videoId));
+    await db.update(video).set({ thumbnailPath: thumbnailFile }).where(eq(video.id, videoId));
 
     await job.updateProgress({ stage: "thumbnail", percent: 10 });
 
-    let targetResolutions = RESOLUTION_LADDER.filter(
-      (r) => r.height <= sourceHeight,
-    );
+    let targetResolutions = RESOLUTION_LADDER.filter((r) => r.height <= sourceHeight);
     if (targetResolutions.length === 0) {
       targetResolutions = [RESOLUTION_LADDER[0]!];
     }

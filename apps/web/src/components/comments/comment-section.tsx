@@ -1,7 +1,4 @@
-import {
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { MessageSquare } from "lucide-react";
 import { useState } from "react";
@@ -19,10 +16,7 @@ interface CommentSectionProps {
   commentCount: number;
 }
 
-export function CommentSection({
-  videoId,
-  commentCount,
-}: CommentSectionProps) {
+export function CommentSection({ videoId, commentCount }: CommentSectionProps) {
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const { data: session } = authClient.useSession();
   const currentUser = session?.user;
@@ -62,10 +56,7 @@ export function CommentSection({
       });
       queryClient.setQueryData<{ commentCount: number } & Record<string, unknown>>(
         ["video", videoId],
-        (old) =>
-          old
-            ? { ...old, commentCount: (old.commentCount ?? 0) + 1 }
-            : old,
+        (old) => (old ? { ...old, commentCount: (old.commentCount ?? 0) + 1 } : old),
       );
     },
     onError: (err) => {
@@ -106,9 +97,7 @@ export function CommentSection({
             )}
           </div>
           <div className="flex-1">
-            <CommentForm
-              onSubmit={(content) => createMutation.mutateAsync(content)}
-            />
+            <CommentForm onSubmit={(content) => createMutation.mutateAsync(content)} />
           </div>
         </div>
       ) : (
@@ -120,11 +109,7 @@ export function CommentSection({
         </div>
       )}
 
-      <CommentList
-        videoId={videoId}
-        sort={sort}
-        currentUserId={currentUser?.id}
-      />
+      <CommentList videoId={videoId} sort={sort} currentUserId={currentUser?.id} />
     </div>
   );
 }

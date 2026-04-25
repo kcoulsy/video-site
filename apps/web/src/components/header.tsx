@@ -32,12 +32,7 @@ export default function Header() {
 
           {/* Actions */}
           <div className="flex shrink-0 items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setUploadOpen(true)}
-              className="gap-2"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setUploadOpen(true)} className="gap-2">
               <Upload className="h-4 w-4" />
               <span className="hidden sm:inline">Upload</span>
             </Button>

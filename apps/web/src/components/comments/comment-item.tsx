@@ -1,8 +1,4 @@
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@video-site/ui/components/button";
 import { ChevronDown, ChevronUp, ThumbsUp } from "lucide-react";
 import { useState } from "react";
@@ -52,13 +48,10 @@ export function CommentItem({
 
   const replyMutation = useMutation({
     mutationFn: (content: string) =>
-      apiClient<Comment>(
-        `/api/videos/${videoId}/comments/${comment.id}/replies`,
-        {
-          method: "POST",
-          body: JSON.stringify({ content }),
-        },
-      ),
+      apiClient<Comment>(`/api/videos/${videoId}/comments/${comment.id}/replies`, {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      }),
     onSuccess: (created) => {
       setReplying(false);
       setShowReplies(true);
@@ -94,9 +87,7 @@ export function CommentItem({
           pages: old.pages.map((p) => ({
             ...p,
             comments: p.comments.map((cm) =>
-              cm.id === comment.id
-                ? { ...cm, replyCount: cm.replyCount + 1 }
-                : cm,
+              cm.id === comment.id ? { ...cm, replyCount: cm.replyCount + 1 } : cm,
             ),
           })),
         };
@@ -109,19 +100,14 @@ export function CommentItem({
 
   const editMutation = useMutation({
     mutationFn: (content: string) =>
-      apiClient<{ ok: true; editedAt: string }>(
-        `/api/comments/${comment.id}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ content }),
-        },
-      ),
+      apiClient<{ ok: true; editedAt: string }>(`/api/comments/${comment.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ content }),
+      }),
     onSuccess: (data, content) => {
       setEditing(false);
       const updateInList = (cm: Comment) =>
-        cm.id === comment.id
-          ? { ...cm, content, editedAt: data.editedAt }
-          : cm;
+        cm.id === comment.id ? { ...cm, content, editedAt: data.editedAt } : cm;
       queryClient.setQueryData<{
         pages: CommentsPage[];
         pageParams: unknown[];
@@ -139,19 +125,16 @@ export function CommentItem({
         queryClient.setQueryData<{
           pages: CommentsPage[];
           pageParams: unknown[];
-        }>(
-          ["comments", videoId, "replies", comment.parentId],
-          (old) => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map((p) => ({
-                ...p,
-                comments: p.comments.map(updateInList),
-              })),
-            };
-          },
-        );
+        }>(["comments", videoId, "replies", comment.parentId], (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((p) => ({
+              ...p,
+              comments: p.comments.map(updateInList),
+            })),
+          };
+        });
       }
     },
     onError: (err) => {
@@ -160,8 +143,7 @@ export function CommentItem({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () =>
-      apiClient(`/api/comments/${comment.id}`, { method: "DELETE" }),
+    mutationFn: () => apiClient(`/api/comments/${comment.id}`, { method: "DELETE" }),
     onSuccess: () => {
       const removeFromList = (cm: Comment) => cm.id !== comment.id;
       const markDeleted = (cm: Comment) =>
@@ -170,29 +152,20 @@ export function CommentItem({
           : cm;
       const transform = comment.replyCount > 0 ? markDeleted : null;
 
-      const updatePages = (
-        old:
-          | { pages: CommentsPage[]; pageParams: unknown[] }
-          | undefined,
-      ) => {
+      const updatePages = (old: { pages: CommentsPage[]; pageParams: unknown[] } | undefined) => {
         if (!old) return old;
         return {
           ...old,
           pages: old.pages.map((p) => ({
             ...p,
-            comments: transform
-              ? p.comments.map(transform)
-              : p.comments.filter(removeFromList),
+            comments: transform ? p.comments.map(transform) : p.comments.filter(removeFromList),
           })),
         };
       };
 
       queryClient.setQueryData(["comments", videoId, "top"], updatePages);
       if (comment.parentId) {
-        queryClient.setQueryData(
-          ["comments", videoId, "replies", comment.parentId],
-          updatePages,
-        );
+        queryClient.setQueryData(["comments", videoId, "replies", comment.parentId], updatePages);
         if (!transform) {
           queryClient.setQueryData<{
             pages: CommentsPage[];
@@ -339,11 +312,7 @@ export function CommentItem({
             onClick={() => setShowReplies((v) => !v)}
             className="mt-3 flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
           >
-            {showReplies ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            {showReplies ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             {showReplies ? "Hide" : "View"} {comment.replyCount}{" "}
             {comment.replyCount === 1 ? "reply" : "replies"}
           </button>
@@ -370,9 +339,7 @@ export function CommentItem({
                 disabled={repliesQuery.isFetchingNextPage}
                 className="self-start text-xs font-medium text-primary hover:text-primary/80"
               >
-                {repliesQuery.isFetchingNextPage
-                  ? "Loading..."
-                  : "Show more replies"}
+                {repliesQuery.isFetchingNextPage ? "Loading..." : "Show more replies"}
               </button>
             )}
           </div>

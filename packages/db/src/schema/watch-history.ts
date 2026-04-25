@@ -1,12 +1,4 @@
-import {
-  index,
-  integer,
-  pgTable,
-  primaryKey,
-  real,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { index, integer, pgTable, primaryKey, real, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 import { video } from "./video";
@@ -32,9 +24,6 @@ export const watchHistory = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.videoId] }),
-    index("watch_history_user_id_last_watched_at_idx").on(
-      table.userId,
-      table.lastWatchedAt,
-    ),
+    index("watch_history_user_id_last_watched_at_idx").on(table.userId, table.lastWatchedAt),
   ],
 );

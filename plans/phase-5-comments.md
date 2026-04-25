@@ -26,7 +26,7 @@ import { video } from "./video";
 export const comment = pgTable(
   "comment",
   {
-    id: text("id").primaryKey(),  // nanoid
+    id: text("id").primaryKey(), // nanoid
     content: text("content").notNull(),
 
     userId: text("user_id")
@@ -54,8 +54,8 @@ export const comment = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
-    editedAt: timestamp("edited_at"),  // set when comment is edited
-    deletedAt: timestamp("deleted_at"),  // set on soft-delete (comments with replies)
+    editedAt: timestamp("edited_at"), // set when comment is edited
+    deletedAt: timestamp("deleted_at"), // set on soft-delete (comments with replies)
   },
   (table) => [
     index("comment_video_id_idx").on(table.videoId),
@@ -94,6 +94,7 @@ export const commentRelations = relations(comment, ({ one, many }) => ({
 ```
 
 Update existing relations:
+
 ```typescript
 // In userRelations, add:
 comments: many(comment),
@@ -119,11 +120,13 @@ Mount comment routes. These are nested under video routes for context.
 List top-level comments for a video.
 
 **Query params**:
+
 - `cursor`: cursor for pagination (comment ID of the last item on previous page)
 - `limit`: number of comments per page (default 20, max 50)
 - `sort`: "newest" (default) | "oldest"
 
 **Response**:
+
 ```json
 {
   "comments": [
@@ -145,11 +148,12 @@ List top-level comments for a video.
 ```
 
 **Query implementation**:
+
 ```typescript
 // Cursor-based pagination
 const where = [
   eq(commentTable.videoId, videoId),
-  isNull(commentTable.parentId),  // top-level only
+  isNull(commentTable.parentId), // top-level only
 ];
 
 if (cursor) {
@@ -164,9 +168,7 @@ if (cursor) {
 
 const comments = await db.query.comment.findMany({
   where: and(...where),
-  orderBy: sort === "oldest"
-    ? asc(commentTable.createdAt)
-    : desc(commentTable.createdAt),
+  orderBy: sort === "oldest" ? asc(commentTable.createdAt) : desc(commentTable.createdAt),
   limit: limit + 1, // fetch one extra to determine hasMore
   with: {
     user: { columns: { id: true, name: true, image: true } },
@@ -188,6 +190,7 @@ List replies to a specific comment. Same pagination pattern as top-level, but fi
 Create a top-level comment.
 
 **Request body**:
+
 ```json
 {
   "content": "This is my comment"
@@ -195,20 +198,19 @@ Create a top-level comment.
 ```
 
 **Validation**:
+
 - `content`: required, 1-2000 characters, trimmed
 - Strip HTML tags (prevent XSS)
 - Rate limit: max 10 comments per minute per user
 
 **Implementation**:
+
 ```typescript
 // Rate limiting via Redis — use a pipeline to atomically INCR + EXPIRE
 // (avoids race where INCR succeeds but EXPIRE fails, leaving key without TTL)
 const redis = getRedisClient();
 const key = `comment-rate:${user.id}`;
-const [[, count]] = await redis.multi()
-  .incr(key)
-  .expire(key, 60)
-  .exec();
+const [[, count]] = await redis.multi().incr(key).expire(key, 60).exec();
 if ((count as number) > 10) return c.json({ error: "Rate limit exceeded" }, 429);
 
 // Create comment and update count atomically
@@ -223,7 +225,8 @@ await db.transaction(async (tx) => {
     depth: 0,
   });
 
-  await tx.update(videoTable)
+  await tx
+    .update(videoTable)
     .set({ commentCount: sql`${videoTable.commentCount} + 1` })
     .where(eq(videoTable.id, videoId));
 });
@@ -236,17 +239,16 @@ Reply to an existing comment.
 **Request body**: Same as top-level comment.
 
 **Additional validation**:
+
 - Parent comment must exist and belong to the same video
 - Depth limit: if parent's depth >= 3, the reply is created at depth 3 (flattened)
   - In the UI, these deep replies show "@parentUsername" as a mention prefix
 
 **Implementation**:
+
 ```typescript
 const parent = await db.query.comment.findFirst({
-  where: and(
-    eq(commentTable.id, parentId),
-    eq(commentTable.videoId, videoId),
-  ),
+  where: and(eq(commentTable.id, parentId), eq(commentTable.videoId, videoId)),
 });
 if (!parent) return c.json({ error: "Parent comment not found" }, 404);
 
@@ -264,12 +266,14 @@ await db.transaction(async (tx) => {
   });
 
   // Update parent reply count
-  await tx.update(commentTable)
+  await tx
+    .update(commentTable)
     .set({ replyCount: sql`${commentTable.replyCount} + 1` })
     .where(eq(commentTable.id, parentId));
 
   // Update video comment count
-  await tx.update(videoTable)
+  await tx
+    .update(videoTable)
     .set({ commentCount: sql`${videoTable.commentCount} + 1` })
     .where(eq(videoTable.id, videoId));
 });
@@ -280,6 +284,7 @@ await db.transaction(async (tx) => {
 Edit a comment. Only the owner can edit.
 
 **Request body**:
+
 ```json
 {
   "content": "Updated comment text"
@@ -287,6 +292,7 @@ Edit a comment. Only the owner can edit.
 ```
 
 **Implementation**:
+
 - Verify `userId` matches authenticated user
 - Update `content` and set `editedAt = new Date()`
 - Same content validation as create (1-2000 chars, sanitize)
@@ -296,10 +302,12 @@ Edit a comment. Only the owner can edit.
 Delete a comment.
 
 **Deletion strategy**:
+
 - **If the comment has replies** (`replyCount > 0`): Soft-delete — replace `content` with `"[deleted]"` and set `deletedAt = new Date()`. Keep `userId` intact (it is `NOT NULL`). The comment skeleton remains to preserve the thread structure. The frontend checks for `deletedAt` to show the greyed-out placeholder.
 - **If the comment has no replies**: Hard-delete — remove the row entirely.
 
 **In both cases**:
+
 - Decrement the video's `commentCount`
 - If the comment has a parent, decrement the parent's `replyCount`
 
@@ -320,6 +328,7 @@ React auto-escapes all text rendered via JSX, so even if a user types `<script>a
 The main comments container, placed on the watch page below the video info.
 
 **Structure**:
+
 ```
 +-----------------------------------------+
 | 123 Comments     [Sort: Newest v]       |
@@ -336,6 +345,7 @@ The main comments container, placed on the watch page below the video info.
 ```
 
 Props:
+
 ```typescript
 interface CommentSectionProps {
   videoId: string;
@@ -344,6 +354,7 @@ interface CommentSectionProps {
 ```
 
 State:
+
 - `sort`: "newest" | "oldest"
 - React Query infinite query for comments with cursor pagination
 
@@ -354,6 +365,7 @@ If the user is not authenticated, show: "Sign in to comment" with a link to `/lo
 A single comment with all its interactive elements.
 
 **Layout**:
+
 ```
 +------------------------------------------+
 | [Avatar] Username · 3 days ago (edited)  |
@@ -371,6 +383,7 @@ A single comment with all its interactive elements.
 ```
 
 Props:
+
 ```typescript
 interface CommentItemProps {
   comment: Comment;
@@ -381,6 +394,7 @@ interface CommentItemProps {
 ```
 
 Behaviors:
+
 - **Reply button**: Toggles a `CommentForm` inline below the comment
 - **Edit button** (owner only): Replaces content with an editable `CommentForm`, pre-filled
 - **Delete button** (owner only): Confirmation dialog, then delete
@@ -394,6 +408,7 @@ Behaviors:
 Reusable form for creating comments and replies, and editing existing comments.
 
 **Layout**:
+
 ```
 +------------------------------------------+
 | [Auto-growing textarea             ]    |
@@ -402,18 +417,20 @@ Reusable form for creating comments and replies, and editing existing comments.
 ```
 
 Props:
+
 ```typescript
 interface CommentFormProps {
   videoId: string;
-  parentId?: string;        // set for replies
-  initialContent?: string;  // set for editing
-  onSubmit: () => void;     // callback after successful submit
-  onCancel?: () => void;    // callback for cancel button
-  placeholder?: string;     // e.g., "Add a comment..." or "Reply to @username..."
+  parentId?: string; // set for replies
+  initialContent?: string; // set for editing
+  onSubmit: () => void; // callback after successful submit
+  onCancel?: () => void; // callback for cancel button
+  placeholder?: string; // e.g., "Add a comment..." or "Reply to @username..."
 }
 ```
 
 Implementation:
+
 - Use TanStack Form for validation
 - Auto-growing `<textarea>`: set `rows=1`, use `onInput` to adjust height via `scrollHeight`
 - Character count displayed (e.g., "0/2000")
@@ -426,15 +443,17 @@ Implementation:
 Renders a list of `CommentItem` components.
 
 Props:
+
 ```typescript
 interface CommentListProps {
   videoId: string;
-  parentId?: string;  // null for top-level, set for replies
+  parentId?: string; // null for top-level, set for replies
   sort?: "newest" | "oldest";
 }
 ```
 
 Implementation:
+
 - Uses `useInfiniteQuery` for cursor-based pagination
 - "Load more" button at the bottom (not infinite scroll — comments are secondary content)
 - Loading skeleton while fetching
@@ -539,17 +558,17 @@ const createComment = useMutation({
 
 ## Files Summary
 
-| Action | File |
-|--------|------|
-| Create | `packages/db/src/schema/comment.ts` |
-| Create | `apps/server/src/routes/comment.ts` |
-| Create | `apps/web/src/components/comments/comment-section.tsx` |
-| Create | `apps/web/src/components/comments/comment-item.tsx` |
-| Create | `apps/web/src/components/comments/comment-form.tsx` |
-| Create | `apps/web/src/components/comments/comment-list.tsx` |
+| Action | File                                                          |
+| ------ | ------------------------------------------------------------- |
+| Create | `packages/db/src/schema/comment.ts`                           |
+| Create | `apps/server/src/routes/comment.ts`                           |
+| Create | `apps/web/src/components/comments/comment-section.tsx`        |
+| Create | `apps/web/src/components/comments/comment-item.tsx`           |
+| Create | `apps/web/src/components/comments/comment-form.tsx`           |
+| Create | `apps/web/src/components/comments/comment-list.tsx`           |
 | Modify | `packages/db/src/schema/relations.ts` (add comment relations) |
-| Modify | `packages/db/src/schema/index.ts` (add export) |
-| Modify | `apps/server/src/index.ts` (mount comment routes) |
+| Modify | `packages/db/src/schema/index.ts` (add export)                |
+| Modify | `apps/server/src/index.ts` (mount comment routes)             |
 | Modify | `apps/web/src/routes/watch.$videoId.tsx` (add CommentSection) |
 
 ## Dependencies to Install

@@ -89,11 +89,7 @@ export function VideoPlayer({
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           {thumbnailUrl ? (
-            <img
-              src={thumbnailUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
               <div className="h-16 w-16 rounded-full border-2 border-muted-foreground/20 flex items-center justify-center">

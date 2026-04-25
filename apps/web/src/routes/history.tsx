@@ -1,8 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 import { Clock, History, Play, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -68,15 +64,12 @@ function HistoryPage() {
   });
 
   const removeMutation = useMutation({
-    mutationFn: (videoId: string) =>
-      apiClient(`/api/history/${videoId}`, { method: "DELETE" }),
+    mutationFn: (videoId: string) => apiClient(`/api/history/${videoId}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["history"] });
     },
     onError: (err) => {
-      toast.error(
-        err instanceof ApiError ? err.message : "Failed to remove from history",
-      );
+      toast.error(err instanceof ApiError ? err.message : "Failed to remove from history");
     },
   });
 
@@ -87,9 +80,7 @@ function HistoryPage() {
       toast.success("Watch history cleared");
     },
     onError: (err) => {
-      toast.error(
-        err instanceof ApiError ? err.message : "Failed to clear history",
-      );
+      toast.error(err instanceof ApiError ? err.message : "Failed to clear history");
     },
   });
 
@@ -105,9 +96,7 @@ function HistoryPage() {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
         <h1 className="text-2xl font-semibold">Couldn't load history</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Please try again in a moment.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Please try again in a moment.</p>
       </div>
     );
   }
@@ -124,9 +113,7 @@ function HistoryPage() {
         </div>
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
           <History className="h-12 w-12 text-muted-foreground/30" />
-          <p className="mt-4 text-sm text-muted-foreground">
-            No watch history yet
-          </p>
+          <p className="mt-4 text-sm text-muted-foreground">No watch history yet</p>
           <Link to="/" className="mt-4">
             <Button variant="outline">Browse videos</Button>
           </Link>
@@ -193,10 +180,7 @@ function HistoryPage() {
               <HistoryRow
                 item={item}
                 onRemove={() => removeMutation.mutate(item.videoId)}
-                removing={
-                  removeMutation.isPending &&
-                  removeMutation.variables === item.videoId
-                }
+                removing={removeMutation.isPending && removeMutation.variables === item.videoId}
               />
             </div>
           ))}
@@ -209,11 +193,7 @@ function HistoryPage() {
 function ContinueCard({ item }: { item: HistoryItem }) {
   const thumbnail = absoluteUrl(item.video.thumbnailUrl);
   return (
-    <Link
-      to="/watch/$videoId"
-      params={{ videoId: item.videoId }}
-      className="group block"
-    >
+    <Link to="/watch/$videoId" params={{ videoId: item.videoId }} className="group block">
       <div className="relative aspect-video overflow-hidden rounded-xl bg-secondary">
         {thumbnail ? (
           <img
@@ -298,14 +278,10 @@ function HistoryRow({
           <h3 className="line-clamp-1 text-sm font-medium transition-colors group-hover:text-primary">
             {item.video.title}
           </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {item.video.user.name}
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{item.video.user.name}</p>
           <p className="text-xs text-muted-foreground">
-            {isComplete
-              ? "Watched"
-              : `${Math.round(item.progressPercent * 100)}% watched`}{" "}
-            &middot; {formatRelativeTime(item.lastWatchedAt)}
+            {isComplete ? "Watched" : `${Math.round(item.progressPercent * 100)}% watched`} &middot;{" "}
+            {formatRelativeTime(item.lastWatchedAt)}
           </p>
         </div>
       </Link>

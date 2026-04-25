@@ -26,9 +26,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
-  const [visibility, setVisibility] = useState<
-    "public" | "unlisted" | "private"
-  >("public");
+  const [visibility, setVisibility] = useState<"public" | "unlisted" | "private">("public");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
@@ -103,10 +101,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
         });
         videoId = created.id;
       } catch (err) {
-        const msg =
-          err instanceof ApiError
-            ? err.message
-            : "Failed to create video record";
+        const msg = err instanceof ApiError ? err.message : "Failed to create video record";
         toast.error(msg);
         setUploading(false);
         return;
@@ -187,9 +182,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
               <p className="text-sm font-medium">
                 {dragOver ? "Drop video here" : "Drag & drop a video file"}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                or click to browse
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">or click to browse</p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -203,9 +196,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
               <Film className="h-8 w-8 shrink-0 text-primary" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{file.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatFileSize(file.size)}
-                </p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
               </div>
               {!uploading && (
                 <button
@@ -223,9 +214,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Uploading...</span>
-                <span className="font-medium text-primary tabular-nums">
-                  {progress}%
-                </span>
+                <span className="font-medium text-primary tabular-nums">{progress}%</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-secondary">
                 <div
@@ -299,12 +288,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={uploading}
-            >
+            <Button type="button" variant="outline" onClick={onClose} disabled={uploading}>
               Cancel
             </Button>
             <Button type="submit" disabled={!file || !title.trim() || uploading}>

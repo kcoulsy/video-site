@@ -31,10 +31,7 @@ function applyToggle(current: LikeType, action: "like" | "dislike"): LikeType {
   return action;
 }
 
-function deltaCounts(
-  prev: LikeType,
-  next: LikeType,
-): { like: number; dislike: number } {
+function deltaCounts(prev: LikeType, next: LikeType): { like: number; dislike: number } {
   let like = 0;
   let dislike = 0;
   if (prev === "like") like -= 1;
@@ -44,18 +41,12 @@ function deltaCounts(
   return { like, dislike };
 }
 
-export function LikeButton({
-  videoId,
-  likeCount,
-  dislikeCount,
-  isAuthenticated,
-}: LikeButtonProps) {
+export function LikeButton({ videoId, likeCount, dislikeCount, isAuthenticated }: LikeButtonProps) {
   const queryClient = useQueryClient();
 
   const { data: likeState } = useQuery<LikeStateResponse>({
     queryKey: likeStateKey(videoId),
-    queryFn: () =>
-      apiClient<LikeStateResponse>(`/api/videos/${videoId}/like`),
+    queryFn: () => apiClient<LikeStateResponse>(`/api/videos/${videoId}/like`),
     enabled: isAuthenticated,
     staleTime: 30_000,
   });
@@ -71,13 +62,12 @@ export function LikeButton({
       await queryClient.cancelQueries({ queryKey: likeStateKey(videoId) });
       await queryClient.cancelQueries({ queryKey: videoKey(videoId) });
 
-      const prevState =
-        queryClient.getQueryData<LikeStateResponse>(likeStateKey(videoId)) ?? {
-          type: null,
-        };
-      const prevVideo = queryClient.getQueryData<
-        VideoCounts & Record<string, unknown>
-      >(videoKey(videoId));
+      const prevState = queryClient.getQueryData<LikeStateResponse>(likeStateKey(videoId)) ?? {
+        type: null,
+      };
+      const prevVideo = queryClient.getQueryData<VideoCounts & Record<string, unknown>>(
+        videoKey(videoId),
+      );
 
       const nextType = applyToggle(prevState.type, action);
       const delta = deltaCounts(prevState.type, nextType);
@@ -89,10 +79,7 @@ export function LikeButton({
         queryClient.setQueryData(videoKey(videoId), {
           ...prevVideo,
           likeCount: Math.max(0, (prevVideo.likeCount ?? 0) + delta.like),
-          dislikeCount: Math.max(
-            0,
-            (prevVideo.dislikeCount ?? 0) + delta.dislike,
-          ),
+          dislikeCount: Math.max(0, (prevVideo.dislikeCount ?? 0) + delta.dislike),
         });
       }
 
@@ -105,9 +92,7 @@ export function LikeButton({
       if (ctx?.prevVideo) {
         queryClient.setQueryData(videoKey(videoId), ctx.prevVideo);
       }
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update reaction",
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to update reaction");
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: likeStateKey(videoId) });
@@ -133,14 +118,10 @@ export function LikeButton({
         disabled={mutate.isPending}
         aria-pressed={currentType === "like"}
         className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-70 ${
-          currentType === "like"
-            ? "text-primary"
-            : "text-foreground hover:bg-accent"
+          currentType === "like" ? "text-primary" : "text-foreground hover:bg-accent"
         }`}
       >
-        <ThumbsUp
-          className={`h-4 w-4 ${currentType === "like" ? "fill-primary" : ""}`}
-        />
+        <ThumbsUp className={`h-4 w-4 ${currentType === "like" ? "fill-primary" : ""}`} />
         {formatViewCount(displayLikes)}
       </button>
       <div className="h-6 w-px bg-border" />
@@ -149,14 +130,10 @@ export function LikeButton({
         disabled={mutate.isPending}
         aria-pressed={currentType === "dislike"}
         className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors disabled:opacity-70 ${
-          currentType === "dislike"
-            ? "text-foreground"
-            : "text-foreground hover:bg-accent"
+          currentType === "dislike" ? "text-foreground" : "text-foreground hover:bg-accent"
         }`}
       >
-        <ThumbsDown
-          className={`h-4 w-4 ${currentType === "dislike" ? "fill-foreground" : ""}`}
-        />
+        <ThumbsDown className={`h-4 w-4 ${currentType === "dislike" ? "fill-foreground" : ""}`} />
         {displayDislikes > 0 ? formatViewCount(displayDislikes) : null}
       </button>
     </div>

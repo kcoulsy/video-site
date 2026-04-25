@@ -1,13 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  Monitor,
-  MonitorOff,
-  Share2,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, Monitor, MonitorOff, Share2 } from "lucide-react";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
 
@@ -65,15 +59,18 @@ function WatchPage() {
   const { data: session } = authClient.useSession();
   const isAuthenticated = !!session;
 
-  const { data: video, isLoading, error } = useQuery<VideoResponse>({
+  const {
+    data: video,
+    isLoading,
+    error,
+  } = useQuery<VideoResponse>({
     queryKey: ["video", videoId],
     queryFn: () => apiClient<VideoResponse>(`/api/videos/${videoId}`),
   });
 
   const { data: progress } = useQuery<ProgressResponse>({
     queryKey: ["video-progress", videoId],
-    queryFn: () =>
-      apiClient<ProgressResponse>(`/api/videos/${videoId}/progress`),
+    queryFn: () => apiClient<ProgressResponse>(`/api/videos/${videoId}/progress`),
     enabled: isAuthenticated,
     staleTime: Infinity,
   });
@@ -160,8 +157,7 @@ function WatchPage() {
 
     if (
       isAuthenticated &&
-      Math.abs(time - lastReportedTime.current) >=
-        PROGRESS_REPORT_INTERVAL_SECONDS
+      Math.abs(time - lastReportedTime.current) >= PROGRESS_REPORT_INTERVAL_SECONDS
     ) {
       lastReportedTime.current = time;
       reportProgress(time);
@@ -196,8 +192,7 @@ function WatchPage() {
     );
   }
 
-  const initialTime =
-    progress && progress.progressPercent < 0.9 ? progress.watchedSeconds : 0;
+  const initialTime = progress && progress.progressPercent < 0.9 ? progress.watchedSeconds : 0;
 
   return (
     <>
@@ -208,14 +203,8 @@ function WatchPage() {
         />
       )}
 
-      <div
-        className={`transition-all duration-500 ${cinemaMode ? "relative z-[50]" : ""}`}
-      >
-        <div
-          className={
-            cinemaMode ? "w-full px-0" : "mx-auto max-w-5xl px-4 pt-4"
-          }
-        >
+      <div className={`transition-all duration-500 ${cinemaMode ? "relative z-[50]" : ""}`}>
+        <div className={cinemaMode ? "w-full px-0" : "mx-auto max-w-5xl px-4 pt-4"}>
           <div className={cinemaMode ? "mx-auto max-w-[1400px]" : ""}>
             <VideoPlayer
               manifestUrl={absoluteUrl(video.streamUrl)}
@@ -233,8 +222,7 @@ function WatchPage() {
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              {formatViewCount(video.viewCount)} views &middot;{" "}
-              {formatDate(video.createdAt)}
+              {formatViewCount(video.viewCount)} views &middot; {formatDate(video.createdAt)}
             </p>
 
             <div className="flex items-center gap-1.5">
@@ -245,11 +233,7 @@ function WatchPage() {
                 isAuthenticated={isAuthenticated}
               />
 
-              <Button
-                variant="secondary"
-                size="sm"
-                className="gap-1.5 rounded-full"
-              >
+              <Button variant="secondary" size="sm" className="gap-1.5 rounded-full">
                 <Share2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Share</span>
               </Button>
@@ -323,10 +307,7 @@ function WatchPage() {
             ) : null}
           </div>
 
-          <CommentSection
-            videoId={video.id}
-            commentCount={video.commentCount}
-          />
+          <CommentSection videoId={video.id} commentCount={video.commentCount} />
         </div>
       </div>
     </>

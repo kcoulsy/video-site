@@ -1,8 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import {
@@ -26,17 +22,10 @@ import {
 } from "@video-site/ui/components/dropdown-menu";
 
 import { UploadModal } from "@/components/upload-modal";
-import {
-  VideoStatusBadge,
-  type VideoStatus,
-} from "@/components/video-status-badge";
+import { VideoStatusBadge, type VideoStatus } from "@/components/video-status-badge";
 import { getUser } from "@/functions/get-user";
 import { ApiError, apiClient } from "@/lib/api-client";
-import {
-  formatDuration,
-  formatRelativeTime,
-  formatViewCount,
-} from "@/lib/format";
+import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/format";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -114,15 +103,10 @@ function DashboardPage() {
             Icon: Loader2,
           },
         ].map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-xl border border-border bg-card p-4"
-          >
+          <div key={stat.label} className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center gap-2 text-muted-foreground">
               <stat.Icon className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wider">
-                {stat.label}
-              </span>
+              <span className="text-xs font-medium uppercase tracking-wider">{stat.label}</span>
             </div>
             <p className="mt-2 text-2xl font-semibold">{stat.value}</p>
           </div>
@@ -142,11 +126,7 @@ function DashboardPage() {
           <div className="flex flex-col items-center justify-center py-16">
             <Film className="h-12 w-12 text-muted-foreground/20" />
             <p className="mt-4 text-sm text-muted-foreground">No videos yet</p>
-            <Button
-              variant="outline"
-              className="mt-4 gap-2"
-              onClick={() => setUploadOpen(true)}
-            >
+            <Button variant="outline" className="mt-4 gap-2" onClick={() => setUploadOpen(true)}>
               <Upload className="h-4 w-4" />
               Upload your first video
             </Button>
@@ -193,9 +173,7 @@ function useVideoStatus(videoId: string, status: VideoStatus) {
   return useQuery<StatusResponse>({
     queryKey: ["video-status", videoId],
     queryFn: async () => {
-      const result = await apiClient<StatusResponse>(
-        `/api/videos/${videoId}/status`,
-      );
+      const result = await apiClient<StatusResponse>(`/api/videos/${videoId}/status`);
       if (result.status === "ready" || result.status === "failed") {
         void queryClient.invalidateQueries({ queryKey: ["videos", "my"] });
       }
@@ -224,8 +202,7 @@ function VideoRow({
   const errorMessage = liveStatus.data?.error ?? video.processingError;
 
   const deleteMutation = useMutation({
-    mutationFn: () =>
-      apiClient(`/api/videos/${video.id}`, { method: "DELETE" }),
+    mutationFn: () => apiClient(`/api/videos/${video.id}`, { method: "DELETE" }),
     onSuccess: () => {
       toast.success("Video deleted");
       onDeleted();
@@ -250,14 +227,13 @@ function VideoRow({
             {formatDuration(video.duration)}
           </span>
         )}
-        {(status === "processing" || status === "uploading") &&
-          progress != null && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-              <span className="text-xs font-medium text-white tabular-nums">
-                {Math.round(progress)}%
-              </span>
-            </div>
-          )}
+        {(status === "processing" || status === "uploading") && progress != null && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <span className="text-xs font-medium text-white tabular-nums">
+              {Math.round(progress)}%
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="min-w-0 flex-1">
@@ -268,17 +244,13 @@ function VideoRow({
           <span>{formatRelativeTime(video.createdAt)}</span>
         </div>
         {status === "failed" && errorMessage ? (
-          <p className="mt-1 truncate text-xs text-red-400/80">
-            {errorMessage}
-          </p>
+          <p className="mt-1 truncate text-xs text-red-400/80">{errorMessage}</p>
         ) : null}
       </div>
 
       <div className="hidden items-center gap-6 text-sm text-muted-foreground sm:flex">
         <div className="text-right">
-          <p className="font-medium text-foreground">
-            {formatViewCount(video.viewCount)}
-          </p>
+          <p className="font-medium text-foreground">{formatViewCount(video.viewCount)}</p>
           <p className="text-xs">views</p>
         </div>
         <div className="text-right">
@@ -293,11 +265,7 @@ function VideoRow({
         </DropdownMenuTrigger>
         <DropdownMenuContent className="bg-card">
           {status === "ready" && (
-            <DropdownMenuItem
-              render={
-                <Link to="/watch/$videoId" params={{ videoId: video.id }} />
-              }
-            >
+            <DropdownMenuItem render={<Link to="/watch/$videoId" params={{ videoId: video.id }} />}>
               <ExternalLink className="mr-2 h-4 w-4" />
               View
             </DropdownMenuItem>
@@ -306,10 +274,7 @@ function VideoRow({
             <Edit2 className="mr-2 h-4 w-4" />
             Edit
           </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            onClick={() => deleteMutation.mutate()}
-          >
+          <DropdownMenuItem variant="destructive" onClick={() => deleteMutation.mutate()}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete
           </DropdownMenuItem>

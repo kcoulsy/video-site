@@ -42,11 +42,13 @@ CREATE INDEX IF NOT EXISTS video_title_trgm_idx ON video USING GIN (title gin_tr
 Option A: Place the SQL file in the Drizzle migrations directory and run it alongside Drizzle migrations.
 
 Option B: Run it manually or via a script:
+
 ```
 psql $DATABASE_URL -f packages/db/src/migrations/xxxx_search_vector.sql
 ```
 
 Option C: Add a custom migration script in `package.json`:
+
 ```json
 "db:search-migration": "psql $DATABASE_URL -f packages/db/src/migrations/xxxx_search_vector.sql"
 ```
@@ -71,6 +73,7 @@ Mounted at `/api/search` in the main app.
 Main search endpoint.
 
 **Query params**:
+
 - `q`: search query (required, 1-200 chars)
 - `page`: page number (default 1)
 - `limit`: results per page (default 20, max 50)
@@ -128,9 +131,13 @@ app.get("/", async (c) => {
         OR similarity(v.title, ${q}) > 0.1
       )
     ORDER BY
-      ${sort === "relevance" ? sql`rank DESC, title_similarity DESC` :
-        sort === "date" ? sql`v.created_at DESC` :
-        sql`v.view_count DESC`}
+      ${
+        sort === "relevance"
+          ? sql`rank DESC, title_similarity DESC`
+          : sort === "date"
+            ? sql`v.created_at DESC`
+            : sql`v.view_count DESC`
+      }
     LIMIT ${limit}
     OFFSET ${offset}
   `);
@@ -148,9 +155,7 @@ app.get("/", async (c) => {
       viewCount: row.view_count,
       likeCount: row.like_count,
       createdAt: row.created_at,
-      thumbnailUrl: row.thumbnail_path
-        ? `/api/stream/${row.id}/thumbnail`
-        : null,
+      thumbnailUrl: row.thumbnail_path ? `/api/stream/${row.id}/thumbnail` : null,
       tags: row.tags,
       user: {
         id: row.user_id,
@@ -190,20 +195,19 @@ app.get("/", async (c) => {
 Autocomplete suggestions for the search bar.
 
 **Query params**:
+
 - `q`: partial query (minimum 2 characters)
 
 **Response**:
+
 ```json
 {
-  "suggestions": [
-    "Cooking with Fire",
-    "Cooking Basics 101",
-    "Cookie Decorating Tutorial"
-  ]
+  "suggestions": ["Cooking with Fire", "Cooking Basics 101", "Cookie Decorating Tutorial"]
 }
 ```
 
 **Implementation**:
+
 ```typescript
 app.get("/suggest", async (c) => {
   const q = c.req.query("q")?.trim();
@@ -223,7 +227,7 @@ app.get("/suggest", async (c) => {
       AND visibility = 'public'
       AND (
         title % ${q}
-        OR title ILIKE ${q + '%'}
+        OR title ILIKE ${q + "%"}
       )
     ORDER BY similarity(title, ${q}) DESC
     LIMIT 10
@@ -246,6 +250,7 @@ The `title % ${q}` operator uses the GIN trigram index for fast fuzzy matching. 
 Search input placed in the header, between navigation and user menu.
 
 **Layout**:
+
 ```
 +-------------------------------------------+
 | [Search icon] [Search videos...] [X]      |
@@ -257,6 +262,7 @@ Search input placed in the header, between navigation and user menu.
 ```
 
 **Behavior**:
+
 - Text input with a search icon (Lucide `Search`)
 - Clear button (X) appears when text is present
 - **Keyboard shortcut**: Press `/` to focus the search bar (YouTube-style). Add a global `keydown` listener that focuses the input when `/` is pressed and the input isn't already focused and no other input is focused.
@@ -270,6 +276,7 @@ Search input placed in the header, between navigation and user menu.
 - **Dropdown dismissal**: Close suggestions on blur, Escape key, or navigation.
 
 **Debounce implementation**:
+
 ```typescript
 const [inputValue, setInputValue] = useState("");
 const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -286,7 +293,7 @@ function handleInputChange(value: string) {
 
   debounceTimer.current = setTimeout(async () => {
     const data = await apiClient<{ suggestions: string[] }>(
-      `/api/search/suggest?q=${encodeURIComponent(value)}`
+      `/api/search/suggest?q=${encodeURIComponent(value)}`,
     );
     setSuggestions(data.suggestions);
   }, 300);
@@ -302,6 +309,7 @@ function handleInputChange(value: string) {
 URL: `/search?q=<query>&sort=relevance&page=1`
 
 Route definition:
+
 ```typescript
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -324,6 +332,7 @@ export const Route = createFileRoute("/search")({
 ```
 
 **Page layout**:
+
 ```
 +--------------------------------------------------+
 | About 42 results for "cooking" (0.12s)           |
@@ -338,6 +347,7 @@ export const Route = createFileRoute("/search")({
 ```
 
 **No results state**:
+
 ```
 +--------------------------------------------------+
 | No results found for "xyzabc123"                 |
@@ -347,6 +357,7 @@ export const Route = createFileRoute("/search")({
 ```
 
 **Features**:
+
 - Search query displayed in the search bar (populated from URL params)
 - Result count + query echo
 - Sort controls: three buttons/tabs for relevance, date, views. Active sort is highlighted. Clicking changes the URL param and refetches.
@@ -362,6 +373,7 @@ export const Route = createFileRoute("/search")({
 Horizontal layout, different from the vertical `VideoCard` used in grids.
 
 **Layout**:
+
 ```
 +-------+----------------------------------------+
 |       | Title of the Video                     |
@@ -373,11 +385,12 @@ Horizontal layout, different from the vertical `VideoCard` used in grids.
 ```
 
 Props:
+
 ```typescript
 interface SearchResultItemProps {
   id: string;
   title: string;
-  descriptionSnippet: string;  // HTML string with <mark> tags
+  descriptionSnippet: string; // HTML string with <mark> tags
   thumbnailUrl: string | null;
   duration: number | null;
   viewCount: number;
@@ -388,6 +401,7 @@ interface SearchResultItemProps {
 ```
 
 Implementation:
+
 - Thumbnail on the left: fixed width (~240px desktop, ~120px mobile), aspect-ratio 16:9, with duration overlay
 - Metadata on the right: title (bold, `line-clamp-2`), view count + relative time, uploader name
 - **Description snippet**: Render with `dangerouslySetInnerHTML` for the `<mark>` tags from `ts_headline`. **Important**: The snippet comes from PostgreSQL's `ts_headline` which only adds `<mark>` tags to the server-provided description text — it does NOT pass through user HTML. This is safe because the description is stored as plain text (HTML is stripped on input in the comment/video API). However, as a defense-in-depth measure, you could sanitize the snippet to only allow `<mark>` tags:
@@ -413,6 +427,7 @@ Add the `SearchBar` component in the center of the header:
 ```
 
 The search bar should take up flexible space in the center. Use flexbox:
+
 ```typescript
 <header className="flex items-center gap-4 px-4 py-2">
   <nav className="flex items-center gap-2">
@@ -465,14 +480,14 @@ app.route("/api/search", searchRoutes);
 
 ## Files Summary
 
-| Action | File |
-|--------|------|
-| Create | `packages/db/src/migrations/xxxx_search_vector.sql` |
-| Create | `apps/server/src/routes/search.ts` |
-| Create | `apps/web/src/routes/search.tsx` |
-| Create | `apps/web/src/components/search-bar.tsx` |
-| Create | `apps/web/src/components/search-result-item.tsx` |
-| Modify | `apps/server/src/index.ts` (mount search routes) |
+| Action | File                                                 |
+| ------ | ---------------------------------------------------- |
+| Create | `packages/db/src/migrations/xxxx_search_vector.sql`  |
+| Create | `apps/server/src/routes/search.ts`                   |
+| Create | `apps/web/src/routes/search.tsx`                     |
+| Create | `apps/web/src/components/search-bar.tsx`             |
+| Create | `apps/web/src/components/search-result-item.tsx`     |
+| Modify | `apps/server/src/index.ts` (mount search routes)     |
 | Modify | `apps/web/src/components/header.tsx` (add SearchBar) |
 
 ## Dependencies to Install

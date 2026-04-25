@@ -17,10 +17,7 @@ function streamUrlFor(videoId: string, status: string): string | null {
   return status === "ready" ? `/api/stream/${videoId}/manifest.mpd` : null;
 }
 
-function thumbnailUrlFor(
-  videoId: string,
-  thumbnailPath: string | null,
-): string | null {
+function thumbnailUrlFor(videoId: string, thumbnailPath: string | null): string | null {
   return thumbnailPath ? `/api/stream/${videoId}/thumbnail` : null;
 }
 
@@ -32,10 +29,7 @@ function hashIpUa(c: {
     c.req.header("x-real-ip") ??
     "unknown";
   const ua = c.req.header("user-agent") ?? "unknown";
-  return new Bun.CryptoHasher("sha256")
-    .update(`${ip}|${ua}`)
-    .digest("hex")
-    .slice(0, 32);
+  return new Bun.CryptoHasher("sha256").update(`${ip}|${ua}`).digest("hex").slice(0, 32);
 }
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
@@ -105,9 +99,7 @@ videoRoutes.post("/", requireAuth, async (c) => {
 });
 
 videoRoutes.get("/my", requireAuth, async (c) => {
-  const parsed = myListQuerySchema.safeParse(
-    Object.fromEntries(new URL(c.req.url).searchParams),
-  );
+  const parsed = myListQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
   if (!parsed.success) {
     throw new ValidationError("Invalid query");
   }
@@ -132,9 +124,7 @@ videoRoutes.get("/my", requireAuth, async (c) => {
 });
 
 videoRoutes.get("/", async (c) => {
-  const parsed = listQuerySchema.safeParse(
-    Object.fromEntries(new URL(c.req.url).searchParams),
-  );
+  const parsed = listQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
   if (!parsed.success) {
     throw new ValidationError("Invalid query");
   }
@@ -147,10 +137,7 @@ videoRoutes.get("/", async (c) => {
         ? desc(video.viewCount)
         : desc(video.createdAt);
 
-  const where = and(
-    eq(video.status, "ready"),
-    eq(video.visibility, "public"),
-  );
+  const where = and(eq(video.status, "ready"), eq(video.visibility, "public"));
 
   const rows = await db
     .select({

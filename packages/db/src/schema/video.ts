@@ -1,12 +1,4 @@
-import {
-  bigint,
-  index,
-  integer,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { bigint, index, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 
@@ -18,11 +10,7 @@ export const videoStatusEnum = pgEnum("video_status", [
   "failed",
 ]);
 
-export const videoVisibilityEnum = pgEnum("video_visibility", [
-  "public",
-  "unlisted",
-  "private",
-]);
+export const videoVisibilityEnum = pgEnum("video_visibility", ["public", "unlisted", "private"]);
 
 export const video = pgTable(
   "video",

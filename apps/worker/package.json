@@ -13,10 +13,10 @@
     "@video-site/env": "workspace:*",
     "@video-site/storage": "workspace:*",
     "bullmq": "^5.34.0",
+    "dotenv": "catalog:",
     "drizzle-orm": "^0.45.2",
     "fluent-ffmpeg": "^2.1.3",
     "ioredis": "^5.4.2",
-    "dotenv": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

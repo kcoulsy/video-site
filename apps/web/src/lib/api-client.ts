@@ -9,10 +9,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiClient<T = unknown>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
+export async function apiClient<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${env.VITE_SERVER_URL}${path}`, {
     credentials: "include",
     headers: {

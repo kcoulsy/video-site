@@ -13,16 +13,9 @@ export async function processThumbnail(job: Job<ThumbnailJobData>) {
   const { videoId, thumbnailSourcePath } = job.data;
 
   const data = await Bun.file(thumbnailSourcePath).arrayBuffer();
-  const savedPath = await storage.saveThumbnail(
-    videoId,
-    Buffer.from(data),
-    "thumbnail-custom.jpg",
-  );
+  const savedPath = await storage.saveThumbnail(videoId, Buffer.from(data), "thumbnail-custom.jpg");
 
-  await db
-    .update(video)
-    .set({ thumbnailPath: savedPath })
-    .where(eq(video.id, videoId));
+  await db.update(video).set({ thumbnailPath: savedPath }).where(eq(video.id, videoId));
 
   await storage.deleteFile(thumbnailSourcePath).catch(() => {
     // best-effort cleanup

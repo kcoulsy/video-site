@@ -18,6 +18,7 @@ Set up Docker Compose for PostgreSQL and Redis, create the shared storage utilit
 Define two services with named volumes and a shared network:
 
 **PostgreSQL 16**:
+
 - Image: `postgres:16-alpine`
 - Port: `5432:5432`
 - Environment: `POSTGRES_USER=postgres`, `POSTGRES_PASSWORD=password`, `POSTGRES_DB=postgres`
@@ -25,6 +26,7 @@ Define two services with named volumes and a shared network:
 - Healthcheck: `pg_isready -U postgres`
 
 **Redis 7**:
+
 - Image: `redis:7-alpine`
 - Port: `6379:6379`
 - Command: `redis-server --maxmemory-policy noeviction` (required for BullMQ — it needs Redis to never evict keys)
@@ -36,6 +38,7 @@ Define two services with named volumes and a shared network:
 **Volumes**: `pgdata`, `redisdata` (both named, persist across restarts)
 
 ### Root `package.json` — add scripts:
+
 ```json
 "docker:up": "docker compose up -d",
 "docker:down": "docker compose down",
@@ -126,6 +129,7 @@ Implementation details:
 **Base directory**: Configurable via `STORAGE_PATH` env var. Must be an absolute path (no default — require it to be set explicitly). In a monorepo, `process.cwd()` varies depending on which app runs, so relative defaults like `./storage` resolve to different locations from `apps/server` vs `apps/worker`.
 
 **Directory structure** created on-demand:
+
 ```
 storage/
   videos/
@@ -142,7 +146,7 @@ storage/
 - Use `Bun.file()` and `Bun.write()` for I/O (the project runs on Bun)
 - `createReadStream(filePath)` returns `Bun.file(filePath).stream()` — a web-standard `ReadableStream` compatible with Hono responses
 - `getFileSize(filePath)` returns `Bun.file(filePath).size`
-- `fileExists(filePath)` uses `Bun.file(filePath).exists()` 
+- `fileExists(filePath)` uses `Bun.file(filePath).exists()`
 - `deleteVideoFiles(videoId)` removes the entire `videos/{videoId}/` directory recursively using `fs.promises.rm(path, { recursive: true, force: true })`
 - `saveRawUpload(videoId, sourceFile, filename)` moves/copies a file from the tus temp directory to `videos/{videoId}/raw/{filename}`. Use `fs.promises.rename()` for same-filesystem moves, fall back to copy+delete
 - `ensureTranscodedDir(videoId)` creates `videos/{videoId}/transcoded/` and returns the absolute path — the FFmpeg worker needs this as the output directory
@@ -183,7 +187,7 @@ export const env = createEnv({
   server: {
     DATABASE_URL: z.string().min(1),
     REDIS_URL: z.string().default("redis://localhost:6379"),
-    STORAGE_PATH: z.string().min(1),  // absolute path, required — no safe default in a monorepo
+    STORAGE_PATH: z.string().min(1), // absolute path, required — no safe default in a monorepo
     FFMPEG_PATH: z.string().default("ffmpeg"),
     FFPROBE_PATH: z.string().default("ffprobe"),
     CONCURRENCY: z.coerce.number().default(2),
@@ -267,20 +271,20 @@ The existing `pnpm-workspace.yaml` already includes `packages/*`, so `packages/s
 
 ## Files Summary
 
-| Action | File |
-|--------|------|
-| Create | `docker-compose.yml` |
-| Create | `packages/storage/package.json` |
-| Create | `packages/storage/tsconfig.json` |
-| Create | `packages/storage/src/index.ts` |
+| Action | File                                    |
+| ------ | --------------------------------------- |
+| Create | `docker-compose.yml`                    |
+| Create | `packages/storage/package.json`         |
+| Create | `packages/storage/tsconfig.json`        |
+| Create | `packages/storage/src/index.ts`         |
 | Create | `packages/storage/src/local-storage.ts` |
-| Create | `packages/env/src/worker.ts` |
-| Create | `apps/worker/.env` |
-| Modify | `packages/env/src/server.ts` |
-| Modify | `packages/env/package.json` |
-| Modify | `.gitignore` |
-| Modify | `apps/server/.env` |
-| Modify | root `package.json` (docker scripts) |
+| Create | `packages/env/src/worker.ts`            |
+| Create | `apps/worker/.env`                      |
+| Modify | `packages/env/src/server.ts`            |
+| Modify | `packages/env/package.json`             |
+| Modify | `.gitignore`                            |
+| Modify | `apps/server/.env`                      |
+| Modify | root `package.json` (docker scripts)    |
 
 ## Dependencies to Install
 

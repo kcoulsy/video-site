@@ -1,11 +1,4 @@
-import {
-  index,
-  pgEnum,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 import { video } from "./video";

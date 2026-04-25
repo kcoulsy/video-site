@@ -32,99 +32,84 @@ async function readProgressBody(req: Request): Promise<unknown> {
   }
 }
 
-watchHistoryRoutes.post(
-  "/videos/:videoId/progress",
-  requireAuth,
-  async (c) => {
-    const userId = c.get("user").id;
-    const videoId = c.req.param("videoId");
+watchHistoryRoutes.post("/videos/:videoId/progress", requireAuth, async (c) => {
+  const userId = c.get("user").id;
+  const videoId = c.req.param("videoId");
 
-    const raw = await readProgressBody(c.req.raw);
-    const parsed = progressSchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new ValidationError(
-        parsed.error.issues[0]?.message ?? "Invalid body",
-      );
-    }
+  const raw = await readProgressBody(c.req.raw);
+  const parsed = progressSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid body");
+  }
 
-    const watchedSeconds = Math.floor(parsed.data.watchedSeconds);
-    const totalDuration = Math.floor(parsed.data.totalDuration);
-    const progressPercent = Math.min(watchedSeconds / totalDuration, 1.0);
-    const completed = progressPercent >= 0.9;
-    const now = new Date();
+  const watchedSeconds = Math.floor(parsed.data.watchedSeconds);
+  const totalDuration = Math.floor(parsed.data.totalDuration);
+  const progressPercent = Math.min(watchedSeconds / totalDuration, 1.0);
+  const completed = progressPercent >= 0.9;
+  const now = new Date();
 
-    const [videoRow] = await db
-      .select({ id: video.id })
-      .from(video)
-      .where(eq(video.id, videoId))
-      .limit(1);
-    if (!videoRow) {
-      throw new NotFoundError("Video");
-    }
+  const [videoRow] = await db
+    .select({ id: video.id })
+    .from(video)
+    .where(eq(video.id, videoId))
+    .limit(1);
+  if (!videoRow) {
+    throw new NotFoundError("Video");
+  }
 
-    await db
-      .insert(watchHistory)
-      .values({
-        userId,
-        videoId,
+  await db
+    .insert(watchHistory)
+    .values({
+      userId,
+      videoId,
+      watchedSeconds,
+      totalDuration,
+      progressPercent,
+      completedAt: completed ? now : null,
+      lastWatchedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [watchHistory.userId, watchHistory.videoId],
+      set: {
         watchedSeconds,
         totalDuration,
         progressPercent,
-        completedAt: completed ? now : null,
+        completedAt: completed ? now : sql`${watchHistory.completedAt}`,
         lastWatchedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [watchHistory.userId, watchHistory.videoId],
-        set: {
-          watchedSeconds,
-          totalDuration,
-          progressPercent,
-          completedAt: completed ? now : sql`${watchHistory.completedAt}`,
-          lastWatchedAt: now,
-        },
-      });
-
-    return c.json({ ok: true });
-  },
-);
-
-watchHistoryRoutes.get(
-  "/videos/:videoId/progress",
-  requireAuth,
-  async (c) => {
-    const userId = c.get("user").id;
-    const videoId = c.req.param("videoId");
-
-    const entry = await db.query.watchHistory.findFirst({
-      where: and(
-        eq(watchHistory.userId, userId),
-        eq(watchHistory.videoId, videoId),
-      ),
+      },
     });
 
-    if (!entry) {
-      return c.json({
-        watchedSeconds: 0,
-        totalDuration: 0,
-        progressPercent: 0,
-        completedAt: null,
-      });
-    }
+  return c.json({ ok: true });
+});
 
+watchHistoryRoutes.get("/videos/:videoId/progress", requireAuth, async (c) => {
+  const userId = c.get("user").id;
+  const videoId = c.req.param("videoId");
+
+  const entry = await db.query.watchHistory.findFirst({
+    where: and(eq(watchHistory.userId, userId), eq(watchHistory.videoId, videoId)),
+  });
+
+  if (!entry) {
     return c.json({
-      watchedSeconds: entry.watchedSeconds,
-      totalDuration: entry.totalDuration,
-      progressPercent: entry.progressPercent,
-      completedAt: entry.completedAt,
+      watchedSeconds: 0,
+      totalDuration: 0,
+      progressPercent: 0,
+      completedAt: null,
     });
-  },
-);
+  }
+
+  return c.json({
+    watchedSeconds: entry.watchedSeconds,
+    totalDuration: entry.totalDuration,
+    progressPercent: entry.progressPercent,
+    completedAt: entry.completedAt,
+  });
+});
 
 watchHistoryRoutes.get("/history", requireAuth, async (c) => {
   const userId = c.get("user").id;
-  const parsed = listQuerySchema.safeParse(
-    Object.fromEntries(new URL(c.req.url).searchParams),
-  );
+  const parsed = listQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
   if (!parsed.success) {
     throw new ValidationError("Invalid query");
   }
@@ -173,9 +158,7 @@ watchHistoryRoutes.get("/history", requireAuth, async (c) => {
     video: {
       id: r.videoId,
       title: r.videoTitle,
-      thumbnailUrl: r.videoThumbnailPath
-        ? `/api/stream/${r.videoId}/thumbnail`
-        : null,
+      thumbnailUrl: r.videoThumbnailPath ? `/api/stream/${r.videoId}/thumbnail` : null,
       duration: r.videoDuration,
       status: r.videoStatus,
       user: { id: r.ownerId, name: r.ownerName, image: r.ownerImage },
@@ -198,12 +181,7 @@ watchHistoryRoutes.delete("/history/:videoId", requireAuth, async (c) => {
 
   await db
     .delete(watchHistory)
-    .where(
-      and(
-        eq(watchHistory.userId, userId),
-        eq(watchHistory.videoId, videoId),
-      ),
-    );
+    .where(and(eq(watchHistory.userId, userId), eq(watchHistory.videoId, videoId)));
 
   return c.json({ ok: true });
 });

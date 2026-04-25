@@ -1,11 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Play } from "lucide-react";
 
-import {
-  formatDuration,
-  formatViewCount,
-  formatRelativeTime,
-} from "@/lib/format";
+import { formatDuration, formatViewCount, formatRelativeTime } from "@/lib/format";
 
 import { WatchProgressBar } from "./watch-progress-bar";
 
@@ -57,20 +53,14 @@ export function VideoCard({
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-primary/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-        {progressPercent != null && (
-          <WatchProgressBar progressPercent={progressPercent} />
-        )}
+        {progressPercent != null && <WatchProgressBar progressPercent={progressPercent} />}
       </div>
 
       {/* Info */}
       <div className="mt-3 flex gap-3">
         <div className="mt-0.5 h-8 w-8 shrink-0 overflow-hidden rounded-full bg-secondary">
           {user.image ? (
-            <img
-              src={user.image}
-              alt={user.name}
-              className="h-full w-full object-cover"
-            />
+            <img src={user.image} alt={user.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
               {user.name.charAt(0).toUpperCase()}
@@ -84,8 +74,7 @@ export function VideoCard({
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">{user.name}</p>
           <p className="text-xs text-muted-foreground">
-            {formatViewCount(viewCount)} views &middot;{" "}
-            {formatRelativeTime(createdAt)}
+            {formatViewCount(viewCount)} views &middot; {formatRelativeTime(createdAt)}
           </p>
         </div>
       </div>

@@ -86,12 +86,7 @@ export function CommentForm({
               Cancel
             </Button>
           )}
-          <Button
-            type="submit"
-            size="sm"
-            disabled={!canSubmit}
-            className="rounded-full"
-          >
+          <Button type="submit" size="sm" disabled={!canSubmit} className="rounded-full">
             {submitting ? "Posting..." : submitLabel}
           </Button>
         </div>

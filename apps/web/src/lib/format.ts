@@ -2,8 +2,7 @@ export function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  if (h > 0)
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
@@ -25,17 +24,12 @@ export function formatRelativeTime(dateString: string): string {
   const diffMonths = Math.floor(diffDays / 30);
   const diffYears = Math.floor(diffDays / 365);
 
-  if (diffYears > 0)
-    return `${diffYears} year${diffYears > 1 ? "s" : ""} ago`;
-  if (diffMonths > 0)
-    return `${diffMonths} month${diffMonths > 1 ? "s" : ""} ago`;
-  if (diffWeeks > 0)
-    return `${diffWeeks} week${diffWeeks > 1 ? "s" : ""} ago`;
+  if (diffYears > 0) return `${diffYears} year${diffYears > 1 ? "s" : ""} ago`;
+  if (diffMonths > 0) return `${diffMonths} month${diffMonths > 1 ? "s" : ""} ago`;
+  if (diffWeeks > 0) return `${diffWeeks} week${diffWeeks > 1 ? "s" : ""} ago`;
   if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-  if (diffHours > 0)
-    return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-  if (diffMinutes > 0)
-    return `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`;
+  if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  if (diffMinutes > 0) return `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`;
   return "just now";
 }
 
@@ -48,8 +42,7 @@ export function formatDate(dateString: string): string {
 }
 
 export function formatFileSize(bytes: number): string {
-  if (bytes >= 1_000_000_000)
-    return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
   if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
   if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(1)} KB`;
   return `${bytes} B`;

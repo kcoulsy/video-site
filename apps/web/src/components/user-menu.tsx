@@ -41,9 +41,7 @@ export default function UserMenu() {
           <DropdownMenuItem onClick={() => navigate({ to: "/dashboard" })}>
             Dashboard
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate({ to: "/history" })}>
-            History
-          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate({ to: "/history" })}>History</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
           <DropdownMenuItem

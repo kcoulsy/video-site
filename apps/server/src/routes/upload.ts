@@ -50,10 +50,7 @@ const tusServer = new Server({
       throw { status_code: 409, body: "Upload already finished" };
     }
 
-    await db
-      .update(video)
-      .set({ tusUploadId: videoId })
-      .where(eq(video.id, videoId));
+    await db.update(video).set({ tusUploadId: videoId }).where(eq(video.id, videoId));
 
     return {};
   },

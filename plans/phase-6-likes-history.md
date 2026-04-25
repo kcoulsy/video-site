@@ -37,13 +37,12 @@ export const videoLike = pgTable(
     type: likeTypeEnum("type").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.userId, table.videoId] }),
-  ],
+  (table) => [primaryKey({ columns: [table.userId, table.videoId] })],
 );
 ```
 
 **Key design**:
+
 - Composite primary key `(userId, videoId)` — one like/dislike per user per video
 - `type` enum: "like" or "dislike" — toggling between them is a single-row update
 - No separate `id` column — the composite PK is sufficient
@@ -55,9 +54,7 @@ export const videoLike = pgTable(
 ### File: `packages/db/src/schema/watch-history.ts` (new)
 
 ```typescript
-import {
-  pgTable, text, timestamp, integer, real, primaryKey,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, real, primaryKey } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { video } from "./video";
 
@@ -82,13 +79,12 @@ export const watchHistory = pgTable(
     lastWatchedAt: timestamp("last_watched_at").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.userId, table.videoId] }),
-  ],
+  (table) => [primaryKey({ columns: [table.userId, table.videoId] })],
 );
 ```
 
 **Key design**:
+
 - Composite primary key `(userId, videoId)` — one history entry per user per video
 - `watchedSeconds` + `totalDuration` -> can compute progress on client or use `progressPercent`
 - `completedAt` is set when `progressPercent >= 0.9` (90% watched = completed)
@@ -130,6 +126,7 @@ export const watchHistoryRelations = relations(watchHistory, ({ one }) => ({
 ```
 
 Update existing relations:
+
 ```typescript
 // In userRelations, add:
 likes: many(videoLike),
@@ -153,49 +150,47 @@ Add: `export * from "./like"; export * from "./watch-history";`
 ### `POST /api/videos/:videoId/like` (auth required)
 
 Like the video. Toggle behavior:
+
 - If no existing record: create with `type: "like"`
 - If existing record is `"like"`: remove the record (un-like)
 - If existing record is `"dislike"`: update to `"like"` (switch)
 
 **Implementation**:
+
 ```typescript
 app.post("/:videoId/like", requireAuth, async (c) => {
   const userId = c.get("user").id;
   const videoId = c.req.param("videoId");
 
   const existing = await db.query.videoLike.findFirst({
-    where: and(
-      eq(videoLikeTable.userId, userId),
-      eq(videoLikeTable.videoId, videoId),
-    ),
+    where: and(eq(videoLikeTable.userId, userId), eq(videoLikeTable.videoId, videoId)),
   });
 
   await db.transaction(async (tx) => {
     if (!existing) {
       // Create new like
       await tx.insert(videoLikeTable).values({ userId, videoId, type: "like" });
-      await tx.update(videoTable)
+      await tx
+        .update(videoTable)
         .set({ likeCount: sql`${videoTable.likeCount} + 1` })
         .where(eq(videoTable.id, videoId));
     } else if (existing.type === "like") {
       // Remove like (toggle off)
-      await tx.delete(videoLikeTable)
-        .where(and(
-          eq(videoLikeTable.userId, userId),
-          eq(videoLikeTable.videoId, videoId),
-        ));
-      await tx.update(videoTable)
+      await tx
+        .delete(videoLikeTable)
+        .where(and(eq(videoLikeTable.userId, userId), eq(videoLikeTable.videoId, videoId)));
+      await tx
+        .update(videoTable)
         .set({ likeCount: sql`${videoTable.likeCount} - 1` })
         .where(eq(videoTable.id, videoId));
     } else {
       // Switch from dislike to like
-      await tx.update(videoLikeTable)
+      await tx
+        .update(videoLikeTable)
         .set({ type: "like", createdAt: new Date() })
-        .where(and(
-          eq(videoLikeTable.userId, userId),
-          eq(videoLikeTable.videoId, videoId),
-        ));
-      await tx.update(videoTable)
+        .where(and(eq(videoLikeTable.userId, userId), eq(videoLikeTable.videoId, videoId)));
+      await tx
+        .update(videoTable)
         .set({
           likeCount: sql`${videoTable.likeCount} + 1`,
           dislikeCount: sql`${videoTable.dislikeCount} - 1`,
@@ -212,7 +207,7 @@ app.post("/:videoId/like", requireAuth, async (c) => {
 
 Same toggle logic as like, but for "dislike". Mirror implementation.
 
-*(No separate `DELETE /api/videos/:videoId/like` endpoint needed — the `POST /like` toggle already handles removing a like when clicked again, and `POST /dislike` handles switching. This avoids API redundancy.)*
+_(No separate `DELETE /api/videos/:videoId/like` endpoint needed — the `POST /like` toggle already handles removing a like when clicked again, and `POST /dislike` handles switching. This avoids API redundancy.)_
 
 ### `GET /api/videos/:videoId/like` (auth required)
 
@@ -241,6 +236,7 @@ app.get("/:videoId/like", requireAuth, async (c) => {
 Upsert the user's watch progress. Called every 10 seconds during playback.
 
 **Request body**:
+
 ```json
 {
   "watchedSeconds": 145,
@@ -249,6 +245,7 @@ Upsert the user's watch progress. Called every 10 seconds during playback.
 ```
 
 **Implementation**:
+
 ```typescript
 app.post("/:videoId/progress", requireAuth, async (c) => {
   const userId = c.get("user").id;
@@ -258,7 +255,8 @@ app.post("/:videoId/progress", requireAuth, async (c) => {
   const progressPercent = Math.min(watchedSeconds / totalDuration, 1.0);
   const completed = progressPercent >= 0.9;
 
-  await db.insert(watchHistoryTable)
+  await db
+    .insert(watchHistoryTable)
     .values({
       userId,
       videoId,
@@ -312,10 +310,12 @@ app.get("/:videoId/progress", requireAuth, async (c) => {
 List the user's watch history, ordered by `lastWatchedAt DESC`:
 
 **Query params**:
+
 - `page` (default 1)
 - `limit` (default 24, max 50)
 
 **Response** includes video details (join with video table):
+
 ```json
 {
   "items": [
@@ -356,11 +356,13 @@ Clear all watch history for the authenticated user.
 Displays like and dislike buttons with counts.
 
 **Layout**:
+
 ```
 [ThumbsUp 1.2K] [ThumbsDown 45]
 ```
 
 Props:
+
 ```typescript
 interface LikeButtonProps {
   videoId: string;
@@ -371,6 +373,7 @@ interface LikeButtonProps {
 ```
 
 Implementation:
+
 - Fetch user's like state via `GET /api/videos/:videoId/like` (only if authenticated)
 - Use React Query for the like state query
 - `useMutation` for like/dislike actions with **optimistic updates**:
@@ -382,6 +385,7 @@ Implementation:
 - If not authenticated: icons are clickable but trigger a toast "Sign in to like this video" or navigate to login
 
 **Optimistic update pattern**:
+
 ```typescript
 const likeMutation = useMutation({
   mutationFn: () => apiClient(`/api/videos/${videoId}/like`, { method: "POST" }),
@@ -448,6 +452,7 @@ Positioned absolutely within the thumbnail container of `VideoCard`.
 Protected route accessible from the user menu.
 
 **Layout**:
+
 ```
 +--------------------------------------------------+
 | Watch History                   [Clear all]       |
@@ -463,6 +468,7 @@ Protected route accessible from the user menu.
 ```
 
 Features:
+
 - **"Continue Watching" section**: Filter history items where `progressPercent < 0.9`. Show in a horizontal scrolling row or small grid.
 - **"All History" section**: Full history in a grid, paginated.
 - Each video card shows:
@@ -474,6 +480,7 @@ Features:
 - Empty state: "No watch history yet"
 
 Route definition:
+
 ```typescript
 export const Route = createFileRoute("/history")({
   component: HistoryPage,
@@ -560,8 +567,12 @@ function reportProgress(watchedSeconds: number) {
 // Use refs for values needed in cleanup to avoid stale closures
 const videoIdRef = useRef(videoId);
 const durationRef = useRef(video.duration);
-useEffect(() => { videoIdRef.current = videoId; }, [videoId]);
-useEffect(() => { durationRef.current = video.duration; }, [video.duration]);
+useEffect(() => {
+  videoIdRef.current = videoId;
+}, [videoId]);
+useEffect(() => {
+  durationRef.current = video.duration;
+}, [video.duration]);
 
 useEffect(() => {
   return () => {
@@ -569,10 +580,15 @@ useEffect(() => {
       // Use navigator.sendBeacon for reliability on page unload
       navigator.sendBeacon(
         `${VITE_SERVER_URL}/api/videos/${videoIdRef.current}/progress`,
-        new Blob([JSON.stringify({
-          watchedSeconds: Math.floor(lastReportedTime.current),
-          totalDuration: durationRef.current,
-        })], { type: "application/json" }),
+        new Blob(
+          [
+            JSON.stringify({
+              watchedSeconds: Math.floor(lastReportedTime.current),
+              totalDuration: durationRef.current,
+            }),
+          ],
+          { type: "application/json" },
+        ),
       );
     }
   };
@@ -582,10 +598,7 @@ useEffect(() => {
 **Note on `sendBeacon`**: `navigator.sendBeacon` sends a POST request that survives page navigation. However, it sends `Content-Type: text/plain` by default. The server endpoint should handle both `application/json` and `text/plain` content types, or use a `Blob` with explicit content type:
 
 ```typescript
-navigator.sendBeacon(
-  url,
-  new Blob([JSON.stringify(body)], { type: "application/json" }),
-);
+navigator.sendBeacon(url, new Blob([JSON.stringify(body)], { type: "application/json" }));
 ```
 
 ---
@@ -595,6 +608,7 @@ navigator.sendBeacon(
 ### File: `apps/web/src/components/video-player.tsx` (modify)
 
 Ensure the player supports:
+
 - `initialTime` prop: seek to this position after the player is ready
 - `onTimeUpdate` prop: fires on every `timeupdate` event from `<video>`
 
@@ -642,6 +656,7 @@ interface VideoCardProps {
 ## Verification Checklist
 
 ### Likes
+
 1. Like a video -> ThumbsUp fills, like count increments by 1
 2. Like again (toggle off) -> ThumbsUp unfills, like count decrements
 3. Dislike a liked video -> ThumbsUp unfills, ThumbsDown fills, like count -1, dislike count +1
@@ -650,6 +665,7 @@ interface VideoCardProps {
 6. Optimistic update: count changes immediately, not after server response
 
 ### Watch History
+
 7. Play a video for 15 seconds -> progress saved to server (check DB or API)
 8. Navigate away -> progress saved via `sendBeacon`
 9. Return to same video -> player resumes from last position
@@ -664,22 +680,22 @@ interface VideoCardProps {
 
 ## Files Summary
 
-| Action | File |
-|--------|------|
-| Create | `packages/db/src/schema/like.ts` |
-| Create | `packages/db/src/schema/watch-history.ts` |
-| Create | `apps/server/src/routes/like.ts` |
-| Create | `apps/server/src/routes/watch-history.ts` |
-| Create | `apps/web/src/components/like-button.tsx` |
-| Create | `apps/web/src/components/watch-progress-bar.tsx` |
-| Create | `apps/web/src/routes/history.tsx` |
+| Action | File                                                                 |
+| ------ | -------------------------------------------------------------------- |
+| Create | `packages/db/src/schema/like.ts`                                     |
+| Create | `packages/db/src/schema/watch-history.ts`                            |
+| Create | `apps/server/src/routes/like.ts`                                     |
+| Create | `apps/server/src/routes/watch-history.ts`                            |
+| Create | `apps/web/src/components/like-button.tsx`                            |
+| Create | `apps/web/src/components/watch-progress-bar.tsx`                     |
+| Create | `apps/web/src/routes/history.tsx`                                    |
 | Modify | `packages/db/src/schema/relations.ts` (add like + history relations) |
-| Modify | `packages/db/src/schema/index.ts` (add exports) |
-| Modify | `apps/server/src/index.ts` (mount like + history routes) |
-| Modify | `apps/web/src/routes/watch.$videoId.tsx` (like button, progress) |
-| Modify | `apps/web/src/components/video-player.tsx` (initialTime handling) |
-| Modify | `apps/web/src/components/video-card.tsx` (progress bar) |
-| Modify | `apps/web/src/components/user-menu.tsx` (history link) |
+| Modify | `packages/db/src/schema/index.ts` (add exports)                      |
+| Modify | `apps/server/src/index.ts` (mount like + history routes)             |
+| Modify | `apps/web/src/routes/watch.$videoId.tsx` (like button, progress)     |
+| Modify | `apps/web/src/components/video-player.tsx` (initialTime handling)    |
+| Modify | `apps/web/src/components/video-card.tsx` (progress bar)              |
+| Modify | `apps/web/src/components/user-menu.tsx` (history link)               |
 
 ## Dependencies to Install
 

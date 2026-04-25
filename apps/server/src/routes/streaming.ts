@@ -33,11 +33,7 @@ function getContentType(filename: string): string {
   }
 }
 
-function handleRangeRequest(
-  file: BunFile,
-  rangeHeader: string,
-  contentType: string,
-): Response {
+function handleRangeRequest(file: BunFile, rangeHeader: string, contentType: string): Response {
   const fileSize = file.size;
   const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
   if (!match) {

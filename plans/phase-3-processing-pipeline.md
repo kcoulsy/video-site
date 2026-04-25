@@ -102,13 +102,13 @@ Define shared types (can live in `apps/worker/src/types.ts` or a shared package)
 ```typescript
 export interface TranscodeJobData {
   videoId: string;
-  rawPath: string;      // relative to STORAGE_PATH
+  rawPath: string; // relative to STORAGE_PATH
   userId: string;
 }
 
 export interface ThumbnailJobData {
   videoId: string;
-  thumbnailSourcePath: string;  // path to uploaded custom thumbnail
+  thumbnailSourcePath: string; // path to uploaded custom thumbnail
 }
 
 export interface CleanupJobData {
@@ -167,11 +167,7 @@ for (const [name, worker] of Object.entries({
 // Graceful shutdown
 async function shutdown() {
   console.log("Shutting down workers...");
-  await Promise.all([
-    transcodeWorker.close(),
-    thumbnailWorker.close(),
-    cleanupWorker.close(),
-  ]);
+  await Promise.all([transcodeWorker.close(), thumbnailWorker.close(), cleanupWorker.close()]);
   await connection.quit();
   process.exit(0);
 }
@@ -197,9 +193,7 @@ This is the core of the pipeline. It processes a single video from raw upload to
 Before any work, update the DB so the frontend can reflect the correct state:
 
 ```typescript
-await db.update(videoTable)
-  .set({ status: "processing" })
-  .where(eq(videoTable.id, videoId));
+await db.update(videoTable).set({ status: "processing" }).where(eq(videoTable.id, videoId));
 ```
 
 #### Step 1: Probe the raw file
@@ -223,6 +217,7 @@ function probe(filePath: string): Promise<ffmpeg.FfprobeData> {
 ```
 
 Extract from probe data:
+
 - `duration` (seconds)
 - `width`, `height` from the video stream
 - `codec_name` for video and audio
@@ -238,14 +233,12 @@ Only transcode to resolutions that are <= the source resolution:
 
 ```typescript
 const RESOLUTION_LADDER = [
-  { height: 360,  width: 640,  bitrate: "800k",  profile: "main" },
-  { height: 720,  width: 1280, bitrate: "2500k", profile: "main" },
+  { height: 360, width: 640, bitrate: "800k", profile: "main" },
+  { height: 720, width: 1280, bitrate: "2500k", profile: "main" },
   { height: 1080, width: 1920, bitrate: "5000k", profile: "high" },
 ];
 
-const targetResolutions = RESOLUTION_LADDER.filter(
-  (r) => r.height <= sourceHeight
-);
+const targetResolutions = RESOLUTION_LADDER.filter((r) => r.height <= sourceHeight);
 
 // If source is smaller than 360p, still produce a 360p output
 if (targetResolutions.length === 0) {
@@ -267,6 +260,7 @@ ffmpeg -i input.mp4 \
 ```
 
 Implementation with fluent-ffmpeg:
+
 ```typescript
 function extractThumbnail(
   inputPath: string,
@@ -313,6 +307,7 @@ ffmpeg -i input.mp4 \
 ```
 
 **Important FFmpeg flags**:
+
 - `-map 0:v` repeated N times for N video renditions
 - `-map 0:a?` — the `?` makes audio optional (some videos have no audio)
 - `-seg_duration 4` — 4-second segments for smooth ABR switching
@@ -322,6 +317,7 @@ ffmpeg -i input.mp4 \
 - `-profile:v:0 main` / `-profile:v:2 high` — H.264 profiles (main for lower res, high for 1080p)
 
 **Dynamic command construction** (pseudocode):
+
 ```typescript
 function buildDashCommand(
   inputPath: string,
@@ -342,29 +338,36 @@ function buildDashCommand(
     for (let i = 0; i < resolutions.length; i++) {
       const r = resolutions[i];
       cmd = cmd.outputOptions(
-        `-c:v:${i}`, "libx264",
-        `-b:v:${i}`, r.bitrate,
-        `-s:v:${i}`, `${r.width}x${r.height}`,
-        `-profile:v:${i}`, r.profile,
+        `-c:v:${i}`,
+        "libx264",
+        `-b:v:${i}`,
+        r.bitrate,
+        `-s:v:${i}`,
+        `${r.width}x${r.height}`,
+        `-profile:v:${i}`,
+        r.profile,
       );
     }
 
     // Audio encoding
-    cmd = cmd.outputOptions(
-      "-c:a", "aac",
-      "-b:a", "128k",
-      "-ar", "44100",
-    );
+    cmd = cmd.outputOptions("-c:a", "aac", "-b:a", "128k", "-ar", "44100");
 
     // DASH output options
     cmd = cmd.outputOptions(
-      "-f", "dash",
-      "-seg_duration", "4",
-      "-use_template", "1",
-      "-use_timeline", "1",
-      "-init_seg_name", "init-stream$RepresentationID$.m4s",
-      "-media_seg_name", "chunk-stream$RepresentationID$-$Number%05d$.m4s",
-      "-adaptation_sets", "id=0,streams=v id=1,streams=a",
+      "-f",
+      "dash",
+      "-seg_duration",
+      "4",
+      "-use_template",
+      "1",
+      "-use_timeline",
+      "1",
+      "-init_seg_name",
+      "init-stream$RepresentationID$.m4s",
+      "-media_seg_name",
+      "chunk-stream$RepresentationID$-$Number%05d$.m4s",
+      "-adaptation_sets",
+      "id=0,streams=v id=1,streams=a",
     );
 
     cmd
@@ -382,6 +385,7 @@ function buildDashCommand(
 ```
 
 **Aspect ratio handling**: Do NOT use `-s:v:N WxH` — it forces exact dimensions and stretches non-16:9 content. Instead, use per-stream scale filters that preserve aspect ratio:
+
 ```
 -filter:v:0 "scale=640:-2"
 -filter:v:1 "scale=1280:-2"
@@ -393,8 +397,10 @@ The `-2` ensures height is divisible by 2 (required by H.264). Remove the `-s:v:
 #### Step 5: Update database
 
 After successful transcoding:
+
 ```typescript
-await db.update(videoTable)
+await db
+  .update(videoTable)
   .set({
     status: "ready",
     manifestPath: `videos/${videoId}/transcoded/manifest.mpd`,
@@ -412,6 +418,7 @@ Report progress: `job.updateProgress({ stage: "complete", percent: 100 })`
 #### Step 6: Cleanup raw file (optional)
 
 After successful transcoding, optionally delete the raw upload to save disk space:
+
 ```typescript
 await storage.deleteFile(rawPath);
 ```
@@ -421,8 +428,10 @@ Make this configurable via an env var (e.g., `DELETE_RAW_AFTER_TRANSCODE=true`).
 ### Error Handling
 
 If any step fails:
+
 ```typescript
-await db.update(videoTable)
+await db
+  .update(videoTable)
   .set({
     status: "failed",
     processingError: error.message,
@@ -431,6 +440,7 @@ await db.update(videoTable)
 ```
 
 BullMQ retry policy handles transient failures:
+
 ```typescript
 defaultJobOptions: {
   attempts: 3,
@@ -451,22 +461,16 @@ Handles custom thumbnail replacement. Job is enqueued when a user uploads a cust
 ```typescript
 export async function processThumbnail(job: Job<ThumbnailJobData>) {
   const { videoId, thumbnailSourcePath } = job.data;
-  
+
   // Read the uploaded thumbnail
   const data = await Bun.file(thumbnailSourcePath).arrayBuffer();
-  
+
   // Save to the video's thumbnail directory (overwrites existing)
-  const savedPath = await storage.saveThumbnail(
-    videoId,
-    Buffer.from(data),
-    "thumbnail-custom.jpg",
-  );
-  
+  const savedPath = await storage.saveThumbnail(videoId, Buffer.from(data), "thumbnail-custom.jpg");
+
   // Update DB
-  await db.update(videoTable)
-    .set({ thumbnailPath: savedPath })
-    .where(eq(videoTable.id, videoId));
-  
+  await db.update(videoTable).set({ thumbnailPath: savedPath }).where(eq(videoTable.id, videoId));
+
   // Delete the temp upload
   await storage.deleteFile(thumbnailSourcePath);
 }
@@ -481,6 +485,7 @@ export async function processThumbnail(job: Job<ThumbnailJobData>) {
 A repeatable job that garbage-collects stale data.
 
 Register as a repeatable job in `apps/worker/src/index.ts`:
+
 ```typescript
 const cleanupQueue = new Queue(CLEANUP_QUEUE, { connection });
 await cleanupQueue.add(
@@ -533,6 +538,7 @@ export const cleanupQueue = new Queue("video-cleanup", {
 ```
 
 ### Dependencies to install on server:
+
 ```
 pnpm -F apps/server add bullmq ioredis
 ```
@@ -549,11 +555,15 @@ In the tus `onUploadFinish` callback, after moving the file to storage:
 import { transcodeQueue } from "../lib/queue";
 
 // After saving raw upload and updating DB status to "uploaded":
-await transcodeQueue.add("transcode", {
-  videoId,
-  rawPath: video.rawPath,
-  userId: video.userId,
-}, { jobId: videoId });  // use videoId as jobId for direct lookup in status endpoint
+await transcodeQueue.add(
+  "transcode",
+  {
+    videoId,
+    rawPath: video.rawPath,
+    userId: video.userId,
+  },
+  { jobId: videoId },
+); // use videoId as jobId for direct lookup in status endpoint
 ```
 
 ---
@@ -640,11 +650,11 @@ Color-coded badge component:
 
 ```typescript
 const STATUS_CONFIG = {
-  uploading:  { color: "blue",   icon: Upload,     label: "Uploading" },
-  uploaded:   { color: "blue",   icon: Clock,      label: "Queued" },
-  processing: { color: "yellow", icon: Loader,     label: "Processing" },
-  ready:      { color: "green",  icon: CheckCircle, label: "Ready" },
-  failed:     { color: "red",    icon: AlertCircle, label: "Failed" },
+  uploading: { color: "blue", icon: Upload, label: "Uploading" },
+  uploaded: { color: "blue", icon: Clock, label: "Queued" },
+  processing: { color: "yellow", icon: Loader, label: "Processing" },
+  ready: { color: "green", icon: CheckCircle, label: "Ready" },
+  failed: { color: "red", icon: AlertCircle, label: "Failed" },
 };
 ```
 
@@ -653,6 +663,7 @@ Use Lucide icons. Apply Tailwind color classes. Pulse animation for "uploading" 
 ### File: `apps/web/src/routes/upload.tsx` (modify)
 
 After upload completes, switch to a "processing" view:
+
 - Show `VideoStatusBadge` with current status
 - Use React Query to poll `GET /api/videos/:id/status` every 3 seconds:
   ```typescript
@@ -673,6 +684,7 @@ After upload completes, switch to a "processing" view:
 ### File: `apps/web/src/routes/dashboard.tsx` (modify)
 
 Replace the placeholder with a list of the user's videos:
+
 - Fetch `GET /api/videos/my` via React Query
 - Display each video as a card showing:
   - Thumbnail (or placeholder if not yet generated)
@@ -690,6 +702,7 @@ Replace the placeholder with a list of the user's videos:
 ### File: `turbo.json` (modify)
 
 Add the worker to the dev pipeline:
+
 ```json
 {
   "tasks": {
@@ -703,6 +716,7 @@ Add the worker to the dev pipeline:
 ### File: root `package.json` (modify)
 
 Add scripts:
+
 ```json
 "dev:worker": "turbo -F worker dev",
 "dev:all": "turbo dev dev:worker"
@@ -730,34 +744,34 @@ Add scripts:
 
 ## Files Summary
 
-| Action | File |
-|--------|------|
-| Create | `apps/worker/package.json` |
-| Create | `apps/worker/tsconfig.json` |
-| Create | `apps/worker/tsdown.config.ts` |
-| Create | `apps/worker/.env` |
-| Create | `apps/worker/src/index.ts` |
-| Create | `apps/worker/src/queues.ts` |
-| Create | `apps/worker/src/types.ts` |
-| Create | `apps/worker/src/processors/transcode.ts` |
-| Create | `apps/worker/src/processors/thumbnail.ts` |
-| Create | `apps/worker/src/processors/cleanup.ts` |
-| Create | `apps/server/src/lib/queue.ts` |
-| Create | `apps/web/src/components/video-status-badge.tsx` |
-| Modify | `apps/server/src/routes/upload.ts` (wire enqueue) |
+| Action | File                                                             |
+| ------ | ---------------------------------------------------------------- |
+| Create | `apps/worker/package.json`                                       |
+| Create | `apps/worker/tsconfig.json`                                      |
+| Create | `apps/worker/tsdown.config.ts`                                   |
+| Create | `apps/worker/.env`                                               |
+| Create | `apps/worker/src/index.ts`                                       |
+| Create | `apps/worker/src/queues.ts`                                      |
+| Create | `apps/worker/src/types.ts`                                       |
+| Create | `apps/worker/src/processors/transcode.ts`                        |
+| Create | `apps/worker/src/processors/thumbnail.ts`                        |
+| Create | `apps/worker/src/processors/cleanup.ts`                          |
+| Create | `apps/server/src/lib/queue.ts`                                   |
+| Create | `apps/web/src/components/video-status-badge.tsx`                 |
+| Modify | `apps/server/src/routes/upload.ts` (wire enqueue)                |
 | Modify | `apps/server/src/routes/video.ts` (status + thumbnail endpoints) |
-| Modify | `apps/web/src/routes/upload.tsx` (processing status view) |
-| Modify | `apps/web/src/routes/dashboard.tsx` (video list) |
-| Modify | `turbo.json` (worker task) |
-| Modify | root `package.json` (worker scripts) |
+| Modify | `apps/web/src/routes/upload.tsx` (processing status view)        |
+| Modify | `apps/web/src/routes/dashboard.tsx` (video list)                 |
+| Modify | `turbo.json` (worker task)                                       |
+| Modify | root `package.json` (worker scripts)                             |
 
 ## Dependencies to Install
 
-| Package | Workspace |
-|---------|-----------|
-| `bullmq` | `apps/worker` |
-| `ioredis` | `apps/worker` |
-| `fluent-ffmpeg` | `apps/worker` |
+| Package                | Workspace           |
+| ---------------------- | ------------------- |
+| `bullmq`               | `apps/worker`       |
+| `ioredis`              | `apps/worker`       |
+| `fluent-ffmpeg`        | `apps/worker`       |
 | `@types/fluent-ffmpeg` | `apps/worker` (dev) |
-| `bullmq` | `apps/server` |
-| `ioredis` | `apps/server` |
+| `bullmq`               | `apps/server`       |
+| `ioredis`              | `apps/server`       |
