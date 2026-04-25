@@ -19,6 +19,7 @@
     "@video-site/env": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "^0.45.1",
+    "nanoid": "^5.1.9",
     "pg": "^8.17.1",
     "zod": "catalog:"
   },
