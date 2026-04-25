@@ -7,16 +7,16 @@ import {
   Monitor,
   MonitorOff,
   Share2,
-  ThumbsDown,
-  ThumbsUp,
 } from "lucide-react";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
 
 import { VideoPlayer } from "@/components/video-player";
+import { LikeButton } from "@/components/like-button";
 import Loader from "@/components/loader";
 import { CommentSection } from "@/components/comments/comment-section";
 import { ApiError, apiClient } from "@/lib/api-client";
+import { authClient } from "@/lib/auth-client";
 import { formatDate, formatViewCount } from "@/lib/format";
 
 export const Route = createFileRoute("/watch/$videoId")({
@@ -40,6 +40,15 @@ interface VideoResponse {
   user: { id: string; name: string; image: string | null };
 }
 
+interface ProgressResponse {
+  watchedSeconds: number;
+  totalDuration: number;
+  progressPercent: number;
+  completedAt: string | null;
+}
+
+const PROGRESS_REPORT_INTERVAL_SECONDS = 10;
+
 function absoluteUrl(path: string | null): string | undefined {
   if (!path) return undefined;
   return `${env.VITE_SERVER_URL}${path}`;
@@ -48,14 +57,34 @@ function absoluteUrl(path: string | null): string | undefined {
 function WatchPage() {
   const { videoId } = Route.useParams();
   const [cinemaMode, setCinemaMode] = useState(false);
-  const [liked, setLiked] = useState<"like" | "dislike" | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const viewReported = useRef(false);
+  const lastReportedTime = useRef(0);
+  const videoIdRef = useRef(videoId);
+  const durationRef = useRef<number | null>(null);
+  const { data: session } = authClient.useSession();
+  const isAuthenticated = !!session;
 
   const { data: video, isLoading, error } = useQuery<VideoResponse>({
     queryKey: ["video", videoId],
     queryFn: () => apiClient<VideoResponse>(`/api/videos/${videoId}`),
   });
+
+  const { data: progress } = useQuery<ProgressResponse>({
+    queryKey: ["video-progress", videoId],
+    queryFn: () =>
+      apiClient<ProgressResponse>(`/api/videos/${videoId}/progress`),
+    enabled: isAuthenticated,
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    videoIdRef.current = videoId;
+  }, [videoId]);
+
+  useEffect(() => {
+    durationRef.current = video?.duration ?? null;
+  }, [video?.duration]);
 
   useEffect(() => {
     if (cinemaMode) {
@@ -70,7 +99,56 @@ function WatchPage() {
 
   useEffect(() => {
     viewReported.current = false;
+    lastReportedTime.current = 0;
   }, [videoId]);
+
+  // Flush progress on unmount / page hide using sendBeacon
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const flush = () => {
+      const watched = lastReportedTime.current;
+      const total = durationRef.current;
+      if (watched <= 0 || !total || total <= 0) return;
+      const url = `${env.VITE_SERVER_URL}/api/videos/${videoIdRef.current}/progress`;
+      const body = new Blob(
+        [
+          JSON.stringify({
+            watchedSeconds: Math.floor(watched),
+            totalDuration: Math.floor(total),
+          }),
+        ],
+        { type: "application/json" },
+      );
+      navigator.sendBeacon(url, body);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      flush();
+    };
+  }, [isAuthenticated]);
+
+  const reportProgress = (watchedSeconds: number) => {
+    const total = durationRef.current;
+    if (!total || total <= 0) return;
+    apiClient(`/api/videos/${videoIdRef.current}/progress`, {
+      method: "POST",
+      body: JSON.stringify({
+        watchedSeconds: Math.floor(watchedSeconds),
+        totalDuration: Math.floor(total),
+      }),
+    }).catch(() => {
+      // fire-and-forget
+    });
+  };
 
   const handleTimeUpdate = (time: number) => {
     if (!viewReported.current && time >= 5) {
@@ -78,6 +156,19 @@ function WatchPage() {
       apiClient(`/api/videos/${videoId}/view`, { method: "POST" }).catch(() => {
         // best-effort — silently ignore
       });
+    }
+
+    if (
+      isAuthenticated &&
+      Math.abs(time - lastReportedTime.current) >=
+        PROGRESS_REPORT_INTERVAL_SECONDS
+    ) {
+      lastReportedTime.current = time;
+      reportProgress(time);
+    } else if (time > lastReportedTime.current) {
+      // Track the latest time we've seen even between reports, so the
+      // unmount/sendBeacon flush can save the most recent position.
+      lastReportedTime.current = Math.max(lastReportedTime.current, time);
     }
   };
 
@@ -105,6 +196,9 @@ function WatchPage() {
     );
   }
 
+  const initialTime =
+    progress && progress.progressPercent < 0.9 ? progress.watchedSeconds : 0;
+
   return (
     <>
       {cinemaMode && (
@@ -126,6 +220,7 @@ function WatchPage() {
             <VideoPlayer
               manifestUrl={absoluteUrl(video.streamUrl)}
               thumbnailUrl={absoluteUrl(video.thumbnailUrl) ?? null}
+              initialTime={initialTime}
               onTimeUpdate={handleTimeUpdate}
             />
           </div>
@@ -143,38 +238,12 @@ function WatchPage() {
             </p>
 
             <div className="flex items-center gap-1.5">
-              <div className="flex items-center overflow-hidden rounded-full bg-secondary">
-                <button
-                  onClick={() => setLiked(liked === "like" ? null : "like")}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
-                    liked === "like"
-                      ? "text-primary"
-                      : "text-foreground hover:bg-accent"
-                  }`}
-                >
-                  <ThumbsUp
-                    className={`h-4 w-4 ${liked === "like" ? "fill-primary" : ""}`}
-                  />
-                  {formatViewCount(
-                    video.likeCount + (liked === "like" ? 1 : 0),
-                  )}
-                </button>
-                <div className="h-6 w-px bg-border" />
-                <button
-                  onClick={() =>
-                    setLiked(liked === "dislike" ? null : "dislike")
-                  }
-                  className={`flex items-center px-4 py-2 transition-colors ${
-                    liked === "dislike"
-                      ? "text-foreground"
-                      : "text-foreground hover:bg-accent"
-                  }`}
-                >
-                  <ThumbsDown
-                    className={`h-4 w-4 ${liked === "dislike" ? "fill-foreground" : ""}`}
-                  />
-                </button>
-              </div>
+              <LikeButton
+                videoId={video.id}
+                likeCount={video.likeCount}
+                dislikeCount={video.dislikeCount}
+                isAuthenticated={isAuthenticated}
+              />
 
               <Button
                 variant="secondary"

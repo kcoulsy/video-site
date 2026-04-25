@@ -6,9 +6,11 @@ import { logger } from "hono/logger";
 
 import { errorHandler } from "./middleware/error-handler";
 import { commentRoutes } from "./routes/comment";
+import { likeRoutes } from "./routes/like";
 import { streamingRoutes } from "./routes/streaming";
 import { handleTusRequest } from "./routes/upload";
 import { videoRoutes } from "./routes/video";
+import { watchHistoryRoutes } from "./routes/watch-history";
 import type { AppVariables } from "./types";
 
 const app = new Hono<{ Variables: AppVariables }>();
@@ -51,8 +53,10 @@ app.onError(errorHandler);
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/api/videos", videoRoutes);
+app.route("/api/videos", likeRoutes);
 app.route("/api/stream", streamingRoutes);
 app.route("/api", commentRoutes);
+app.route("/api", watchHistoryRoutes);
 
 app.all("/api/uploads", (c) => handleTusRequest(c.req.raw));
 app.all("/api/uploads/*", (c) => handleTusRequest(c.req.raw));

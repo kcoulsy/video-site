@@ -1,127 +1,203 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Clock, History, Play } from "lucide-react";
-
 import {
-  formatDuration,
-  formatRelativeTime,
-} from "@/lib/format";
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { Link, createFileRoute, redirect } from "@tanstack/react-router";
+import { Clock, History, Play, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@video-site/ui/components/button";
+import { env } from "@video-site/env/web";
+
+import Loader from "@/components/loader";
+import { WatchProgressBar } from "@/components/watch-progress-bar";
+import { getUser } from "@/functions/get-user";
+import { ApiError, apiClient } from "@/lib/api-client";
+import { formatDuration, formatRelativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/history")({
   component: HistoryPage,
+  beforeLoad: async () => {
+    const session = await getUser();
+    return { session };
+  },
+  loader: async ({ context }) => {
+    if (!context.session) {
+      throw redirect({ to: "/login" });
+    }
+  },
 });
 
-interface WatchedVideo {
-  id: string;
-  title: string;
-  thumbnailUrl: string | null;
-  duration: number;
+interface HistoryItem {
+  videoId: string;
   watchedSeconds: number;
+  totalDuration: number;
   progressPercent: number;
+  completedAt: string | null;
   lastWatchedAt: string;
-  user: { name: string };
+  video: {
+    id: string;
+    title: string;
+    thumbnailUrl: string | null;
+    duration: number | null;
+    status: string;
+    user: { id: string; name: string; image: string | null };
+  };
 }
 
-// Mock data — replace with GET /api/history
-const MOCK_CONTINUE: WatchedVideo[] = [
-  {
-    id: "v1",
-    title: "Building a Full-Stack App with TanStack Start",
-    thumbnailUrl: null,
-    duration: 2100,
-    watchedSeconds: 840,
-    progressPercent: 0.4,
-    lastWatchedAt: new Date(Date.now() - 3600000).toISOString(),
-    user: { name: "Alex Turner" },
-  },
-  {
-    id: "v2",
-    title: "Advanced TypeScript Patterns You Need to Know",
-    thumbnailUrl: null,
-    duration: 1256,
-    watchedSeconds: 628,
-    progressPercent: 0.5,
-    lastWatchedAt: new Date(Date.now() - 7200000).toISOString(),
-    user: { name: "Sarah Chen" },
-  },
-  {
-    id: "v3",
-    title: "The Future of Web Streaming Technology",
-    thumbnailUrl: null,
-    duration: 892,
-    watchedSeconds: 200,
-    progressPercent: 0.22,
-    lastWatchedAt: new Date(Date.now() - 86400000).toISOString(),
-    user: { name: "Mike Rodriguez" },
-  },
-];
+interface HistoryResponse {
+  items: HistoryItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
 
-const MOCK_HISTORY: WatchedVideo[] = [
-  ...MOCK_CONTINUE,
-  {
-    id: "v4",
-    title: "Cinema-Quality Color Grading Tutorial",
-    thumbnailUrl: null,
-    duration: 1800,
-    watchedSeconds: 1800,
-    progressPercent: 1.0,
-    lastWatchedAt: new Date(Date.now() - 172800000).toISOString(),
-    user: { name: "Emma Wilson" },
-  },
-  {
-    id: "v5",
-    title: "Understanding DASH Streaming Protocol",
-    thumbnailUrl: null,
-    duration: 720,
-    watchedSeconds: 720,
-    progressPercent: 1.0,
-    lastWatchedAt: new Date(Date.now() - 604800000).toISOString(),
-    user: { name: "Alex Turner" },
-  },
-];
+function absoluteUrl(path: string | null): string | undefined {
+  if (!path) return undefined;
+  return `${env.VITE_SERVER_URL}${path}`;
+}
 
 function HistoryPage() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, error } = useQuery<HistoryResponse>({
+    queryKey: ["history"],
+    queryFn: () => apiClient<HistoryResponse>("/api/history?limit=50"),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (videoId: string) =>
+      apiClient(`/api/history/${videoId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["history"] });
+    },
+    onError: (err) => {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to remove from history",
+      );
+    },
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => apiClient(`/api/history`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["history"] });
+      toast.success("Watch history cleared");
+    },
+    onError: (err) => {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to clear history",
+      );
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-semibold">Couldn't load history</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Please try again in a moment.
+        </p>
+      </div>
+    );
+  }
+
+  const items = data?.items ?? [];
+  const continueItems = items.filter((it) => it.progressPercent < 0.9);
+
+  if (items.length === 0) {
+    return (
+      <div className="mx-auto max-w-[1400px] px-4 py-6">
+        <div className="mb-8 flex items-center gap-3">
+          <History className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold">Watch History</h1>
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
+          <History className="h-12 w-12 text-muted-foreground/30" />
+          <p className="mt-4 text-sm text-muted-foreground">
+            No watch history yet
+          </p>
+          <Link to="/" className="mt-4">
+            <Button variant="outline">Browse videos</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6">
-      <div className="mb-8 flex items-center gap-3">
-        <History className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-semibold">Watch History</h1>
+      <div className="mb-8 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <History className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold">Watch History</h1>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          disabled={clearMutation.isPending}
+          onClick={() => {
+            if (window.confirm("Clear your entire watch history?")) {
+              clearMutation.mutate();
+            }
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+          Clear all
+        </Button>
       </div>
 
-      {/* Continue Watching */}
-      {MOCK_CONTINUE.length > 0 && (
+      {continueItems.length > 0 && (
         <section className="mb-10">
           <h2 className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
             <Play className="h-4 w-4" />
             Continue Watching
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {MOCK_CONTINUE.map((video, i) => (
+            {continueItems.map((item, i) => (
               <div
-                key={video.id}
+                key={`continue-${item.videoId}`}
                 className="animate-fade-slide-up"
                 style={{ animationDelay: `${i * 50}ms` }}
               >
-                <ContinueCard video={video} />
+                <ContinueCard item={item} />
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* Full History */}
       <section>
         <h2 className="mb-4 flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
           <Clock className="h-4 w-4" />
           All History
         </h2>
         <div className="space-y-2">
-          {MOCK_HISTORY.map((video, i) => (
+          {items.map((item, i) => (
             <div
-              key={`${video.id}-history`}
+              key={`${item.videoId}-history`}
               className="animate-fade-slide-up"
               style={{ animationDelay: `${i * 40}ms` }}
             >
-              <HistoryRow video={video} />
+              <HistoryRow
+                item={item}
+                onRemove={() => removeMutation.mutate(item.videoId)}
+                removing={
+                  removeMutation.isPending &&
+                  removeMutation.variables === item.videoId
+                }
+              />
             </div>
           ))}
         </div>
@@ -130,19 +206,21 @@ function HistoryPage() {
   );
 }
 
-function ContinueCard({ video }: { video: WatchedVideo }) {
+function ContinueCard({ item }: { item: HistoryItem }) {
+  const thumbnail = absoluteUrl(item.video.thumbnailUrl);
   return (
     <Link
       to="/watch/$videoId"
-      params={{ videoId: video.id }}
+      params={{ videoId: item.videoId }}
       className="group block"
     >
       <div className="relative aspect-video overflow-hidden rounded-xl bg-secondary">
-        {video.thumbnailUrl ? (
+        {thumbnail ? (
           <img
-            src={video.thumbnailUrl}
-            alt={video.title}
+            src={thumbnail}
+            alt={item.video.title}
             className="h-full w-full object-cover"
+            loading="lazy"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
@@ -150,15 +228,8 @@ function ContinueCard({ video }: { video: WatchedVideo }) {
           </div>
         )}
 
-        {/* Progress bar */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-          <div
-            className="h-full bg-primary transition-all"
-            style={{ width: `${video.progressPercent * 100}%` }}
-          />
-        </div>
+        <WatchProgressBar progressPercent={item.progressPercent} />
 
-        {/* Resume hover overlay */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
           <div className="flex items-center gap-2 rounded-full bg-white/20 px-4 py-2 backdrop-blur-sm">
             <Play className="h-4 w-4 fill-white text-white" />
@@ -169,65 +240,85 @@ function ContinueCard({ video }: { video: WatchedVideo }) {
 
       <div className="mt-2">
         <h3 className="line-clamp-1 text-sm font-medium transition-colors group-hover:text-primary">
-          {video.title}
+          {item.video.title}
         </h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {formatDuration(video.watchedSeconds)} /{" "}
-          {formatDuration(video.duration)} &middot; {video.user.name}
+          {formatDuration(item.watchedSeconds)} /{" "}
+          {item.video.duration != null
+            ? formatDuration(item.video.duration)
+            : formatDuration(item.totalDuration)}{" "}
+          &middot; {item.video.user.name}
         </p>
       </div>
     </Link>
   );
 }
 
-function HistoryRow({ video }: { video: WatchedVideo }) {
-  const isComplete = video.progressPercent >= 0.9;
+function HistoryRow({
+  item,
+  onRemove,
+  removing,
+}: {
+  item: HistoryItem;
+  onRemove: () => void;
+  removing: boolean;
+}) {
+  const isComplete = item.progressPercent >= 0.9;
+  const thumbnail = absoluteUrl(item.video.thumbnailUrl);
 
   return (
-    <Link
-      to="/watch/$videoId"
-      params={{ videoId: video.id }}
-      className="group flex items-center gap-4 rounded-xl p-3 transition-colors hover:bg-secondary/50"
-    >
-      <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-secondary">
-        {video.thumbnailUrl ? (
-          <img
-            src={video.thumbnailUrl}
-            alt={video.title}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-            <Play className="h-6 w-6 text-muted-foreground/30" />
-          </div>
-        )}
-        <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">
-          {formatDuration(video.duration)}
-        </span>
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20">
-          <div
-            className="h-full bg-primary"
-            style={{
-              width: `${Math.min(video.progressPercent, 1) * 100}%`,
-            }}
-          />
+    <div className="group flex items-center gap-4 rounded-xl p-3 transition-colors hover:bg-secondary/50">
+      <Link
+        to="/watch/$videoId"
+        params={{ videoId: item.videoId }}
+        className="flex min-w-0 flex-1 items-center gap-4"
+      >
+        <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-secondary">
+          {thumbnail ? (
+            <img
+              src={thumbnail}
+              alt={item.video.title}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
+              <Play className="h-6 w-6 text-muted-foreground/30" />
+            </div>
+          )}
+          {item.video.duration != null && (
+            <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">
+              {formatDuration(item.video.duration)}
+            </span>
+          )}
+          <WatchProgressBar progressPercent={item.progressPercent} />
         </div>
-      </div>
 
-      <div className="min-w-0 flex-1">
-        <h3 className="line-clamp-1 text-sm font-medium transition-colors group-hover:text-primary">
-          {video.title}
-        </h3>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {video.user.name}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {isComplete
-            ? "Watched"
-            : `${Math.round(video.progressPercent * 100)}% watched`}{" "}
-          &middot; {formatRelativeTime(video.lastWatchedAt)}
-        </p>
-      </div>
-    </Link>
+        <div className="min-w-0 flex-1">
+          <h3 className="line-clamp-1 text-sm font-medium transition-colors group-hover:text-primary">
+            {item.video.title}
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {item.video.user.name}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {isComplete
+              ? "Watched"
+              : `${Math.round(item.progressPercent * 100)}% watched`}{" "}
+            &middot; {formatRelativeTime(item.lastWatchedAt)}
+          </p>
+        </div>
+      </Link>
+
+      <button
+        type="button"
+        aria-label="Remove from history"
+        disabled={removing}
+        onClick={onRemove}
+        className="rounded-full p-2 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-secondary hover:text-foreground disabled:opacity-50"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
   );
 }

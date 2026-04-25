@@ -7,6 +7,8 @@ import {
   formatRelativeTime,
 } from "@/lib/format";
 
+import { WatchProgressBar } from "./watch-progress-bar";
+
 export interface VideoCardProps {
   id: string;
   title: string;
@@ -15,6 +17,7 @@ export interface VideoCardProps {
   viewCount: number;
   createdAt: string;
   user: { name: string; image?: string | null };
+  progressPercent?: number;
 }
 
 export function VideoCard({
@@ -25,6 +28,7 @@ export function VideoCard({
   viewCount,
   createdAt,
   user,
+  progressPercent,
 }: VideoCardProps) {
   return (
     <Link to="/watch/$videoId" params={{ videoId: id }} className="group block">
@@ -52,6 +56,10 @@ export function VideoCard({
 
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-primary/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+        {progressPercent != null && (
+          <WatchProgressBar progressPercent={progressPercent} />
+        )}
       </div>
 
       {/* Info */}

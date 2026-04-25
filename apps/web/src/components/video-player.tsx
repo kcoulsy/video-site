@@ -19,12 +19,18 @@ export function VideoPlayer({
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<unknown>(null);
+  const initialTimeRef = useRef<number | undefined>(initialTime);
+
+  useEffect(() => {
+    initialTimeRef.current = initialTime;
+  }, [initialTime]);
 
   // dash.js integration — dynamic import to avoid SSR crashes
   useEffect(() => {
     if (!videoRef.current || !manifestUrl) return;
 
     let cancelled = false;
+    let seeked = false;
 
     import("dashjs")
       .then((dashjs) => {
@@ -44,11 +50,14 @@ export function VideoPlayer({
           },
         });
 
-        if (initialTime && initialTime > 0) {
-          player.on(dashjs.MediaPlayer.events.CAN_PLAY, () => {
-            player.seek(initialTime);
-          });
-        }
+        player.on(dashjs.MediaPlayer.events.CAN_PLAY, () => {
+          if (seeked) return;
+          const t = initialTimeRef.current;
+          if (t && t > 0) {
+            player.seek(t);
+          }
+          seeked = true;
+        });
 
         playerRef.current = player;
       })
