@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
-  MessageSquare,
   Monitor,
   MonitorOff,
   Share2,
@@ -16,6 +15,7 @@ import { env } from "@video-site/env/web";
 
 import { VideoPlayer } from "@/components/video-player";
 import Loader from "@/components/loader";
+import { CommentSection } from "@/components/comments/comment-section";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { formatDate, formatViewCount } from "@/lib/format";
 
@@ -33,6 +33,7 @@ interface VideoResponse {
   viewCount: number;
   likeCount: number;
   dislikeCount: number;
+  commentCount: number;
   createdAt: string;
   streamUrl: string | null;
   thumbnailUrl: string | null;
@@ -253,21 +254,10 @@ function WatchPage() {
             ) : null}
           </div>
 
-          <div className="mb-12 mt-6">
-            <div className="mb-4 flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Comments</h2>
-              <span className="text-sm text-muted-foreground">
-                Coming soon
-              </span>
-            </div>
-            <div className="rounded-xl border border-dashed border-border p-8 text-center">
-              <MessageSquare className="mx-auto h-10 w-10 text-muted-foreground/20" />
-              <p className="mt-3 text-sm text-muted-foreground">
-                Comments will be available in a future update
-              </p>
-            </div>
-          </div>
+          <CommentSection
+            videoId={video.id}
+            commentCount={video.commentCount}
+          />
         </div>
       </div>
     </>
