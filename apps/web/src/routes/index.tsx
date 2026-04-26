@@ -56,8 +56,7 @@ export const Route = createFileRoute("/")({
         ? search.category.trim()
         : undefined;
     const pageNum = Number(search.page);
-    const page =
-      Number.isFinite(pageNum) && pageNum > 1 ? Math.floor(pageNum) : undefined;
+    const page = Number.isFinite(pageNum) && pageNum > 1 ? Math.floor(pageNum) : undefined;
     return { sort, category, page };
   },
 });

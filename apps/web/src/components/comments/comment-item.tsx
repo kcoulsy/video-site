@@ -196,6 +196,50 @@ export function CommentItem({
     },
   });
 
+  const likeMutation = useMutation({
+    mutationFn: () =>
+      apiClient<{ liked: boolean; likeCount: number }>(
+        `/api/comments/${comment.id}/like`,
+        { method: "POST" },
+      ),
+    onMutate: async () => {
+      const nextLiked = !comment.liked;
+      const delta = nextLiked ? 1 : -1;
+      const updateInList = (cm: Comment) =>
+        cm.id === comment.id
+          ? { ...cm, liked: nextLiked, likeCount: Math.max(0, cm.likeCount + delta) }
+          : cm;
+      const updatePages = (
+        old: { pages: CommentsPage[]; pageParams: unknown[] } | undefined,
+      ) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((p) => ({
+            ...p,
+            comments: p.comments.map(updateInList),
+          })),
+        };
+      };
+      queryClient.setQueriesData(
+        { queryKey: ["comments", videoId, "top"] },
+        updatePages,
+      );
+      if (comment.parentId) {
+        queryClient.setQueryData(
+          ["comments", videoId, "replies", comment.parentId],
+          updatePages,
+        );
+      } else {
+        queryClient.setQueryData(["comments", videoId, "replies", comment.id], updatePages);
+      }
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Failed to like comment");
+      queryClient.invalidateQueries({ queryKey: ["comments", videoId] });
+    },
+  });
+
   const handleDelete = () => {
     if (!confirm("Delete this comment?")) return;
     deleteMutation.mutate();
@@ -253,9 +297,22 @@ export function CommentItem({
           <div className="mt-2 flex items-center gap-1">
             <button
               type="button"
-              className="flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              onClick={() => {
+                if (!currentUserId) {
+                  toast.message("Sign in to like comments");
+                  return;
+                }
+                likeMutation.mutate();
+              }}
+              disabled={likeMutation.isPending}
+              aria-pressed={comment.liked}
+              className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors hover:bg-accent disabled:opacity-70 ${
+                comment.liked ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <ThumbsUp className="h-3.5 w-3.5" />
+              <ThumbsUp
+                className={`h-3.5 w-3.5 ${comment.liked ? "fill-primary" : ""}`}
+              />
               {comment.likeCount > 0 ? comment.likeCount : ""}
             </button>
             {currentUserId && (

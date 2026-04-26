@@ -2,11 +2,15 @@ import { relations } from "drizzle-orm";
 
 import { account, session, user } from "./auth";
 import { comment } from "./comment";
+import { commentLike } from "./comment-like";
 import { videoLike } from "./like";
 import { moderationAction, report } from "./moderation";
+import { playlist, playlistItem } from "./playlist";
 import { category, categoryTag, tag, videoTag } from "./tags";
 import { video } from "./video";
+import { viewEvent } from "./view-event";
 import { watchHistory } from "./watch-history";
+import { watchLater } from "./watch-later";
 
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
@@ -14,7 +18,10 @@ export const userRelations = relations(user, ({ many }) => ({
   videos: many(video),
   comments: many(comment),
   likes: many(videoLike),
+  commentLikes: many(commentLike),
   watchHistory: many(watchHistory),
+  watchLater: many(watchLater),
+  playlists: many(playlist),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -39,6 +46,9 @@ export const videoRelations = relations(video, ({ one, many }) => ({
   comments: many(comment),
   likes: many(videoLike),
   watchHistory: many(watchHistory),
+  watchLater: many(watchLater),
+  playlistItems: many(playlistItem),
+  viewEvents: many(viewEvent),
   videoTags: many(videoTag),
 }));
 
@@ -89,6 +99,59 @@ export const commentRelations = relations(comment, ({ one, many }) => ({
   }),
   replies: many(comment, {
     relationName: "commentReplies",
+  }),
+  likes: many(commentLike),
+}));
+
+export const commentLikeRelations = relations(commentLike, ({ one }) => ({
+  user: one(user, {
+    fields: [commentLike.userId],
+    references: [user.id],
+  }),
+  comment: one(comment, {
+    fields: [commentLike.commentId],
+    references: [comment.id],
+  }),
+}));
+
+export const watchLaterRelations = relations(watchLater, ({ one }) => ({
+  user: one(user, {
+    fields: [watchLater.userId],
+    references: [user.id],
+  }),
+  video: one(video, {
+    fields: [watchLater.videoId],
+    references: [video.id],
+  }),
+}));
+
+export const playlistRelations = relations(playlist, ({ one, many }) => ({
+  user: one(user, {
+    fields: [playlist.userId],
+    references: [user.id],
+  }),
+  items: many(playlistItem),
+}));
+
+export const playlistItemRelations = relations(playlistItem, ({ one }) => ({
+  playlist: one(playlist, {
+    fields: [playlistItem.playlistId],
+    references: [playlist.id],
+  }),
+  video: one(video, {
+    fields: [playlistItem.videoId],
+    references: [video.id],
+  }),
+}));
+
+export const viewEventRelations = relations(viewEvent, ({ one }) => ({
+  video: one(video, {
+    fields: [viewEvent.videoId],
+    references: [video.id],
+  }),
+  user: one(user, {
+    fields: [viewEvent.userId],
+    references: [user.id],
   }),
 }));
 

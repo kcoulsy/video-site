@@ -295,9 +295,7 @@ function WatchPage() {
           <CommentSection videoId={video.id} commentCount={video.commentCount} />
         </div>
 
-        <aside
-          className={`lg:col-start-2 ${cinemaMode ? "" : "lg:row-start-1 lg:row-span-2"}`}
-        >
+        <aside className={`lg:col-start-2 ${cinemaMode ? "" : "lg:row-start-1 lg:row-span-2"}`}>
           <WatchNext currentVideoId={video.id} />
         </aside>
       </div>

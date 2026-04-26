@@ -76,9 +76,7 @@ function SearchPage() {
 
   useEffect(() => {
     const previous = document.title;
-    document.title = trimmed
-      ? `Search: ${trimmed} — Watchbox`
-      : "Search — Watchbox";
+    document.title = trimmed ? `Search: ${trimmed} — Watchbox` : "Search — Watchbox";
     return () => {
       document.title = previous;
     };

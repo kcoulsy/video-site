@@ -117,9 +117,7 @@ videoRoutes.post("/", ...requireNotMuted, async (c) => {
       status: "uploading",
     });
     if (uniqueTagIds.length > 0) {
-      await tx
-        .insert(videoTag)
-        .values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
+      await tx.insert(videoTag).values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
     }
   });
 
@@ -211,9 +209,7 @@ videoRoutes.get("/", async (c) => {
     visibleVideoWhere(),
     activeAuthorWhere(),
   ];
-  const where = categoryFilter
-    ? and(...baseConditions, categoryFilter)
-    : and(...baseConditions);
+  const where = categoryFilter ? and(...baseConditions, categoryFilter) : and(...baseConditions);
 
   const rows = await db
     .select({
@@ -387,9 +383,7 @@ videoRoutes.patch("/:id", requireAuth, async (c) => {
     if (uniqueTagIds !== undefined) {
       await tx.delete(videoTag).where(eq(videoTag.videoId, id));
       if (uniqueTagIds.length > 0) {
-        await tx
-          .insert(videoTag)
-          .values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
+        await tx.insert(videoTag).values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
       }
     }
   });

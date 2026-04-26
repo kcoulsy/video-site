@@ -116,7 +116,10 @@ function EditVideoPage() {
   });
 
   const isBusy = saveMutation.isPending;
-  const canSubmit = useMemo(() => hydrated && title.trim().length > 0 && !isBusy, [hydrated, title, isBusy]);
+  const canSubmit = useMemo(
+    () => hydrated && title.trim().length > 0 && !isBusy,
+    [hydrated, title, isBusy],
+  );
 
   if (videoLoading || !tagData) {
     return (

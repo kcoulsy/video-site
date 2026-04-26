@@ -147,7 +147,6 @@ function DashboardPage() {
           </div>
         )}
       </div>
-
     </div>
   );
 }
@@ -179,13 +178,7 @@ function useVideoStatus(videoId: string, status: VideoStatus) {
   });
 }
 
-function VideoRow({
-  video,
-  onDeleted,
-}: {
-  video: DashboardVideo;
-  onDeleted: () => void;
-}) {
+function VideoRow({ video, onDeleted }: { video: DashboardVideo; onDeleted: () => void }) {
   const liveStatus = useVideoStatus(video.id, video.status);
   const status = liveStatus.data?.status ?? video.status;
   const progress = liveStatus.data?.progress?.percent ?? null;
@@ -293,9 +286,7 @@ function VideoRow({
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
-            render={
-              <Link to="/videos/$videoId/edit" params={{ videoId: video.id }} />
-            }
+            render={<Link to="/videos/$videoId/edit" params={{ videoId: video.id }} />}
           >
             <Edit2 className="mr-2 h-4 w-4" />
             Edit

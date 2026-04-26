@@ -41,10 +41,7 @@ tagRoutes.get("/categories", async (c) => {
     .from(categoryTag)
     .innerJoin(tag, eq(tag.id, categoryTag.tagId));
 
-  const tagsByCategory = new Map<
-    string,
-    { id: string; slug: string; name: string }[]
-  >();
+  const tagsByCategory = new Map<string, { id: string; slug: string; name: string }[]>();
   for (const link of links) {
     const list = tagsByCategory.get(link.categoryId) ?? [];
     list.push({ id: link.tagId, slug: link.tagSlug, name: link.tagName });

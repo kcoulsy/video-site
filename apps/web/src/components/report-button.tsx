@@ -127,11 +127,7 @@ export function ReportButton({
               <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                size="sm"
-                onClick={() => submit.mutate()}
-                disabled={submit.isPending}
-              >
+              <Button size="sm" onClick={() => submit.mutate()} disabled={submit.isPending}>
                 {submit.isPending ? "Submitting..." : "Submit report"}
               </Button>
             </div>

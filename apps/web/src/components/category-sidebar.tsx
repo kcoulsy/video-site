@@ -45,9 +45,7 @@ export function CategorySidebar({ selected }: CategorySidebarProps) {
             page: undefined,
           })}
           className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-            !selected
-              ? "bg-primary text-primary-foreground"
-              : "text-foreground hover:bg-accent"
+            !selected ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-accent"
           }`}
         >
           All videos
@@ -67,9 +65,7 @@ export function CategorySidebar({ selected }: CategorySidebarProps) {
                 page: undefined,
               })}
               className={`flex items-center justify-between rounded-md px-3 py-1.5 text-sm transition-colors ${
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-foreground hover:bg-accent"
+                active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-accent"
               }`}
               title={cat.tags.map((t) => t.name).join(cat.mode === "all" ? " AND " : " OR ")}
             >

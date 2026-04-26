@@ -244,30 +244,27 @@ export function VideoPlayer({
     }
   }, []);
 
-  const setQuality = useCallback(
-    (option: QualityOption | null) => {
-      const player = playerRef.current;
-      if (!player) return;
-      if (option === null) {
-        player.updateSettings({
-          streaming: { abr: { autoSwitchBitrate: { video: true } } },
-        });
-        setCurrentQuality(null);
-      } else {
-        player.updateSettings({
-          streaming: { abr: { autoSwitchBitrate: { video: false } } },
-        });
-        try {
-          player.setRepresentationForTypeById("video", option.id, true);
-        } catch {
-          player.setRepresentationForTypeByIndex("video", option.index, true);
-        }
-        setCurrentQuality(option.id);
+  const setQuality = useCallback((option: QualityOption | null) => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (option === null) {
+      player.updateSettings({
+        streaming: { abr: { autoSwitchBitrate: { video: true } } },
+      });
+      setCurrentQuality(null);
+    } else {
+      player.updateSettings({
+        streaming: { abr: { autoSwitchBitrate: { video: false } } },
+      });
+      try {
+        player.setRepresentationForTypeById("video", option.id, true);
+      } catch {
+        player.setRepresentationForTypeByIndex("video", option.index, true);
       }
-      setSettingsOpen(false);
-    },
-    [],
-  );
+      setCurrentQuality(option.id);
+    }
+    setSettingsOpen(false);
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -554,8 +551,7 @@ export function VideoPlayer({
                             currentQuality === q.id ? "text-white" : "text-white/80"
                           }`}
                         >
-                          {q.height}p
-                          {currentQuality === q.id && <span>•</span>}
+                          {q.height}p{currentQuality === q.id && <span>•</span>}
                         </button>
                       ))}
                   </div>
@@ -571,9 +567,7 @@ export function VideoPlayer({
                 aria-label={cinemaMode ? "Exit cinema mode" : "Cinema mode"}
                 aria-pressed={cinemaMode}
               >
-                <RectangleHorizontal
-                  className={`h-5 w-5 ${cinemaMode ? "fill-white" : ""}`}
-                />
+                <RectangleHorizontal className={`h-5 w-5 ${cinemaMode ? "fill-white" : ""}`} />
               </button>
             )}
 
@@ -599,7 +593,6 @@ export function VideoPlayer({
           </div>
         </div>
       </div>
-
     </div>
   );
 }

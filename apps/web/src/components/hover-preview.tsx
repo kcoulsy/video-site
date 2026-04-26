@@ -125,11 +125,7 @@ export function HoverPreview({ videoId, title, thumbnailUrl, duration }: HoverPr
   }, []);
 
   return (
-    <div
-      className="absolute inset-0"
-      onMouseEnter={start}
-      onMouseLeave={stop}
-    >
+    <div className="absolute inset-0" onMouseEnter={start} onMouseLeave={stop}>
       {thumbnailUrl ? (
         <img
           src={thumbnailUrl}

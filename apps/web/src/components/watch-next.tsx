@@ -82,12 +82,9 @@ export function WatchNext({ currentVideoId }: WatchNextProps) {
                   <h3 className="line-clamp-2 text-xs font-medium leading-snug text-foreground group-hover:text-primary">
                     {v.title}
                   </h3>
-                  <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                    {v.user.name}
-                  </p>
+                  <p className="mt-1 truncate text-[11px] text-muted-foreground">{v.user.name}</p>
                   <p className="truncate text-[11px] text-muted-foreground">
-                    {formatViewCount(v.viewCount)} views &middot;{" "}
-                    {formatRelativeTime(v.createdAt)}
+                    {formatViewCount(v.viewCount)} views &middot; {formatRelativeTime(v.createdAt)}
                   </p>
                 </div>
               </Link>

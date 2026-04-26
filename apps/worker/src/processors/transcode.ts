@@ -71,23 +71,22 @@ function transcodeToMp4(
   onProgress: (percent: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    let cmd = ffmpeg(inputPath)
-      .outputOptions(
-        "-map",
-        "0:v",
-        "-c:v",
-        "libx264",
-        "-b:v",
-        resolution.bitrate,
-        "-vf",
-        `scale=${resolution.width}:-2`,
-        "-profile:v",
-        resolution.profile,
-        "-preset",
-        "veryfast",
-        "-movflags",
-        "+faststart",
-      );
+    let cmd = ffmpeg(inputPath).outputOptions(
+      "-map",
+      "0:v",
+      "-c:v",
+      "libx264",
+      "-b:v",
+      resolution.bitrate,
+      "-vf",
+      `scale=${resolution.width}:-2`,
+      "-profile:v",
+      resolution.profile,
+      "-preset",
+      "veryfast",
+      "-movflags",
+      "+faststart",
+    );
 
     if (hasAudio) {
       cmd = cmd.outputOptions("-map", "0:a?", "-c:a", "aac", "-b:a", "128k", "-ar", "44100");

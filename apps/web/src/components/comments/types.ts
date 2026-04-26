@@ -12,6 +12,7 @@ export interface Comment {
   depth: number;
   replyCount: number;
   likeCount: number;
+  liked: boolean;
   createdAt: string;
   editedAt: string | null;
   deletedAt: string | null;

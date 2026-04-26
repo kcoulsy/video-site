@@ -171,12 +171,13 @@ function UploadPage() {
 
       <div className="mb-8">
         <h1 className="text-2xl font-semibold">Upload Video</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Share your video with the world.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Share your video with the world.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <form
+        onSubmit={handleSubmit}
+        className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+      >
         <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">
           {!file ? (
             <div
@@ -298,9 +299,7 @@ function UploadPage() {
                       type="button"
                       onClick={() =>
                         setSelectedTagIds((prev) =>
-                          prev.includes(t.id)
-                            ? prev.filter((id) => id !== t.id)
-                            : [...prev, t.id],
+                          prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id],
                         )
                       }
                       disabled={isBusy}

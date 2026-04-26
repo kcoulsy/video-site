@@ -67,7 +67,11 @@ moderationRoutes.post("/reports", ...requireActiveUser, async (c) => {
   // Validate target exists
   const { targetType, targetId } = parsed.data;
   if (targetType === "video") {
-    const [v] = await db.select({ id: video.id }).from(video).where(eq(video.id, targetId)).limit(1);
+    const [v] = await db
+      .select({ id: video.id })
+      .from(video)
+      .where(eq(video.id, targetId))
+      .limit(1);
     if (!v) throw new NotFoundError("Video");
   } else {
     const [cm] = await db
@@ -290,9 +294,7 @@ const queueQuerySchema = listQuerySchema.extend({
 });
 
 modOnly.get("/queue", async (c) => {
-  const parsed = queueQuerySchema.safeParse(
-    Object.fromEntries(new URL(c.req.url).searchParams),
-  );
+  const parsed = queueQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
   if (!parsed.success) throw new ValidationError("Invalid query");
   const { page, limit, type } = parsed.data;
 
@@ -340,10 +342,16 @@ modOnly.get("/queue", async (c) => {
           .limit(limit + (page - 1) * limit)
       : Promise.resolve([] as never[]),
     includeVideos
-      ? db.select({ count: sql<number>`count(*)::int` }).from(video).where(videoWhere)
+      ? db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(video)
+          .where(videoWhere)
       : Promise.resolve([{ count: 0 }]),
     includeComments
-      ? db.select({ count: sql<number>`count(*)::int` }).from(comment).where(commentWhere)
+      ? db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(comment)
+          .where(commentWhere)
       : Promise.resolve([{ count: 0 }]),
   ]);
 
@@ -565,7 +573,11 @@ modOnly.post("/reports/:id/resolve", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const note = reasonSchema.parse((body as { note?: string })?.note);
 
-  const [existing] = await db.select({ id: report.id }).from(report).where(eq(report.id, id)).limit(1);
+  const [existing] = await db
+    .select({ id: report.id })
+    .from(report)
+    .where(eq(report.id, id))
+    .limit(1);
   if (!existing) throw new NotFoundError("Report");
 
   await db.transaction(async (tx) => {
@@ -595,7 +607,11 @@ modOnly.post("/reports/:id/dismiss", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const note = reasonSchema.parse((body as { note?: string })?.note);
 
-  const [existing] = await db.select({ id: report.id }).from(report).where(eq(report.id, id)).limit(1);
+  const [existing] = await db
+    .select({ id: report.id })
+    .from(report)
+    .where(eq(report.id, id))
+    .limit(1);
   if (!existing) throw new NotFoundError("Report");
 
   await db.transaction(async (tx) => {

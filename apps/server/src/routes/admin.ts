@@ -96,7 +96,10 @@ adminRoutes.get("/users", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  const [total] = await db.select({ count: sql<number>`count(*)::int` }).from(user).where(where);
+  const [total] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(user)
+    .where(where);
 
   return c.json({ items: rows, page, limit, total: total?.count ?? 0 });
 });
@@ -143,10 +146,7 @@ adminRoutes.delete("/users/:id", async (c) => {
     throw new ForbiddenError("Cannot delete your own account");
   }
 
-  const userVideos = await db
-    .select({ id: video.id })
-    .from(video)
-    .where(eq(video.userId, id));
+  const userVideos = await db.select({ id: video.id }).from(video).where(eq(video.userId, id));
 
   const [existing] = await db.select({ id: user.id }).from(user).where(eq(user.id, id)).limit(1);
   if (!existing) throw new NotFoundError("User");
@@ -217,7 +217,10 @@ adminRoutes.get("/videos", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  const [total] = await db.select({ count: sql<number>`count(*)::int` }).from(video).where(where);
+  const [total] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(video)
+    .where(where);
 
   const items = rows.map((r) => ({
     id: r.id,
@@ -285,9 +288,7 @@ adminRoutes.patch("/videos/:id", async (c) => {
     if (uniqueTagIds !== undefined) {
       await tx.delete(videoTag).where(eq(videoTag.videoId, id));
       if (uniqueTagIds.length > 0) {
-        await tx
-          .insert(videoTag)
-          .values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
+        await tx.insert(videoTag).values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
       }
     }
   });
@@ -499,10 +500,7 @@ adminRoutes.get("/categories", async (c) => {
 
 async function validateTagIds(tagIds: string[]): Promise<void> {
   if (tagIds.length === 0) return;
-  const found = await db
-    .select({ id: tag.id })
-    .from(tag)
-    .where(inArray(tag.id, tagIds));
+  const found = await db.select({ id: tag.id }).from(tag).where(inArray(tag.id, tagIds));
   if (found.length !== tagIds.length) {
     throw new ValidationError("One or more tagIds are invalid");
   }
@@ -535,9 +533,7 @@ adminRoutes.post("/categories", async (c) => {
       sortOrder: parsed.data.sortOrder,
     });
     if (uniqueTagIds.length > 0) {
-      await tx
-        .insert(categoryTag)
-        .values(uniqueTagIds.map((tagId) => ({ categoryId: id, tagId })));
+      await tx.insert(categoryTag).values(uniqueTagIds.map((tagId) => ({ categoryId: id, tagId })));
     }
   });
 

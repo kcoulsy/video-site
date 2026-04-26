@@ -1,8 +1,10 @@
+import { auth } from "@video-site/auth";
 import { db, generateId } from "@video-site/db";
 import { user } from "@video-site/db/schema/auth";
 import { comment } from "@video-site/db/schema/comment";
+import { commentLike } from "@video-site/db/schema/comment-like";
 import { video } from "@video-site/db/schema/video";
-import { and, asc, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -42,6 +44,7 @@ async function checkRateLimit(userId: string) {
 function serializeComment(
   row: typeof comment.$inferSelect & {
     user: { id: string; name: string; image: string | null };
+    liked?: boolean;
   },
 ) {
   const isDeleted = row.deletedAt != null;
@@ -54,6 +57,7 @@ function serializeComment(
     depth: row.depth,
     replyCount: row.replyCount,
     likeCount: row.likeCount,
+    liked: row.liked ?? false,
     createdAt: row.createdAt,
     editedAt: row.editedAt,
     deletedAt: row.deletedAt,
@@ -67,6 +71,7 @@ async function listComments(
   sort: "newest" | "oldest",
   limit: number,
   cursor?: string,
+  currentUserId?: string,
 ) {
   if (cursor) {
     const [cursorRow] = await db
@@ -100,10 +105,22 @@ async function listComments(
 
   const hasMore = rows.length > limit;
   const slice = hasMore ? rows.slice(0, limit) : rows;
+
+  let likedSet: Set<string> = new Set();
+  if (currentUserId && slice.length > 0) {
+    const ids = slice.map((r) => r.c.id);
+    const likedRows = await db
+      .select({ commentId: commentLike.commentId })
+      .from(commentLike)
+      .where(and(eq(commentLike.userId, currentUserId), inArray(commentLike.commentId, ids)));
+    likedSet = new Set(likedRows.map((r) => r.commentId));
+  }
+
   const items = slice.map((r) =>
     serializeComment({
       ...r.c,
       user: { id: r.userId, name: r.userName, image: r.userImage },
+      liked: likedSet.has(r.c.id),
     }),
   );
 
@@ -121,11 +138,13 @@ commentRoutes.get("/videos/:videoId/comments", async (c) => {
     throw new ValidationError("Invalid query");
   }
 
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
   const result = await listComments(
     [eq(comment.videoId, videoId), isNull(comment.parentId)],
     parsed.data.sort,
     parsed.data.limit,
     parsed.data.cursor,
+    session?.user.id,
   );
 
   return c.json(result);
@@ -139,11 +158,13 @@ commentRoutes.get("/videos/:videoId/comments/:id/replies", async (c) => {
     throw new ValidationError("Invalid query");
   }
 
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
   const result = await listComments(
     [eq(comment.videoId, videoId), eq(comment.parentId, parentId)],
     "oldest",
     parsed.data.limit,
     parsed.data.cursor,
+    session?.user.id,
   );
 
   return c.json(result);

@@ -90,7 +90,9 @@ function AdminReports() {
   return (
     <div>
       <h1 className="text-2xl font-semibold">Reports</h1>
-      <p className="mt-1 text-sm text-muted-foreground">{total} {status || "all"}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {total} {status || "all"}
+      </p>
 
       <div className="mt-4 flex gap-2">
         {["pending", "resolved", "dismissed", ""].map((s) => (

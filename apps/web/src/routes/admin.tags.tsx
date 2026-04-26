@@ -147,7 +147,9 @@ function AdminTags() {
           />
         </div>
         <Button type="submit" disabled={!name.trim() || !slug.trim()}>
-          {editingId ? "Save" : (
+          {editingId ? (
+            "Save"
+          ) : (
             <>
               <Plus className="mr-1 h-4 w-4" /> Add tag
             </>

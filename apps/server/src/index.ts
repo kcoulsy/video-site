@@ -7,6 +7,7 @@ import { logger } from "hono/logger";
 import { errorHandler } from "./middleware/error-handler";
 import { adminRoutes } from "./routes/admin";
 import { commentRoutes } from "./routes/comment";
+import { commentLikeRoutes } from "./routes/comment-like";
 import { likeRoutes } from "./routes/like";
 import { moderationRoutes } from "./routes/moderation";
 import { searchRoutes } from "./routes/search";
@@ -15,6 +16,7 @@ import { tagRoutes } from "./routes/tags";
 import { handleTusRequest } from "./routes/upload";
 import { videoRoutes } from "./routes/video";
 import { watchHistoryRoutes } from "./routes/watch-history";
+import { watchLaterRoutes } from "./routes/watch-later";
 import type { AppVariables } from "./types";
 
 const app = new Hono<{ Variables: AppVariables }>();
@@ -64,6 +66,7 @@ app.route("/api/stream", streamingRoutes);
 app.route("/api/search", searchRoutes);
 app.route("/api", tagRoutes);
 app.route("/api", commentRoutes);
+app.route("/api", commentLikeRoutes);
 app.route("/api", watchHistoryRoutes);
 
 app.all("/api/uploads", (c) => handleTusRequest(c.req.raw));

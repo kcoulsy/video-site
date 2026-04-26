@@ -30,12 +30,7 @@ export function VideoCard({
     <Link to="/watch/$videoId" params={{ videoId: id }} className="group block">
       {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden bg-secondary">
-        <HoverPreview
-          videoId={id}
-          title={title}
-          thumbnailUrl={thumbnailUrl}
-          duration={duration}
-        />
+        <HoverPreview videoId={id} title={title} thumbnailUrl={thumbnailUrl} duration={duration} />
 
         {/* Duration badge */}
         {duration != null && (

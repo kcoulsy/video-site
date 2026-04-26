@@ -156,9 +156,7 @@ function AdminCategories() {
   const toggleTag = (id: string) => {
     setForm((prev) => ({
       ...prev,
-      tagIds: prev.tagIds.includes(id)
-        ? prev.tagIds.filter((t) => t !== id)
-        : [...prev.tagIds, id],
+      tagIds: prev.tagIds.includes(id) ? prev.tagIds.filter((t) => t !== id) : [...prev.tagIds, id],
     }));
   };
 
@@ -311,7 +309,9 @@ function AdminCategories() {
             type="submit"
             disabled={!form.name.trim() || !form.slug.trim() || upsertMutation.isPending}
           >
-            {editingId ? "Save changes" : (
+            {editingId ? (
+              "Save changes"
+            ) : (
               <>
                 <Plus className="mr-1 h-4 w-4" /> Create category
               </>

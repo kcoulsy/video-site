@@ -231,8 +231,7 @@ function QueueRow({
         )}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span>
-            by{" "}
-            <span className="text-foreground">{item.authorName ?? "deleted user"}</span>
+            by <span className="text-foreground">{item.authorName ?? "deleted user"}</span>
           </span>
           <span>{formatRelativeTime(item.createdAt)}</span>
           {item.type === "video" ? (
@@ -257,12 +256,7 @@ function QueueRow({
         </div>
       </div>
       <div className="flex items-start gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onApprove}
-          title="Mark OK (remove from queue)"
-        >
+        <Button variant="ghost" size="sm" onClick={onApprove} title="Mark OK (remove from queue)">
           <Check className="h-4 w-4" />
         </Button>
         <Button
