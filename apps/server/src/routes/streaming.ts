@@ -88,10 +88,9 @@ streamingRoutes.get("/:videoId/manifest.mpd", async (c) => {
     }
   }
 
-  const filePath = storage.resolve(row.manifestPath);
-  if (!(await storage.fileExists(filePath))) return c.notFound();
+  if (!(await storage.fileExists(row.manifestPath))) return c.notFound();
 
-  const file = Bun.file(filePath);
+  const file = Bun.file(row.manifestPath);
   return new Response(file.stream(), {
     headers: {
       "Content-Type": "application/dash+xml",
@@ -123,10 +122,9 @@ streamingRoutes.get("/:videoId/thumbnail", async (c) => {
     }
   }
 
-  const filePath = storage.resolve(row.thumbnailPath);
-  if (!(await storage.fileExists(filePath))) return c.notFound();
+  if (!(await storage.fileExists(row.thumbnailPath))) return c.notFound();
 
-  const file = Bun.file(filePath);
+  const file = Bun.file(row.thumbnailPath);
   return new Response(file.stream(), {
     headers: {
       "Content-Type": file.type || "image/jpeg",

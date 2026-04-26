@@ -7,6 +7,7 @@ import { logger } from "hono/logger";
 import { errorHandler } from "./middleware/error-handler";
 import { commentRoutes } from "./routes/comment";
 import { likeRoutes } from "./routes/like";
+import { searchRoutes } from "./routes/search";
 import { streamingRoutes } from "./routes/streaming";
 import { handleTusRequest } from "./routes/upload";
 import { videoRoutes } from "./routes/video";
@@ -55,6 +56,7 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 app.route("/api/videos", videoRoutes);
 app.route("/api/videos", likeRoutes);
 app.route("/api/stream", streamingRoutes);
+app.route("/api/search", searchRoutes);
 app.route("/api", commentRoutes);
 app.route("/api", watchHistoryRoutes);
 

@@ -27,11 +27,13 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "private">("public");
-  const [uploading, setUploading] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [progress, setProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<tus.Upload | null>(null);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
 
   const reset = useCallback(() => {
     setFile(null);
@@ -39,13 +41,15 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     setDescription("");
     setTags("");
     setVisibility("public");
-    setUploading(false);
+    setPhase("idle");
     setProgress(0);
   }, []);
 
   useEffect(() => {
     if (!open) {
-      uploadRef.current?.abort();
+      if (phaseRef.current === "uploading") {
+        uploadRef.current?.abort();
+      }
       uploadRef.current = null;
       reset();
     }
@@ -79,7 +83,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!file) return;
-      setUploading(true);
+      setPhase("uploading");
       setProgress(0);
 
       let videoId: string;
@@ -103,7 +107,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
       } catch (err) {
         const msg = err instanceof ApiError ? err.message : "Failed to create video record";
         toast.error(msg);
-        setUploading(false);
+        setPhase("idle");
         return;
       }
 
@@ -112,6 +116,10 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           endpoint: `${env.VITE_SERVER_URL}/api/uploads`,
           retryDelays: [0, 1000, 3000, 5000],
           chunkSize: 8 * 1024 * 1024,
+          onBeforeRequest: (req) => {
+            const xhr = req.getUnderlyingObject() as XMLHttpRequest;
+            xhr.withCredentials = true;
+          },
           metadata: {
             videoId,
             filename: file.name,
@@ -119,7 +127,9 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           },
           onError: (err) => reject(err),
           onProgress: (bytesUploaded, bytesTotal) => {
-            setProgress(Math.round((bytesUploaded / bytesTotal) * 100));
+            const pct = Math.round((bytesUploaded / bytesTotal) * 100);
+            setProgress(pct);
+            if (pct >= 100) setPhase("processing");
           },
           onSuccess: () => resolve(),
         });
@@ -127,13 +137,13 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
         upload.start();
       })
         .then(() => {
-          toast.success("Upload complete — processing started");
+          toast.success("Upload complete — processing in the background");
           onUploaded?.(videoId);
           onClose();
         })
         .catch((err: Error) => {
           toast.error(`Upload failed: ${err.message}`);
-          setUploading(false);
+          setPhase("idle");
         });
     },
     [file, title, description, tags, visibility, onClose, onUploaded],
@@ -141,11 +151,15 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
 
   if (!open) return null;
 
+  const isUploading = phase === "uploading";
+  const isProcessing = phase === "processing";
+  const isBusy = isUploading || isProcessing;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={uploading ? undefined : onClose}
+        onClick={isUploading ? undefined : onClose}
       />
 
       <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl animate-fade-slide-up">
@@ -153,7 +167,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           <h2 className="text-xl font-semibold">Upload Video</h2>
           <button
             onClick={onClose}
-            disabled={uploading}
+            disabled={isUploading}
             className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
           >
             <X className="h-5 w-5" />
@@ -198,7 +212,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
                 <p className="truncate text-sm font-medium">{file.name}</p>
                 <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
               </div>
-              {!uploading && (
+              {!isBusy && (
                 <button
                   type="button"
                   onClick={() => setFile(null)}
@@ -210,7 +224,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
             </div>
           )}
 
-          {uploading && (
+          {isUploading && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Uploading...</span>
@@ -225,6 +239,19 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
             </div>
           )}
 
+          {isProcessing && (
+            <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+              <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" />
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">Upload complete — processing</p>
+                <p className="text-xs text-muted-foreground">
+                  We're transcoding your video in the background. You can close this and keep
+                  browsing.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="upload-title">Title</Label>
             <Input
@@ -232,7 +259,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Give your video a title"
-              disabled={uploading}
+              disabled={isBusy}
               required
             />
           </div>
@@ -245,7 +272,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Tell viewers about your video"
               rows={4}
-              disabled={uploading}
+              disabled={isBusy}
               className="w-full resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
             />
           </div>
@@ -257,7 +284,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="gaming, tutorial, vlog (comma separated)"
-              disabled={uploading}
+              disabled={isBusy}
             />
           </div>
 
@@ -269,7 +296,7 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
                   key={v}
                   type="button"
                   onClick={() => setVisibility(v)}
-                  disabled={uploading}
+                  disabled={isBusy}
                   className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm capitalize transition-colors disabled:opacity-50 ${
                     visibility === v
                       ? "border-primary bg-primary/10 text-primary"
@@ -288,22 +315,24 @@ export function UploadModal({ open, onClose, onUploaded }: UploadModalProps) {
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={uploading}>
-              Cancel
+            <Button type="button" variant="outline" onClick={onClose} disabled={isUploading}>
+              {isProcessing ? "Close" : "Cancel"}
             </Button>
-            <Button type="submit" disabled={!file || !title.trim() || uploading}>
-              {uploading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload
-                </>
-              )}
-            </Button>
+            {!isProcessing && (
+              <Button type="submit" disabled={!file || !title.trim() || isUploading}>
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </form>
       </div>

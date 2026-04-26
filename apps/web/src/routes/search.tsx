@@ -1,76 +1,92 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Grid3x3, List, Play, Search, SearchX } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Flame, Search, SearchX, Sparkles } from "lucide-react";
+import { env } from "@video-site/env/web";
 
-import type { VideoCardProps } from "@/components/video-card";
-import { VideoGrid } from "@/components/video-grid";
-import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/format";
+import Loader from "@/components/loader";
+import { SearchResultItem } from "@/components/search-result-item";
+import { apiClient } from "@/lib/api-client";
+
+type SortMode = "relevance" | "date" | "views";
+
+interface SearchSearchParams {
+  q: string;
+  sort: SortMode;
+  page: number;
+}
+
+const SORT_VALUES = new Set<SortMode>(["relevance", "date", "views"]);
 
 export const Route = createFileRoute("/search")({
   component: SearchPage,
-  validateSearch: (search: Record<string, unknown>) => ({
-    q: (search.q as string) || "",
-  }),
+  validateSearch: (search: Record<string, unknown>): SearchSearchParams => {
+    const sortRaw = typeof search.sort === "string" ? (search.sort as SortMode) : "relevance";
+    const sort: SortMode = SORT_VALUES.has(sortRaw) ? sortRaw : "relevance";
+    const pageNum = Number(search.page);
+    return {
+      q: typeof search.q === "string" ? search.q : "",
+      sort,
+      page: Number.isFinite(pageNum) && pageNum > 0 ? Math.floor(pageNum) : 1,
+    };
+  },
 });
 
-// Mock results — replace with GET /api/search?q=...
-const MOCK_RESULTS: VideoCardProps[] = [
-  "Building a Full-Stack App with TanStack Start",
-  "Advanced TypeScript Patterns You Need to Know",
-  "The Future of Web Streaming Technology",
-  "How to Build a Video Processing Pipeline",
-  "React 19: Everything New Explained",
-  "Cinema-Quality Color Grading Tutorial",
-  "Understanding DASH Streaming Protocol",
-  "10 Tips for Better Video Production",
-].map((title, i) => ({
-  id: `search-${i + 1}`,
-  title,
-  thumbnailUrl: null,
-  duration: [432, 1256, 892, 2100, 645, 1800, 720, 560][i]!,
-  viewCount: [12400, 89200, 3400, 156000, 45600, 234000, 7800, 1200][i]!,
-  createdAt: new Date(
-    Date.now() -
-      [86400000, 172800000, 604800000, 2592000000, 259200000, 3600000, 7200000, 1209600000][i]!,
-  ).toISOString(),
-  user: {
-    name: ["Alex Turner", "Sarah Chen", "Mike Rodriguez", "Emma Wilson"][i % 4]!,
-    image: null,
-  },
-}));
+interface SearchResult {
+  id: string;
+  title: string;
+  descriptionSnippet: string;
+  duration: number | null;
+  viewCount: number;
+  likeCount: number;
+  createdAt: string;
+  thumbnailUrl: string | null;
+  tags: string[];
+  user: { id: string; name: string; image: string | null };
+  relevanceScore: number;
+}
+
+interface SearchResponse {
+  results: SearchResult[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  query: string;
+}
+
+const SORT_OPTIONS: { value: SortMode; label: string; icon: React.ReactNode }[] = [
+  { value: "relevance", label: "Relevance", icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { value: "date", label: "Upload Date", icon: <Clock className="h-3.5 w-3.5" /> },
+  { value: "views", label: "View Count", icon: <Flame className="h-3.5 w-3.5" /> },
+];
+
+function absoluteUrl(path: string | null): string | null {
+  if (!path) return null;
+  return `${env.VITE_SERVER_URL}${path}`;
+}
 
 function SearchPage() {
-  const { q } = Route.useSearch();
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const { q, sort, page } = Route.useSearch();
+  const navigate = Route.useNavigate();
 
-  // TODO: Replace with useQuery call to search API
-  const results = q ? MOCK_RESULTS : [];
+  const trimmed = q.trim();
+  const params = new URLSearchParams({
+    q: trimmed,
+    sort,
+    page: String(page),
+    limit: "20",
+  });
 
-  return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6">
-      {q ? (
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-lg font-medium">
-            Results for <span className="text-primary">&ldquo;{q}&rdquo;</span>
-          </h1>
-          <div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`rounded-md p-1.5 transition-colors ${viewMode === "grid" ? "bg-accent text-foreground" : "text-muted-foreground"}`}
-            >
-              <Grid3x3 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`rounded-md p-1.5 transition-colors ${viewMode === "list" ? "bg-accent text-foreground" : "text-muted-foreground"}`}
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      ) : null}
+  const { data, isLoading, error } = useQuery<SearchResponse>({
+    queryKey: ["search", trimmed, sort, page],
+    queryFn: () => apiClient<SearchResponse>(`/api/search?${params.toString()}`),
+    enabled: trimmed.length > 0,
+    placeholderData: (prev) => prev,
+  });
 
-      {!q ? (
+  if (!trimmed) {
+    return (
+      <div className="mx-auto max-w-[1100px] px-4 py-6">
         <div className="flex flex-col items-center justify-center py-24">
           <Search className="h-16 w-16 text-muted-foreground/20" />
           <h2 className="mt-4 text-lg font-medium">Search for videos</h2>
@@ -78,64 +94,145 @@ function SearchPage() {
             Enter a search term in the search bar above
           </p>
         </div>
-      ) : results.length === 0 ? (
+      </div>
+    );
+  }
+
+  if (isLoading && !data) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-2xl font-semibold">Search failed</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Please try again in a moment.</p>
+      </div>
+    );
+  }
+
+  const results = data?.results ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 0;
+
+  return (
+    <div className="mx-auto max-w-[1100px] px-4 py-6">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-lg font-medium">
+            {total > 0 ? (
+              <>
+                About <span className="font-semibold">{total.toLocaleString()}</span>{" "}
+                {total === 1 ? "result" : "results"} for{" "}
+                <span className="text-primary">&ldquo;{trimmed}&rdquo;</span>
+              </>
+            ) : (
+              <>
+                No results for <span className="text-primary">&ldquo;{trimmed}&rdquo;</span>
+              </>
+            )}
+          </h1>
+        </div>
+
+        {total > 0 && (
+          <div className="flex items-center gap-1 self-start rounded-lg bg-secondary p-1">
+            {SORT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() =>
+                  navigate({
+                    search: (prev) => ({ ...prev, sort: option.value, page: 1 }),
+                  })
+                }
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  sort === option.value
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {option.icon}
+                <span className="hidden sm:inline">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {results.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24">
           <SearchX className="h-16 w-16 text-muted-foreground/20" />
           <h2 className="mt-4 text-lg font-medium">No results found</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Try different keywords or check your spelling
           </p>
+          <Link to="/" className="mt-6 text-sm text-primary hover:underline">
+            Browse all videos
+          </Link>
         </div>
-      ) : viewMode === "grid" ? (
-        <VideoGrid videos={results} />
       ) : (
-        <div className="space-y-2">
-          {results.map((video, i) => (
-            <div
-              key={video.id}
-              className="animate-fade-slide-up"
-              style={{ animationDelay: `${i * 40}ms` }}
-            >
-              <SearchListItem {...video} />
+        <>
+          <div className="space-y-1">
+            {results.map((result, i) => (
+              <div
+                key={result.id}
+                className="animate-fade-slide-up"
+                style={{ animationDelay: `${i * 30}ms` }}
+              >
+                <SearchResultItem
+                  id={result.id}
+                  title={result.title}
+                  descriptionSnippet={result.descriptionSnippet}
+                  thumbnailUrl={absoluteUrl(result.thumbnailUrl)}
+                  duration={result.duration}
+                  viewCount={result.viewCount}
+                  createdAt={result.createdAt}
+                  user={result.user}
+                  tags={result.tags}
+                />
+              </div>
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-3 text-sm">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() =>
+                  navigate({
+                    search: (prev) => ({ ...prev, page: Math.max(1, page - 1) }),
+                  })
+                }
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </button>
+              <span className="text-muted-foreground">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() =>
+                  navigate({
+                    search: (prev) => ({ ...prev, page: Math.min(totalPages, page + 1) }),
+                  })
+                }
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
-  );
-}
-
-function SearchListItem(props: VideoCardProps) {
-  return (
-    <Link
-      to="/watch/$videoId"
-      params={{ videoId: props.id }}
-      className="group flex gap-4 rounded-xl p-2 transition-colors hover:bg-secondary/50"
-    >
-      <div className="relative aspect-video w-64 shrink-0 overflow-hidden rounded-lg bg-secondary">
-        {props.thumbnailUrl ? (
-          <img src={props.thumbnailUrl} alt={props.title} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-            <Play className="h-8 w-8 text-muted-foreground/30" />
-          </div>
-        )}
-        {props.duration != null && (
-          <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white">
-            {formatDuration(props.duration)}
-          </span>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1 py-1">
-        <h3 className="line-clamp-2 text-base font-medium transition-colors group-hover:text-primary">
-          {props.title}
-        </h3>
-        <p className="mt-1.5 text-sm text-muted-foreground">{props.user.name}</p>
-        <p className="text-sm text-muted-foreground">
-          {formatViewCount(props.viewCount)} views &middot; {formatRelativeTime(props.createdAt)}
-        </p>
-      </div>
-    </Link>
   );
 }
