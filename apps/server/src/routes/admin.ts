@@ -8,6 +8,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
+import { logModerationAction } from "../lib/moderation-log";
 import { cleanupQueue } from "../lib/queue";
 import { requireAdmin } from "../middleware/require-admin";
 import type { AppVariables } from "../types";
@@ -18,7 +19,7 @@ adminRoutes.use("*", ...requireAdmin);
 
 const visibilitySchema = z.enum(["public", "unlisted", "private"]);
 const statusSchema = z.enum(["uploading", "uploaded", "processing", "ready", "failed"]);
-const roleSchema = z.enum(["user", "admin"]);
+const roleSchema = z.enum(["user", "moderator", "admin"]);
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -80,6 +81,12 @@ adminRoutes.get("/users", async (c) => {
       role: user.role,
       image: user.image,
       createdAt: user.createdAt,
+      bannedAt: user.bannedAt,
+      banReason: user.banReason,
+      suspendedUntil: user.suspendedUntil,
+      suspendReason: user.suspendReason,
+      mutedAt: user.mutedAt,
+      muteReason: user.muteReason,
       videoCount: sql<number>`(SELECT count(*)::int FROM ${video} WHERE ${video.userId} = ${user.id})`,
       commentCount: sql<number>`(SELECT count(*)::int FROM ${comment} WHERE ${comment.userId} = ${user.id})`,
     })
@@ -109,10 +116,23 @@ adminRoutes.patch("/users/:id", async (c) => {
     throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid body");
   }
 
-  const [existing] = await db.select({ id: user.id }).from(user).where(eq(user.id, id)).limit(1);
+  const [existing] = await db
+    .select({ id: user.id, role: user.role })
+    .from(user)
+    .where(eq(user.id, id))
+    .limit(1);
   if (!existing) throw new NotFoundError("User");
 
-  await db.update(user).set({ role: parsed.data.role }).where(eq(user.id, id));
+  await db.transaction(async (tx) => {
+    await tx.update(user).set({ role: parsed.data.role }).where(eq(user.id, id));
+    await logModerationAction(tx, {
+      actorId: currentUser.id,
+      action: "role_change",
+      targetType: "user",
+      targetId: id,
+      metadata: { oldRole: existing.role, newRole: parsed.data.role },
+    });
+  });
   return c.json({ ok: true });
 });
 
@@ -131,7 +151,16 @@ adminRoutes.delete("/users/:id", async (c) => {
   const [existing] = await db.select({ id: user.id }).from(user).where(eq(user.id, id)).limit(1);
   if (!existing) throw new NotFoundError("User");
 
-  await db.delete(user).where(eq(user.id, id));
+  await db.transaction(async (tx) => {
+    await logModerationAction(tx, {
+      actorId: currentUser.id,
+      action: "delete_user",
+      targetType: "user",
+      targetId: id,
+      metadata: { videoCount: userVideos.length },
+    });
+    await tx.delete(user).where(eq(user.id, id));
+  });
 
   for (const v of userVideos) {
     await cleanupQueue.add("delete-video", { type: "delete-video", videoId: v.id });
@@ -174,6 +203,9 @@ adminRoutes.get("/videos", async (c) => {
       commentCount: video.commentCount,
       thumbnailPath: video.thumbnailPath,
       createdAt: video.createdAt,
+      deletedAt: video.deletedAt,
+      removedBy: video.removedBy,
+      removalReason: video.removalReason,
       ownerId: user.id,
       ownerName: user.name,
       ownerEmail: user.email,
@@ -198,6 +230,9 @@ adminRoutes.get("/videos", async (c) => {
     commentCount: r.commentCount,
     thumbnailUrl: r.thumbnailPath ? `/api/stream/${r.id}/thumbnail` : null,
     createdAt: r.createdAt,
+    deletedAt: r.deletedAt,
+    removedBy: r.removedBy,
+    removalReason: r.removalReason,
     owner: { id: r.ownerId, name: r.ownerName, email: r.ownerEmail },
   }));
 
@@ -262,11 +297,20 @@ adminRoutes.patch("/videos/:id", async (c) => {
 
 adminRoutes.delete("/videos/:id", async (c) => {
   const id = c.req.param("id");
+  const actor = c.get("user");
 
   const [existing] = await db.select({ id: video.id }).from(video).where(eq(video.id, id)).limit(1);
   if (!existing) throw new NotFoundError("Video");
 
-  await db.delete(video).where(eq(video.id, id));
+  await db.transaction(async (tx) => {
+    await tx.delete(video).where(eq(video.id, id));
+    await logModerationAction(tx, {
+      actorId: actor.id,
+      action: "hard_delete_video",
+      targetType: "video",
+      targetId: id,
+    });
+  });
   await cleanupQueue.add("delete-video", { type: "delete-video", videoId: id });
 
   return c.json({ ok: true });
@@ -297,6 +341,8 @@ adminRoutes.get("/comments", async (c) => {
       content: comment.content,
       createdAt: comment.createdAt,
       deletedAt: comment.deletedAt,
+      removedBy: comment.removedBy,
+      removalReason: comment.removalReason,
       videoId: comment.videoId,
       videoTitle: video.title,
       authorId: user.id,
@@ -562,6 +608,7 @@ adminRoutes.delete("/categories/:id", async (c) => {
 
 adminRoutes.delete("/comments/:id", async (c) => {
   const id = c.req.param("id");
+  const actor = c.get("user");
 
   const [existing] = await db
     .select({ videoId: comment.videoId, parentId: comment.parentId })
@@ -572,6 +619,12 @@ adminRoutes.delete("/comments/:id", async (c) => {
 
   await db.transaction(async (tx) => {
     await tx.delete(comment).where(eq(comment.id, id));
+    await logModerationAction(tx, {
+      actorId: actor.id,
+      action: "hard_delete_comment",
+      targetType: "comment",
+      targetId: id,
+    });
     await tx
       .update(video)
       .set({ commentCount: sql`GREATEST(${video.commentCount} - 1, 0)` })

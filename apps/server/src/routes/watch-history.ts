@@ -2,11 +2,12 @@ import { db } from "@video-site/db";
 import { user } from "@video-site/db/schema/auth";
 import { video } from "@video-site/db/schema/video";
 import { watchHistory } from "@video-site/db/schema/watch-history";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
 import { NotFoundError, ValidationError } from "../lib/errors";
+import { requireActiveUser } from "../middleware/require-active-user";
 import { requireAuth } from "../middleware/auth";
 import type { AppVariables } from "../types";
 
@@ -32,7 +33,7 @@ async function readProgressBody(req: Request): Promise<unknown> {
   }
 }
 
-watchHistoryRoutes.post("/videos/:videoId/progress", requireAuth, async (c) => {
+watchHistoryRoutes.post("/videos/:videoId/progress", ...requireActiveUser, async (c) => {
   const userId = c.get("user").id;
   const videoId = c.req.param("videoId");
 
@@ -134,7 +135,14 @@ watchHistoryRoutes.get("/history", requireAuth, async (c) => {
     .from(watchHistory)
     .innerJoin(video, eq(video.id, watchHistory.videoId))
     .innerJoin(user, eq(user.id, video.userId))
-    .where(eq(watchHistory.userId, userId))
+    .where(
+      and(
+        eq(watchHistory.userId, userId),
+        isNull(video.deletedAt),
+        isNull(user.bannedAt),
+        or(isNull(user.suspendedUntil), sql`${user.suspendedUntil} < NOW()`),
+      ),
+    )
     .orderBy(desc(watchHistory.lastWatchedAt))
     .limit(limit + 1)
     .offset((page - 1) * limit);

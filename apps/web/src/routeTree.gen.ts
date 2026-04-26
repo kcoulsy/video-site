@@ -21,8 +21,11 @@ import { Route as WatchVideoIdRouteImport } from './routes/watch.$videoId'
 import { Route as AdminVideosRouteImport } from './routes/admin.videos'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTagsRouteImport } from './routes/admin.tags'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminCommentsRouteImport } from './routes/admin.comments'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as VideosVideoIdEditRouteImport } from './routes/videos.$videoId.edit'
 
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
@@ -84,6 +87,11 @@ const AdminTagsRoute = AdminTagsRouteImport.update({
   path: '/tags',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCommentsRoute = AdminCommentsRouteImport.update({
   id: '/comments',
   path: '/comments',
@@ -94,6 +102,16 @@ const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
+const VideosVideoIdEditRoute = VideosVideoIdEditRouteImport.update({
+  id: '/videos/$videoId/edit',
+  path: '/videos/$videoId/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,13 +121,16 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/search': typeof SearchRoute
   '/upload': typeof UploadRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/tags': typeof AdminTagsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/videos': typeof AdminVideosRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/videos/$videoId/edit': typeof VideosVideoIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -118,13 +139,16 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/search': typeof SearchRoute
   '/upload': typeof UploadRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/tags': typeof AdminTagsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/videos': typeof AdminVideosRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
   '/admin': typeof AdminIndexRoute
+  '/videos/$videoId/edit': typeof VideosVideoIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -135,13 +159,16 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/search': typeof SearchRoute
   '/upload': typeof UploadRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/comments': typeof AdminCommentsRoute
+  '/admin/reports': typeof AdminReportsRoute
   '/admin/tags': typeof AdminTagsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/videos': typeof AdminVideosRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/videos/$videoId/edit': typeof VideosVideoIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -153,13 +180,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/search'
     | '/upload'
+    | '/admin/audit'
     | '/admin/categories'
     | '/admin/comments'
+    | '/admin/reports'
     | '/admin/tags'
     | '/admin/users'
     | '/admin/videos'
     | '/watch/$videoId'
     | '/admin/'
+    | '/videos/$videoId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -168,13 +198,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/search'
     | '/upload'
+    | '/admin/audit'
     | '/admin/categories'
     | '/admin/comments'
+    | '/admin/reports'
     | '/admin/tags'
     | '/admin/users'
     | '/admin/videos'
     | '/watch/$videoId'
     | '/admin'
+    | '/videos/$videoId/edit'
   id:
     | '__root__'
     | '/'
@@ -184,13 +217,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/search'
     | '/upload'
+    | '/admin/audit'
     | '/admin/categories'
     | '/admin/comments'
+    | '/admin/reports'
     | '/admin/tags'
     | '/admin/users'
     | '/admin/videos'
     | '/watch/$videoId'
     | '/admin/'
+    | '/videos/$videoId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -202,6 +238,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   UploadRoute: typeof UploadRoute
   WatchVideoIdRoute: typeof WatchVideoIdRoute
+  VideosVideoIdEditRoute: typeof VideosVideoIdEditRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -290,6 +327,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTagsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/comments': {
       id: '/admin/comments'
       path: '/comments'
@@ -304,12 +348,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCategoriesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/videos/$videoId/edit': {
+      id: '/videos/$videoId/edit'
+      path: '/videos/$videoId/edit'
+      fullPath: '/videos/$videoId/edit'
+      preLoaderRoute: typeof VideosVideoIdEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminAuditRoute: typeof AdminAuditRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminCommentsRoute: typeof AdminCommentsRoute
+  AdminReportsRoute: typeof AdminReportsRoute
   AdminTagsRoute: typeof AdminTagsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminVideosRoute: typeof AdminVideosRoute
@@ -317,8 +377,10 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAuditRoute: AdminAuditRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminCommentsRoute: AdminCommentsRoute,
+  AdminReportsRoute: AdminReportsRoute,
   AdminTagsRoute: AdminTagsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminVideosRoute: AdminVideosRoute,
@@ -336,6 +398,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   UploadRoute: UploadRoute,
   WatchVideoIdRoute: WatchVideoIdRoute,
+  VideosVideoIdEditRoute: VideosVideoIdEditRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

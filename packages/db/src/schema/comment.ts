@@ -32,6 +32,8 @@ export const comment = pgTable(
       .notNull(),
     editedAt: timestamp("edited_at"),
     deletedAt: timestamp("deleted_at"),
+    removedBy: text("removed_by"),
+    removalReason: text("removal_reason"),
   },
   (table) => [
     index("comment_video_id_idx").on(table.videoId),

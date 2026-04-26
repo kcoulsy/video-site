@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Layers, Loader2, Plus, Tag as TagIcon, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
 import { Input } from "@video-site/ui/components/input";
@@ -58,6 +58,7 @@ function AdminCategories() {
   const [form, setForm] = useState(emptyForm);
   const [slugDirty, setSlugDirty] = useState(false);
   const [newTagName, setNewTagName] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
 
   const { data, isLoading } = useQuery<CategoriesResponse>({
     queryKey: ["admin", "categories"],
@@ -148,6 +149,7 @@ function AdminCategories() {
       tagIds: cat.tagIds,
     });
     setSlugDirty(true);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const toggleTag = (id: string) => {
@@ -167,13 +169,21 @@ function AdminCategories() {
       </p>
 
       <form
+        ref={formRef}
         onSubmit={(e) => {
           e.preventDefault();
           if (!form.name.trim() || !form.slug.trim()) return;
           upsertMutation.mutate();
         }}
-        className="mt-4 space-y-4 rounded-xl border border-border p-4"
+        className={`mt-4 space-y-4 rounded-xl border p-4 transition-colors ${
+          editingId ? "border-primary/40 bg-primary/[0.02]" : "border-border"
+        }`}
       >
+        {editingId && (
+          <div className="text-xs font-medium uppercase tracking-wide text-primary">
+            Editing category
+          </div>
+        )}
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="cat-name">Name</Label>
@@ -241,31 +251,58 @@ function AdminCategories() {
 
         <div className="space-y-1.5">
           <Label>Tags</Label>
-          {tagOptions.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No tags yet — create some on the Tags page first.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {tagOptions.map((t) => {
-                const active = form.tagIds.includes(t.id);
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => toggleTag(t.id)}
-                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                      active
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:border-muted-foreground"
-                    }`}
-                  >
-                    {t.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {tagOptions.map((t) => {
+              const active = form.tagIds.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => toggleTag(t.id)}
+                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                    active
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-muted-foreground"
+                  }`}
+                >
+                  {t.name}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <TagIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (newTagName.trim() && !createTagMutation.isPending) {
+                    createTagMutation.mutate(newTagName);
+                  }
+                }
+              }}
+              placeholder="New tag name (press Enter)"
+              className="h-8 max-w-xs text-sm"
+              disabled={createTagMutation.isPending}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!newTagName.trim() || createTagMutation.isPending}
+              onClick={() => createTagMutation.mutate(newTagName)}
+            >
+              {createTagMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="mr-1 h-3.5 w-3.5" /> Add
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-2">

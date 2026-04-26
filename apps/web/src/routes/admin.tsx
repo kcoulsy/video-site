@@ -1,5 +1,15 @@
 import { Link, Outlet, createFileRoute, redirect } from "@tanstack/react-router";
-import { Layers, LayoutDashboard, MessageSquare, ShieldCheck, Tag, Users, Video } from "lucide-react";
+import {
+  FileClock,
+  Flag,
+  Layers,
+  LayoutDashboard,
+  MessageSquare,
+  ShieldCheck,
+  Tag,
+  Users,
+  Video,
+} from "lucide-react";
 
 import { getUser } from "@/functions/get-user";
 
@@ -8,29 +18,42 @@ export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
     const session = await getUser();
     if (!session) throw redirect({ to: "/login" });
-    if ((session.user as { role?: string }).role !== "admin") {
+    const role = (session.user as { role?: string }).role;
+    if (role !== "admin" && role !== "moderator") {
       throw redirect({ to: "/" });
     }
     return { session };
   },
 });
 
-const navItems = [
-  { to: "/admin", label: "Overview", Icon: LayoutDashboard, exact: true },
-  { to: "/admin/videos", label: "Videos", Icon: Video, exact: false },
-  { to: "/admin/users", label: "Users", Icon: Users, exact: false },
-  { to: "/admin/comments", label: "Comments", Icon: MessageSquare, exact: false },
-  { to: "/admin/tags", label: "Tags", Icon: Tag, exact: false },
-  { to: "/admin/categories", label: "Categories", Icon: Layers, exact: false },
-] as const;
+function navItemsForRole(role: string | undefined) {
+  const base = [
+    { to: "/admin", label: "Overview", Icon: LayoutDashboard, exact: true },
+    { to: "/admin/videos", label: "Videos", Icon: Video, exact: false },
+    { to: "/admin/users", label: "Users", Icon: Users, exact: false },
+    { to: "/admin/comments", label: "Comments", Icon: MessageSquare, exact: false },
+    { to: "/admin/reports", label: "Reports", Icon: Flag, exact: false },
+    { to: "/admin/audit", label: "Audit log", Icon: FileClock, exact: false },
+  ];
+  if (role === "admin") {
+    base.push(
+      { to: "/admin/tags", label: "Tags", Icon: Tag, exact: false },
+      { to: "/admin/categories", label: "Categories", Icon: Layers, exact: false },
+    );
+  }
+  return base;
+}
 
 function AdminLayout() {
+  const { session } = Route.useRouteContext();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const navItems = navItemsForRole(role);
   return (
     <div className="mx-auto grid max-w-[1200px] gap-6 px-4 py-6 md:grid-cols-[200px_1fr]">
       <aside className="md:sticky md:top-20 md:self-start">
         <div className="mb-3 flex items-center gap-2 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5" />
-          Admin
+          {role === "moderator" ? "Moderator" : "Admin"}
         </div>
         <nav className="flex flex-row gap-1 overflow-x-auto md:flex-col">
           {navItems.map((item) => (

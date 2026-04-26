@@ -8,6 +8,7 @@ import { errorHandler } from "./middleware/error-handler";
 import { adminRoutes } from "./routes/admin";
 import { commentRoutes } from "./routes/comment";
 import { likeRoutes } from "./routes/like";
+import { moderationRoutes } from "./routes/moderation";
 import { searchRoutes } from "./routes/search";
 import { streamingRoutes } from "./routes/streaming";
 import { tagRoutes } from "./routes/tags";
@@ -56,6 +57,7 @@ app.onError(errorHandler);
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/api/admin", adminRoutes);
+app.route("/api/moderation", moderationRoutes);
 app.route("/api/videos", videoRoutes);
 app.route("/api/videos", likeRoutes);
 app.route("/api/stream", streamingRoutes);

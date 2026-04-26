@@ -91,6 +91,9 @@ searchRoutes.get("/", async (c) => {
     WHERE
       v.status = 'ready'
       AND v.visibility = 'public'
+      AND v.deleted_at IS NULL
+      AND u.banned_at IS NULL
+      AND (u.suspended_until IS NULL OR u.suspended_until < NOW())
       AND (
         v.search_vector @@ websearch_to_tsquery('english', ${q})
         OR similarity(v.title, ${q}) > 0.1
@@ -144,16 +147,20 @@ searchRoutes.get("/suggest", async (c) => {
   const prefix = `${q}%`;
 
   const results = await db.execute(sql`
-    SELECT DISTINCT title
-    FROM video
+    SELECT DISTINCT v.title AS title
+    FROM video v
+    JOIN "user" u ON v.user_id = u.id
     WHERE
-      status = 'ready'
-      AND visibility = 'public'
+      v.status = 'ready'
+      AND v.visibility = 'public'
+      AND v.deleted_at IS NULL
+      AND u.banned_at IS NULL
+      AND (u.suspended_until IS NULL OR u.suspended_until < NOW())
       AND (
-        title % ${q}
-        OR title ILIKE ${prefix}
+        v.title % ${q}
+        OR v.title ILIKE ${prefix}
       )
-    ORDER BY similarity(title, ${q}) DESC
+    ORDER BY similarity(v.title, ${q}) DESC
     LIMIT 10
   `);
 

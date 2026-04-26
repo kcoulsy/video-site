@@ -8,10 +8,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
+import { activeAuthorWhere, visibleVideoWhere } from "../lib/moderation-filters";
 import { cleanupQueue, thumbnailQueue, transcodeQueue } from "../lib/queue";
 import { getRedisClient } from "../lib/redis";
 import { storage } from "../lib/storage";
 import { requireAuth } from "../middleware/auth";
+import { requireNotMuted } from "../middleware/require-active-user";
 import type { AppVariables } from "../types";
 
 function streamUrlFor(videoId: string, status: string): string | null {
@@ -88,7 +90,7 @@ const myListQuerySchema = z.object({
 
 export const videoRoutes = new Hono<{ Variables: AppVariables }>();
 
-videoRoutes.post("/", requireAuth, async (c) => {
+videoRoutes.post("/", ...requireNotMuted, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createVideoSchema.safeParse(body);
   if (!parsed.success) {
@@ -132,13 +134,19 @@ videoRoutes.get("/my", requireAuth, async (c) => {
   const { page, limit } = parsed.data;
   const currentUser = c.get("user");
 
-  const items = await db
+  const rows = await db
     .select()
     .from(video)
     .where(eq(video.userId, currentUser.id))
     .orderBy(desc(video.createdAt))
     .limit(limit)
     .offset((page - 1) * limit);
+
+  const items = rows.map((r) => ({
+    ...r,
+    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath),
+    isRemoved: r.deletedAt != null,
+  }));
 
   const countResult = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -174,21 +182,35 @@ videoRoutes.get("/", async (c) => {
       return c.json({ items: [], page, limit, total: 0, totalPages: 0 });
     }
     const tagRows = await db
-      .select({ slug: tag.slug })
+      .select({ id: tag.id })
       .from(categoryTag)
       .innerJoin(tag, eq(tag.id, categoryTag.tagId))
       .where(eq(categoryTag.categoryId, cat.id));
     if (tagRows.length === 0) {
       return c.json({ items: [], page, limit, total: 0, totalPages: 0 });
     }
-    const slugs = tagRows.map((r) => r.slug);
+    const tagIds = tagRows.map((r) => r.id);
     categoryFilter =
       cat.mode === "all"
-        ? sql`${video.tags} @> ${slugs}::text[]`
-        : sql`${video.tags} && ${slugs}::text[]`;
+        ? sql`(
+            SELECT COUNT(DISTINCT ${videoTag.tagId})
+            FROM ${videoTag}
+            WHERE ${videoTag.videoId} = ${video.id}
+              AND ${inArray(videoTag.tagId, tagIds)}
+          ) = ${tagIds.length}`
+        : sql`EXISTS (
+            SELECT 1 FROM ${videoTag}
+            WHERE ${videoTag.videoId} = ${video.id}
+              AND ${inArray(videoTag.tagId, tagIds)}
+          )`;
   }
 
-  const baseConditions = [eq(video.status, "ready"), eq(video.visibility, "public")];
+  const baseConditions = [
+    eq(video.status, "ready"),
+    eq(video.visibility, "public"),
+    visibleVideoWhere(),
+    activeAuthorWhere(),
+  ];
   const where = categoryFilter
     ? and(...baseConditions, categoryFilter)
     : and(...baseConditions);
@@ -244,6 +266,8 @@ videoRoutes.get("/:id", async (c) => {
       v: video,
       userName: user.name,
       userImage: user.image,
+      authorBannedAt: user.bannedAt,
+      authorSuspendedUntil: user.suspendedUntil,
     })
     .from(video)
     .innerJoin(user, eq(user.id, video.userId))
@@ -257,6 +281,13 @@ videoRoutes.get("/:id", async (c) => {
   const isOwner = currentUserId === row.v.userId;
   if (row.v.visibility === "private" && !isOwner) {
     throw new NotFoundError("Video");
+  }
+  if (!isOwner) {
+    if (row.v.deletedAt) throw new NotFoundError("Video");
+    if (row.authorBannedAt) throw new NotFoundError("Video");
+    if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) {
+      throw new NotFoundError("Video");
+    }
   }
 
   return c.json({
@@ -275,8 +306,12 @@ videoRoutes.post("/:id/view", async (c) => {
       visibility: video.visibility,
       status: video.status,
       userId: video.userId,
+      deletedAt: video.deletedAt,
+      authorBannedAt: user.bannedAt,
+      authorSuspendedUntil: user.suspendedUntil,
     })
     .from(video)
+    .innerJoin(user, eq(user.id, video.userId))
     .where(eq(video.id, videoId))
     .limit(1);
 
@@ -287,6 +322,13 @@ videoRoutes.post("/:id/view", async (c) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
   if (row.visibility === "private" && session?.user.id !== row.userId) {
+    throw new NotFoundError("Video");
+  }
+  if (
+    row.deletedAt ||
+    row.authorBannedAt ||
+    (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date())
+  ) {
     throw new NotFoundError("Video");
   }
 

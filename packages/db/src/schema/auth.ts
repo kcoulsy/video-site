@@ -1,18 +1,35 @@
 import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 
-export const user = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").default(false).notNull(),
-  image: text("image"),
-  role: text("role").notNull().default("user"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-});
+export const user = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    image: text("image"),
+    role: text("role").notNull().default("user"),
+
+    bannedAt: timestamp("banned_at"),
+    banReason: text("ban_reason"),
+    bannedBy: text("banned_by"),
+
+    suspendedUntil: timestamp("suspended_until"),
+    suspendReason: text("suspend_reason"),
+    suspendedBy: text("suspended_by"),
+
+    mutedAt: timestamp("muted_at"),
+    muteReason: text("mute_reason"),
+    mutedBy: text("muted_by"),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("user_banned_suspended_idx").on(table.bannedAt, table.suspendedUntil)],
+);
 
 export const session = pgTable(
   "session",

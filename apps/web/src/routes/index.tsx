@@ -9,6 +9,7 @@ import { Pagination } from "@/components/pagination";
 import { VideoGrid } from "@/components/video-grid";
 import type { VideoCardProps } from "@/components/video-card";
 import { apiClient } from "@/lib/api-client";
+import { authClient } from "@/lib/auth-client";
 
 type SortOption = "newest" | "popular" | "oldest";
 
@@ -38,6 +39,10 @@ interface FeedResponse {
   limit: number;
   total: number;
   totalPages: number;
+}
+
+interface HistoryProgressResponse {
+  items: { videoId: string; progressPercent: number }[];
 }
 
 export const Route = createFileRoute("/")({
@@ -70,6 +75,22 @@ function HomePage() {
     placeholderData: (prev) => prev,
   });
 
+  const { data: sessionData } = authClient.useSession();
+  const isAuthed = !!sessionData?.user;
+
+  const { data: historyData } = useQuery<HistoryProgressResponse>({
+    queryKey: ["history", "progress-map"],
+    queryFn: () => apiClient<HistoryProgressResponse>("/api/history?limit=50"),
+    enabled: isAuthed,
+  });
+
+  const progressByVideoId = new Map<string, number>();
+  for (const item of historyData?.items ?? []) {
+    if (item.progressPercent > 0 && item.progressPercent < 0.9) {
+      progressByVideoId.set(item.videoId, item.progressPercent);
+    }
+  }
+
   const videos: VideoCardProps[] =
     data?.items.map((v) => ({
       id: v.id,
@@ -79,6 +100,7 @@ function HomePage() {
       viewCount: v.viewCount,
       createdAt: v.createdAt,
       user: { name: v.user.name, image: v.user.image },
+      progressPercent: progressByVideoId.get(v.id),
     })) ?? [];
 
   const totalPages = data?.totalPages ?? 0;

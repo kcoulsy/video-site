@@ -5,7 +5,8 @@ import { env } from "@video-site/env/web";
 
 import Loader from "@/components/loader";
 import { Pagination } from "@/components/pagination";
-import { SearchResultItem } from "@/components/search-result-item";
+import { VideoGrid } from "@/components/video-grid";
+import type { VideoCardProps } from "@/components/video-card";
 import { apiClient } from "@/lib/api-client";
 
 type SortMode = "relevance" | "date" | "views";
@@ -87,7 +88,7 @@ function SearchPage() {
 
   if (!trimmed) {
     return (
-      <div className="mx-auto max-w-[1100px] px-4 py-6">
+      <div className="mx-auto max-w-[1400px] px-4 py-6">
         <div className="flex flex-col items-center justify-center py-24">
           <Search className="h-16 w-16 text-muted-foreground/20" />
           <h2 className="mt-4 text-lg font-medium">Search for videos</h2>
@@ -120,8 +121,18 @@ function SearchPage() {
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 0;
 
+  const videos: VideoCardProps[] = results.map((r) => ({
+    id: r.id,
+    title: r.title,
+    thumbnailUrl: absoluteUrl(r.thumbnailUrl),
+    duration: r.duration,
+    viewCount: r.viewCount,
+    createdAt: r.createdAt,
+    user: { name: r.user.name, image: r.user.image },
+  }));
+
   return (
-    <div className="mx-auto max-w-[1100px] px-4 py-6">
+    <div className="mx-auto max-w-[1400px] px-4 py-6">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-lg font-medium">
@@ -177,22 +188,7 @@ function SearchPage() {
         </div>
       ) : (
         <>
-          <div className="space-y-1">
-            {results.map((result) => (
-              <SearchResultItem
-                key={result.id}
-                id={result.id}
-                title={result.title}
-                descriptionSnippet={result.descriptionSnippet}
-                thumbnailUrl={absoluteUrl(result.thumbnailUrl)}
-                duration={result.duration}
-                viewCount={result.viewCount}
-                createdAt={result.createdAt}
-                user={result.user}
-                tags={result.tags}
-              />
-            ))}
-          </div>
+          <VideoGrid videos={videos} />
 
           <Pagination
             page={page}

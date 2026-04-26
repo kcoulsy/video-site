@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
+import { env } from "@video-site/env/web";
 import {
   CheckCircle,
   Edit2,
@@ -42,6 +43,7 @@ interface DashboardVideo {
   id: string;
   title: string;
   thumbnailPath: string | null;
+  thumbnailUrl: string | null;
   status: VideoStatus;
   visibility: "public" | "unlisted" | "private";
   duration: number | null;
@@ -202,10 +204,18 @@ function VideoRow({
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-secondary/30">
-      <div className="relative aspect-video w-32 shrink-0 overflow-hidden bg-secondary">
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-          <Film className="h-6 w-6 text-muted-foreground/20" />
-        </div>
+      <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-md bg-secondary">
+        {video.thumbnailUrl ? (
+          <img
+            src={`${env.VITE_SERVER_URL}${video.thumbnailUrl}`}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
+            <Film className="h-6 w-6 text-muted-foreground/20" />
+          </div>
+        )}
         {video.duration != null && (
           <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">
             {formatDuration(video.duration)}
@@ -254,7 +264,11 @@ function VideoRow({
               View
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem>
+          <DropdownMenuItem
+            render={
+              <Link to="/videos/$videoId/edit" params={{ videoId: video.id }} />
+            }
+          >
             <Edit2 className="mr-2 h-4 w-4" />
             Edit
           </DropdownMenuItem>

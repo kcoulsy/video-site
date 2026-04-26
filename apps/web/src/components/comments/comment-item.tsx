@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { formatRelativeTime } from "@/lib/format";
 
+import { ReportButton } from "../report-button";
 import { CommentForm } from "./comment-form";
 import type { Comment, CommentsPage } from "./types";
 
@@ -290,6 +291,14 @@ export function CommentItem({
                   Delete
                 </Button>
               </>
+            )}
+            {!isOwner && currentUserId && (
+              <ReportButton
+                targetType="comment"
+                targetId={comment.id}
+                isAuthenticated
+                variant="icon"
+              />
             )}
           </div>
         )}

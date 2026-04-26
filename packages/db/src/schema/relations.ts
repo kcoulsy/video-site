@@ -3,6 +3,7 @@ import { relations } from "drizzle-orm";
 import { account, session, user } from "./auth";
 import { comment } from "./comment";
 import { videoLike } from "./like";
+import { moderationAction, report } from "./moderation";
 import { category, categoryTag, tag, videoTag } from "./tags";
 import { video } from "./video";
 import { watchHistory } from "./watch-history";
@@ -99,6 +100,26 @@ export const videoLikeRelations = relations(videoLike, ({ one }) => ({
   video: one(video, {
     fields: [videoLike.videoId],
     references: [video.id],
+  }),
+}));
+
+export const moderationActionRelations = relations(moderationAction, ({ one }) => ({
+  actor: one(user, {
+    fields: [moderationAction.actorId],
+    references: [user.id],
+  }),
+}));
+
+export const reportRelations = relations(report, ({ one }) => ({
+  reporter: one(user, {
+    fields: [report.reporterId],
+    references: [user.id],
+    relationName: "reportReporter",
+  }),
+  resolver: one(user, {
+    fields: [report.resolvedBy],
+    references: [user.id],
+    relationName: "reportResolver",
   }),
 }));
 

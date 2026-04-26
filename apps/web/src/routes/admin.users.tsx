@@ -1,6 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, MoreHorizontal, ShieldCheck, ShieldOff, Trash2, User as UserIcon } from "lucide-react";
+import {
+  Ban,
+  Clock,
+  Loader2,
+  MicOff,
+  MoreHorizontal,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+  User as UserIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
@@ -28,6 +38,12 @@ interface AdminUserRow {
   createdAt: string;
   videoCount: number;
   commentCount: number;
+  bannedAt: string | null;
+  banReason: string | null;
+  suspendedUntil: string | null;
+  suspendReason: string | null;
+  mutedAt: string | null;
+  muteReason: string | null;
 }
 
 interface UsersResponse {
@@ -43,6 +59,7 @@ function AdminUsers() {
   const queryClient = useQueryClient();
   const { session } = Route.useRouteContext();
   const currentUserId = session?.user.id;
+  const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
 
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
@@ -55,28 +72,97 @@ function AdminUsers() {
     queryFn: () => apiClient<UsersResponse>(`/api/admin/users?${params}`),
   });
 
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+  };
+
+  const onError = (err: unknown) =>
+    toast.error(err instanceof ApiError ? err.message : "Action failed");
+
   const roleMutation = useMutation({
-    mutationFn: ({ id, role }: { id: string; role: "user" | "admin" }) =>
+    mutationFn: ({ id, role }: { id: string; role: "user" | "moderator" | "admin" }) =>
       apiClient(`/api/admin/users/${id}`, {
         method: "PATCH",
         body: JSON.stringify({ role }),
       }),
     onSuccess: (_, vars) => {
-      toast.success(vars.role === "admin" ? "Promoted to admin" : "Demoted to user");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      toast.success(`Role set to ${vars.role}`);
+      invalidate();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed"),
+    onError,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient(`/api/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       toast.success("User deleted");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+      invalidate();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to delete"),
+    onError,
   });
+
+  const modAction = useMutation({
+    mutationFn: async ({
+      id,
+      action,
+      body,
+    }: {
+      id: string;
+      action: string;
+      body?: Record<string, unknown>;
+    }) =>
+      apiClient(`/api/moderation/users/${id}/${action}`, {
+        method: "POST",
+        body: body ? JSON.stringify(body) : undefined,
+      }),
+    onSuccess: (_, vars) => {
+      toast.success(`${vars.action} succeeded`);
+      invalidate();
+    },
+    onError,
+  });
+
+  const handleBan = (u: AdminUserRow) => {
+    const reason = prompt(`Ban ${u.email}? Enter a reason:`);
+    if (!reason) return;
+    modAction.mutate({ id: u.id, action: "ban", body: { reason } });
+  };
+
+  const handleUnban = (u: AdminUserRow) => {
+    if (!confirm(`Unban ${u.email}?`)) return;
+    modAction.mutate({ id: u.id, action: "unban" });
+  };
+
+  const handleSuspend = (u: AdminUserRow) => {
+    const days = prompt(`Suspend ${u.email} for how many days?`, "7");
+    if (!days) return;
+    const n = Number(days);
+    if (!Number.isFinite(n) || n <= 0) {
+      toast.error("Invalid number of days");
+      return;
+    }
+    const reason = prompt("Reason for suspension:");
+    if (!reason) return;
+    const until = new Date(Date.now() + n * 86400 * 1000).toISOString();
+    modAction.mutate({ id: u.id, action: "suspend", body: { until, reason } });
+  };
+
+  const handleUnsuspend = (u: AdminUserRow) => {
+    if (!confirm(`Lift suspension on ${u.email}?`)) return;
+    modAction.mutate({ id: u.id, action: "unsuspend" });
+  };
+
+  const handleMute = (u: AdminUserRow) => {
+    const reason = prompt(`Mute ${u.email}? Enter a reason:`);
+    if (!reason) return;
+    modAction.mutate({ id: u.id, action: "mute", body: { reason } });
+  };
+
+  const handleUnmute = (u: AdminUserRow) => {
+    if (!confirm(`Unmute ${u.email}?`)) return;
+    modAction.mutate({ id: u.id, action: "unmute" });
+  };
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -112,7 +198,12 @@ function AdminUsers() {
           <div className="divide-y divide-border">
             {items.map((u) => {
               const isSelf = u.id === currentUserId;
-              const isAdmin = u.role === "admin";
+              const isUserAdmin = u.role === "admin";
+              const isModerator = u.role === "moderator";
+              const isBanned = !!u.bannedAt;
+              const isSuspended =
+                !!u.suspendedUntil && new Date(u.suspendedUntil).getTime() > Date.now();
+              const isMuted = !!u.mutedAt;
               return (
                 <div
                   key={u.id}
@@ -127,11 +218,40 @@ function AdminUsers() {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h3 className="truncate text-sm font-medium">{u.name}</h3>
-                      {isAdmin && (
+                      {isUserAdmin && (
                         <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
                           Admin
+                        </span>
+                      )}
+                      {isModerator && (
+                        <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-blue-500">
+                          Moderator
+                        </span>
+                      )}
+                      {isBanned && (
+                        <span
+                          title={u.banReason ?? ""}
+                          className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-destructive"
+                        >
+                          Banned
+                        </span>
+                      )}
+                      {isSuspended && (
+                        <span
+                          title={`${u.suspendReason ?? ""} until ${u.suspendedUntil}`}
+                          className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-500"
+                        >
+                          Suspended
+                        </span>
+                      )}
+                      {isMuted && (
+                        <span
+                          title={u.muteReason ?? ""}
+                          className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                        >
+                          Muted
                         </span>
                       )}
                       {isSelf && (
@@ -163,39 +283,102 @@ function AdminUsers() {
                       <MoreHorizontal className="h-4 w-4" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="bg-card">
-                      {isAdmin ? (
-                        <DropdownMenuItem
-                          disabled={isSelf}
-                          onClick={() => roleMutation.mutate({ id: u.id, role: "user" })}
-                        >
-                          <ShieldOff className="mr-2 h-4 w-4" />
-                          Demote to user
+                      {isBanned ? (
+                        <DropdownMenuItem disabled={isSelf} onClick={() => handleUnban(u)}>
+                          <Ban className="mr-2 h-4 w-4" />
+                          Unban
                         </DropdownMenuItem>
                       ) : (
-                        <DropdownMenuItem
-                          disabled={isSelf}
-                          onClick={() => roleMutation.mutate({ id: u.id, role: "admin" })}
-                        >
-                          <ShieldCheck className="mr-2 h-4 w-4" />
-                          Promote to admin
+                        <DropdownMenuItem disabled={isSelf} onClick={() => handleBan(u)}>
+                          <Ban className="mr-2 h-4 w-4" />
+                          Ban
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem
-                        variant="destructive"
-                        disabled={isSelf}
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Delete ${u.email}? Their videos and comments will also be removed.`,
-                            )
-                          ) {
-                            deleteMutation.mutate(u.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
+                      {isSuspended ? (
+                        <DropdownMenuItem disabled={isSelf} onClick={() => handleUnsuspend(u)}>
+                          <Clock className="mr-2 h-4 w-4" />
+                          Lift suspension
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem disabled={isSelf} onClick={() => handleSuspend(u)}>
+                          <Clock className="mr-2 h-4 w-4" />
+                          Suspend
+                        </DropdownMenuItem>
+                      )}
+                      {isMuted ? (
+                        <DropdownMenuItem disabled={isSelf} onClick={() => handleUnmute(u)}>
+                          <MicOff className="mr-2 h-4 w-4" />
+                          Unmute
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem disabled={isSelf} onClick={() => handleMute(u)}>
+                          <MicOff className="mr-2 h-4 w-4" />
+                          Mute
+                        </DropdownMenuItem>
+                      )}
+                      {isAdmin && (
+                        <>
+                          {isUserAdmin ? (
+                            <DropdownMenuItem
+                              disabled={isSelf}
+                              onClick={() => roleMutation.mutate({ id: u.id, role: "user" })}
+                            >
+                              <ShieldOff className="mr-2 h-4 w-4" />
+                              Demote to user
+                            </DropdownMenuItem>
+                          ) : isModerator ? (
+                            <>
+                              <DropdownMenuItem
+                                disabled={isSelf}
+                                onClick={() => roleMutation.mutate({ id: u.id, role: "admin" })}
+                              >
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Promote to admin
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={isSelf}
+                                onClick={() => roleMutation.mutate({ id: u.id, role: "user" })}
+                              >
+                                <ShieldOff className="mr-2 h-4 w-4" />
+                                Demote to user
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <>
+                              <DropdownMenuItem
+                                disabled={isSelf}
+                                onClick={() => roleMutation.mutate({ id: u.id, role: "moderator" })}
+                              >
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Make moderator
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={isSelf}
+                                onClick={() => roleMutation.mutate({ id: u.id, role: "admin" })}
+                              >
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Promote to admin
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={isSelf}
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  `Delete ${u.email}? Their videos and comments will also be removed. This is permanent.`,
+                                )
+                              ) {
+                                deleteMutation.mutate(u.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

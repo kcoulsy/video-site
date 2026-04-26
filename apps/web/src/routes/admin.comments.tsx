@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Loader2, Trash2 } from "lucide-react";
+import { EyeOff, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
@@ -18,6 +18,8 @@ interface AdminCommentRow {
   content: string;
   createdAt: string;
   deletedAt: string | null;
+  removedBy: string | null;
+  removalReason: string | null;
   videoId: string;
   videoTitle: string;
   authorId: string;
@@ -36,6 +38,8 @@ const PAGE_SIZE = 25;
 
 function AdminComments() {
   const queryClient = useQueryClient();
+  const { session } = Route.useRouteContext() as { session: { user: { role?: string } } };
+  const isAdmin = session?.user?.role === "admin";
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
 
@@ -47,14 +51,43 @@ function AdminComments() {
     queryFn: () => apiClient<CommentsResponse>(`/api/admin/comments?${params}`),
   });
 
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "comments"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+  };
+  const onErr = (err: unknown) =>
+    toast.error(err instanceof ApiError ? err.message : "Action failed");
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient(`/api/admin/comments/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Comment deleted");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "comments"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+      toast.success("Comment permanently deleted");
+      invalidate();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed"),
+    onError: onErr,
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiClient(`/api/moderation/comments/${id}/remove`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      toast.success("Comment removed");
+      invalidate();
+    },
+    onError: onErr,
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiClient(`/api/moderation/comments/${id}/restore`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success("Comment restored");
+      invalidate();
+    },
+    onError: onErr,
   });
 
   const items = data?.items ?? [];
@@ -89,44 +122,89 @@ function AdminComments() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {items.map((c) => (
-              <div key={c.id} className="flex gap-4 px-4 py-3 transition-colors hover:bg-secondary/30">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm">
-                    {c.deletedAt ? (
-                      <span className="italic text-muted-foreground">[deleted] {c.content}</span>
+            {items.map((c) => {
+              const isRemoved = !!c.removedBy;
+              return (
+                <div
+                  key={c.id}
+                  className="flex gap-4 px-4 py-3 transition-colors hover:bg-secondary/30"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm">
+                      {isRemoved ? (
+                        <span
+                          className="italic text-muted-foreground"
+                          title={c.removalReason ?? ""}
+                        >
+                          [removed] {c.content}
+                        </span>
+                      ) : c.deletedAt ? (
+                        <span className="italic text-muted-foreground">[deleted] {c.content}</span>
+                      ) : (
+                        c.content
+                      )}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>
+                        by <span className="text-foreground">{c.authorName}</span> ({c.authorEmail})
+                      </span>
+                      <span>{formatRelativeTime(c.createdAt)}</span>
+                      <Link
+                        to="/watch/$videoId"
+                        params={{ videoId: c.videoId }}
+                        className="text-primary underline-offset-2 hover:underline"
+                      >
+                        on "{c.videoTitle}"
+                      </Link>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1">
+                    {isRemoved ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => restoreMutation.mutate(c.id)}
+                        title="Restore"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
                     ) : (
-                      c.content
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const reason = prompt("Remove this comment? Enter a reason:");
+                          if (!reason) return;
+                          removeMutation.mutate({ id: c.id, reason });
+                        }}
+                        title="Remove"
+                      >
+                        <EyeOff className="h-4 w-4" />
+                      </Button>
                     )}
-                  </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <span>
-                      by <span className="text-foreground">{c.authorName}</span> ({c.authorEmail})
-                    </span>
-                    <span>{formatRelativeTime(c.createdAt)}</span>
-                    <Link
-                      to="/watch/$videoId"
-                      params={{ videoId: c.videoId }}
-                      className="text-primary underline-offset-2 hover:underline"
-                    >
-                      on "{c.videoTitle}"
-                    </Link>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (
+                            confirm(
+                              "Permanently delete this comment? This cannot be undone. Use only for harmful content.",
+                            )
+                          ) {
+                            deleteMutation.mutate(c.id);
+                          }
+                        }}
+                        title="Hard delete"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (confirm("Delete this comment?")) {
-                      deleteMutation.mutate(c.id);
-                    }
-                  }}
-                  className="self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

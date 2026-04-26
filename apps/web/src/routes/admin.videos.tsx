@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { ExternalLink, Film, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { ExternalLink, EyeOff, Film, Loader2, MoreHorizontal, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
@@ -32,6 +32,9 @@ interface AdminVideo {
   commentCount: number;
   thumbnailUrl: string | null;
   createdAt: string;
+  deletedAt: string | null;
+  removedBy: string | null;
+  removalReason: string | null;
   owner: { id: string; name: string; email: string };
 }
 
@@ -46,6 +49,8 @@ const PAGE_SIZE = 25;
 
 function AdminVideos() {
   const queryClient = useQueryClient();
+  const { session } = Route.useRouteContext() as { session: { user: { role?: string } } };
+  const isAdmin = session?.user?.role === "admin";
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("");
@@ -64,16 +69,43 @@ function AdminVideos() {
     queryFn: () => apiClient<VideosResponse>(`/api/admin/videos?${params}`),
   });
 
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "videos"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+  };
+  const onErr = (err: unknown) =>
+    toast.error(err instanceof ApiError ? err.message : "Action failed");
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient(`/api/admin/videos/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast.success("Video deleted");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "videos"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+      toast.success("Video permanently deleted");
+      invalidate();
     },
-    onError: (err) => {
-      toast.error(err instanceof ApiError ? err.message : "Failed to delete");
+    onError: onErr,
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiClient(`/api/moderation/videos/${id}/remove`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    onSuccess: () => {
+      toast.success("Video removed");
+      invalidate();
     },
+    onError: onErr,
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiClient(`/api/moderation/videos/${id}/restore`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success("Video restored");
+      invalidate();
+    },
+    onError: onErr,
   });
 
   const items = data?.items ?? [];
@@ -168,6 +200,14 @@ function AdminVideos() {
                     <span className="capitalize">{video.visibility}</span>
                     <span>{formatRelativeTime(video.createdAt)}</span>
                     <span>by {video.owner.name}</span>
+                    {video.deletedAt && (
+                      <span
+                        title={video.removalReason ?? ""}
+                        className="rounded bg-destructive/15 px-1.5 py-0.5 font-medium text-destructive"
+                      >
+                        Removed
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -197,17 +237,40 @@ function AdminVideos() {
                         View
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => {
-                        if (confirm(`Delete "${video.title}"? This cannot be undone.`)) {
-                          deleteMutation.mutate(video.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
+                    {video.deletedAt ? (
+                      <DropdownMenuItem onClick={() => restoreMutation.mutate(video.id)}>
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Restore
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const reason = prompt(`Remove "${video.title}"? Enter a reason:`);
+                          if (!reason) return;
+                          removeMutation.mutate({ id: video.id, reason });
+                        }}
+                      >
+                        <EyeOff className="mr-2 h-4 w-4" />
+                        Remove
+                      </DropdownMenuItem>
+                    )}
+                    {isAdmin && (
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `Permanently delete "${video.title}"? This cannot be undone. Use this only for harmful content.`,
+                            )
+                          ) {
+                            deleteMutation.mutate(video.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Hard delete
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>

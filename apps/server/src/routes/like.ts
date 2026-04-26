@@ -5,7 +5,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { NotFoundError } from "../lib/errors";
-import { requireAuth } from "../middleware/auth";
+import { requireActiveUser } from "../middleware/require-active-user";
 import type { AppVariables } from "../types";
 
 export const likeRoutes = new Hono<{ Variables: AppVariables }>();
@@ -17,7 +17,7 @@ async function ensureVideoExists(videoId: string) {
   }
 }
 
-likeRoutes.get("/:videoId/like", requireAuth, async (c) => {
+likeRoutes.get("/:videoId/like", ...requireActiveUser, async (c) => {
   const userId = c.get("user").id;
   const videoId = c.req.param("videoId");
 
@@ -28,7 +28,7 @@ likeRoutes.get("/:videoId/like", requireAuth, async (c) => {
   return c.json({ type: existing?.type ?? null });
 });
 
-likeRoutes.post("/:videoId/like", requireAuth, async (c) => {
+likeRoutes.post("/:videoId/like", ...requireActiveUser, async (c) => {
   const userId = c.get("user").id;
   const videoId = c.req.param("videoId");
 
@@ -76,7 +76,7 @@ likeRoutes.post("/:videoId/like", requireAuth, async (c) => {
   return c.json({ type: resultType });
 });
 
-likeRoutes.post("/:videoId/dislike", requireAuth, async (c) => {
+likeRoutes.post("/:videoId/dislike", ...requireActiveUser, async (c) => {
   const userId = c.get("user").id;
   const videoId = c.req.param("videoId");
 

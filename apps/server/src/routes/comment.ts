@@ -7,8 +7,9 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { AppError, ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
+import { activeAuthorWhere } from "../lib/moderation-filters";
 import { getRedisClient } from "../lib/redis";
-import { requireAuth } from "../middleware/auth";
+import { requireActiveUser, requireNotMuted } from "../middleware/require-active-user";
 import type { AppVariables } from "../types";
 
 const MAX_DEPTH = 3;
@@ -44,9 +45,10 @@ function serializeComment(
   },
 ) {
   const isDeleted = row.deletedAt != null;
+  const isRemoved = row.removedBy != null;
   return {
     id: row.id,
-    content: isDeleted ? "[deleted]" : row.content,
+    content: isRemoved ? "[removed]" : isDeleted ? "[deleted]" : row.content,
     user: row.user,
     parentId: row.parentId,
     depth: row.depth,
@@ -92,7 +94,7 @@ async function listComments(
     })
     .from(comment)
     .innerJoin(user, eq(user.id, comment.userId))
-    .where(and(...where))
+    .where(and(...where, activeAuthorWhere()))
     .orderBy(orderBy)
     .limit(limit + 1);
 
@@ -147,7 +149,7 @@ commentRoutes.get("/videos/:videoId/comments/:id/replies", async (c) => {
   return c.json(result);
 });
 
-commentRoutes.post("/videos/:videoId/comments", requireAuth, async (c) => {
+commentRoutes.post("/videos/:videoId/comments", ...requireNotMuted, async (c) => {
   const videoId = c.req.param("videoId");
   const currentUser = c.get("user");
 
@@ -198,6 +200,8 @@ commentRoutes.post("/videos/:videoId/comments", requireAuth, async (c) => {
       updatedAt: new Date(),
       editedAt: null,
       deletedAt: null,
+      removedBy: null,
+      removalReason: null,
       user: {
         id: currentUser.id,
         name: currentUser.name,
@@ -208,7 +212,7 @@ commentRoutes.post("/videos/:videoId/comments", requireAuth, async (c) => {
   );
 });
 
-commentRoutes.post("/videos/:videoId/comments/:id/replies", requireAuth, async (c) => {
+commentRoutes.post("/videos/:videoId/comments/:id/replies", ...requireNotMuted, async (c) => {
   const videoId = c.req.param("videoId");
   const parentId = c.req.param("id");
   const currentUser = c.get("user");
@@ -266,6 +270,8 @@ commentRoutes.post("/videos/:videoId/comments/:id/replies", requireAuth, async (
       updatedAt: new Date(),
       editedAt: null,
       deletedAt: null,
+      removedBy: null,
+      removalReason: null,
       user: {
         id: currentUser.id,
         name: currentUser.name,
@@ -276,7 +282,7 @@ commentRoutes.post("/videos/:videoId/comments/:id/replies", requireAuth, async (
   );
 });
 
-commentRoutes.patch("/comments/:id", requireAuth, async (c) => {
+commentRoutes.patch("/comments/:id", ...requireActiveUser, async (c) => {
   const id = c.req.param("id");
   const currentUser = c.get("user");
 
@@ -310,7 +316,7 @@ commentRoutes.patch("/comments/:id", requireAuth, async (c) => {
   return c.json({ ok: true, editedAt });
 });
 
-commentRoutes.delete("/comments/:id", requireAuth, async (c) => {
+commentRoutes.delete("/comments/:id", ...requireActiveUser, async (c) => {
   const id = c.req.param("id");
   const currentUser = c.get("user");
 

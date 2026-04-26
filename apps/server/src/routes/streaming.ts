@@ -1,7 +1,8 @@
 import { auth } from "@video-site/auth";
 import { db } from "@video-site/db";
+import { user } from "@video-site/db/schema/auth";
 import { video } from "@video-site/db/schema/video";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import type { BunFile } from "bun";
 
@@ -74,12 +75,18 @@ streamingRoutes.get("/:videoId/manifest.mpd", async (c) => {
       manifestPath: video.manifestPath,
       visibility: video.visibility,
       userId: video.userId,
+      deletedAt: video.deletedAt,
+      authorBannedAt: user.bannedAt,
+      authorSuspendedUntil: user.suspendedUntil,
     })
     .from(video)
-    .where(and(eq(video.id, videoId), eq(video.status, "ready")))
+    .innerJoin(user, eq(user.id, video.userId))
+    .where(and(eq(video.id, videoId), eq(video.status, "ready"), isNull(video.deletedAt)))
     .limit(1);
 
   if (!row || !row.manifestPath) return c.notFound();
+  if (row.authorBannedAt) return c.notFound();
+  if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) return c.notFound();
 
   if (row.visibility === "private") {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -108,12 +115,19 @@ streamingRoutes.get("/:videoId/thumbnail", async (c) => {
       thumbnailPath: video.thumbnailPath,
       visibility: video.visibility,
       userId: video.userId,
+      deletedAt: video.deletedAt,
+      authorBannedAt: user.bannedAt,
+      authorSuspendedUntil: user.suspendedUntil,
     })
     .from(video)
+    .innerJoin(user, eq(user.id, video.userId))
     .where(eq(video.id, videoId))
     .limit(1);
 
   if (!row || !row.thumbnailPath) return c.notFound();
+  if (row.deletedAt) return c.notFound();
+  if (row.authorBannedAt) return c.notFound();
+  if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) return c.notFound();
 
   if (row.visibility === "private") {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
