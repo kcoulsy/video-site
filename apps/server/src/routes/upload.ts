@@ -33,6 +33,7 @@ async function failVideo(videoId: string, reason: string): Promise<void> {
 }
 
 const MAX_UPLOAD_SIZE = 500 * 1024 * 1024;
+const VIDEO_ID_RE = /^[A-Za-z0-9_-]{21}$/;
 
 const tusServer = new Server({
   path: "/api/uploads",
@@ -40,8 +41,8 @@ const tusServer = new Server({
   maxSize: MAX_UPLOAD_SIZE,
   namingFunction(_req, metadata) {
     const videoId = metadata?.videoId;
-    if (!videoId) {
-      throw new Error("videoId is required in upload metadata");
+    if (!videoId || !VIDEO_ID_RE.test(videoId)) {
+      throw { status_code: 400, body: "Invalid videoId" };
     }
     return videoId;
   },
@@ -52,8 +53,8 @@ const tusServer = new Server({
     }
 
     const videoId = upload.metadata?.videoId;
-    if (!videoId) {
-      throw { status_code: 400, body: "videoId is required" };
+    if (!videoId || !VIDEO_ID_RE.test(videoId)) {
+      throw { status_code: 400, body: "Invalid videoId" };
     }
 
     const [existing] = await db
@@ -78,8 +79,8 @@ const tusServer = new Server({
   },
   async onUploadFinish(_req, upload) {
     const videoId = upload.metadata?.videoId;
-    if (!videoId) {
-      throw { status_code: 400, body: "videoId is required" };
+    if (!videoId || !VIDEO_ID_RE.test(videoId)) {
+      throw { status_code: 400, body: "Invalid videoId" };
     }
 
     const tusFilePath = path.posix.join(storage.getTusDir(), upload.id);

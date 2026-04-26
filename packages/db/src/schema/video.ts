@@ -42,10 +42,10 @@ export const video = pgTable(
 
     tusUploadId: text("tus_upload_id"),
 
-    viewCount: integer("view_count").default(0).notNull(),
-    likeCount: integer("like_count").default(0).notNull(),
-    dislikeCount: integer("dislike_count").default(0).notNull(),
-    commentCount: integer("comment_count").default(0).notNull(),
+    viewCount: bigint("view_count", { mode: "number" }).default(0).notNull(),
+    likeCount: bigint("like_count", { mode: "number" }).default(0).notNull(),
+    dislikeCount: bigint("dislike_count", { mode: "number" }).default(0).notNull(),
+    commentCount: bigint("comment_count", { mode: "number" }).default(0).notNull(),
 
     tags: text("tags").array(),
 

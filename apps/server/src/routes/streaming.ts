@@ -10,6 +10,7 @@ import { storage } from "../lib/storage";
 import type { AppVariables } from "../types";
 
 const SEGMENT_FILENAME_RE = /^(init-stream\d+|chunk-stream\d+-\d{5,})\.m4s$/;
+const VIDEO_ID_RE = /^[A-Za-z0-9_-]{21}$/;
 
 function getContentType(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase();
@@ -69,6 +70,7 @@ export const streamingRoutes = new Hono<{ Variables: AppVariables }>();
 
 streamingRoutes.get("/:videoId/manifest.mpd", async (c) => {
   const videoId = c.req.param("videoId");
+  if (!VIDEO_ID_RE.test(videoId)) return c.notFound();
 
   const [row] = await db
     .select({
@@ -109,6 +111,7 @@ streamingRoutes.get("/:videoId/manifest.mpd", async (c) => {
 
 streamingRoutes.get("/:videoId/thumbnail", async (c) => {
   const videoId = c.req.param("videoId");
+  if (!VIDEO_ID_RE.test(videoId)) return c.notFound();
 
   const [row] = await db
     .select({
@@ -150,6 +153,7 @@ streamingRoutes.get("/:videoId/thumbnail", async (c) => {
 
 streamingRoutes.get("/:videoId/thumbnail/still/:index", async (c) => {
   const videoId = c.req.param("videoId");
+  if (!VIDEO_ID_RE.test(videoId)) return c.notFound();
   const indexStr = c.req.param("index");
   const index = Number.parseInt(indexStr, 10);
   if (!Number.isInteger(index) || index < 0 || index > 99) {
@@ -199,6 +203,9 @@ streamingRoutes.get("/:videoId/thumbnail/still/:index", async (c) => {
 streamingRoutes.get("/:videoId/:filename", async (c) => {
   const { videoId, filename } = c.req.param();
 
+  if (!VIDEO_ID_RE.test(videoId)) {
+    return c.json({ error: "Invalid videoId" }, 400);
+  }
   if (!SEGMENT_FILENAME_RE.test(filename)) {
     return c.json({ error: "Invalid filename" }, 400);
   }

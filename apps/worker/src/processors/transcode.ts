@@ -249,7 +249,9 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
       Boolean(audioStream),
       (ffmpegPercent) => {
         const overall = 10 + ffmpegPercent * 0.75;
-        void job.updateProgress({ stage: "transcoding", percent: overall });
+        job.updateProgress({ stage: "transcoding", percent: overall }).catch((err: unknown) => {
+          console.error(`[transcode ${videoId}] progress update failed:`, err);
+        });
       },
     );
 
@@ -262,7 +264,11 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
         Boolean(audioStream),
         (ffmpegPercent) => {
           const overall = 85 + ffmpegPercent * 0.1;
-          void job.updateProgress({ stage: "transcoding-1080p", percent: overall });
+          job
+            .updateProgress({ stage: "transcoding-1080p", percent: overall })
+            .catch((err: unknown) => {
+              console.error(`[transcode ${videoId}] progress update failed:`, err);
+            });
         },
       );
     }

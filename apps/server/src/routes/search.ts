@@ -8,7 +8,7 @@ import type { AppVariables } from "../types";
 
 const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(200),
-  page: z.coerce.number().int().positive().default(1),
+  page: z.coerce.number().int().positive().max(500).default(1),
   limit: z.coerce.number().int().positive().max(50).default(20),
   sort: z.enum(["relevance", "date", "views"]).default("relevance"),
 });
