@@ -19,6 +19,50 @@ import { formatDate, formatViewCount } from "@/lib/format";
 
 export const Route = createFileRoute("/watch/$videoId")({
   component: WatchPage,
+  loader: async ({ params }) => {
+    try {
+      const res = await fetch(`${env.VITE_SERVER_URL}/api/videos/${params.videoId}`);
+      if (!res.ok) return { video: null };
+      const video = (await res.json()) as VideoResponse;
+      return { video };
+    } catch {
+      return { video: null };
+    }
+  },
+  head: ({ loaderData }) => {
+    const video = loaderData?.video;
+    if (!video) return {};
+
+    const pageUrl = `${env.VITE_WEB_URL}/watch/${video.id}`;
+    const image = video.thumbnailUrl ? `${env.VITE_SERVER_URL}${video.thumbnailUrl}` : undefined;
+    const title = `${video.title} — Watchbox`;
+    const description = video.description?.trim()
+      ? video.description.slice(0, 200)
+      : `Watch ${video.title} on Watchbox.`;
+
+    const meta: Array<Record<string, string>> = [
+      { title },
+      { name: "description", content: description },
+      { property: "og:type", content: "video.other" },
+      { property: "og:site_name", content: "Watchbox" },
+      { property: "og:title", content: video.title },
+      { property: "og:description", content: description },
+      { property: "og:url", content: pageUrl },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: video.title },
+      { name: "twitter:description", content: description },
+    ];
+
+    if (image) {
+      meta.push(
+        { property: "og:image", content: image },
+        { property: "og:image:secure_url", content: image },
+        { name: "twitter:image", content: image },
+      );
+    }
+
+    return { meta };
+  },
 });
 
 interface VideoResponse {
