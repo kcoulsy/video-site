@@ -4,9 +4,9 @@ import { Clock, Flame, Search, SearchX, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { env } from "@video-site/env/web";
 
-import Loader from "@/components/loader";
 import { Pagination } from "@/components/pagination";
 import { VideoGrid } from "@/components/video-grid";
+import { VideoGridSkeleton } from "@/components/video-card-skeleton";
 import type { VideoCardProps } from "@/components/video-card";
 import { apiClient } from "@/lib/api-client";
 
@@ -114,8 +114,8 @@ function SearchPage() {
 
   if (isLoading && !data) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader />
+      <div className="mx-auto max-w-[1400px] px-4 py-6">
+        <VideoGridSkeleton count={20} />
       </div>
     );
   }

@@ -4,9 +4,9 @@ import { Clock, Film, Flame, Sparkles, TrendingUp } from "lucide-react";
 import { env } from "@video-site/env/web";
 
 import { CategorySidebar } from "@/components/category-sidebar";
-import Loader from "@/components/loader";
 import { Pagination } from "@/components/pagination";
 import { VideoGrid } from "@/components/video-grid";
+import { VideoGridSkeleton } from "@/components/video-card-skeleton";
 import type { VideoCardProps } from "@/components/video-card";
 import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
@@ -175,9 +175,7 @@ function HomePage() {
         </div>
 
         {isLoading && items.length === 0 ? (
-          <div className="py-16">
-            <Loader />
-          </div>
+          <VideoGridSkeleton count={PAGE_SIZE} />
         ) : videos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24">
             <Film className="h-12 w-12 text-muted-foreground/20" />
