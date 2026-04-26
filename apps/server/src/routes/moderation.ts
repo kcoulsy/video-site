@@ -3,7 +3,7 @@ import { session, user } from "@video-site/db/schema/auth";
 import { comment } from "@video-site/db/schema/comment";
 import { moderationAction, report } from "@video-site/db/schema/moderation";
 import { video } from "@video-site/db/schema/video";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -277,6 +277,128 @@ modOnly.post("/users/:id/unmute", async (c) => {
       actorId: actor.id,
       action: "unmute",
       targetType: "user",
+      targetId: id,
+    });
+  });
+  return c.json({ ok: true });
+});
+
+// Moderation queue (unreviewed, undeleted videos + comments)
+
+const queueQuerySchema = listQuerySchema.extend({
+  type: z.enum(["all", "video", "comment"]).default("all"),
+});
+
+modOnly.get("/queue", async (c) => {
+  const parsed = queueQuerySchema.safeParse(
+    Object.fromEntries(new URL(c.req.url).searchParams),
+  );
+  if (!parsed.success) throw new ValidationError("Invalid query");
+  const { page, limit, type } = parsed.data;
+
+  const includeVideos = type === "all" || type === "video";
+  const includeComments = type === "all" || type === "comment";
+
+  const videoWhere = and(isNull(video.reviewedAt), isNull(video.deletedAt));
+  const commentWhere = and(isNull(comment.reviewedAt), isNull(comment.deletedAt));
+
+  const [videoRows, commentRows, videoTotal, commentTotal] = await Promise.all([
+    includeVideos
+      ? db
+          .select({
+            id: video.id,
+            createdAt: video.createdAt,
+            authorId: video.userId,
+            authorName: user.name,
+            title: video.title,
+            visibility: video.visibility,
+            status: video.status,
+            thumbnailPath: video.thumbnailPath,
+          })
+          .from(video)
+          .leftJoin(user, eq(user.id, video.userId))
+          .where(videoWhere)
+          .orderBy(desc(video.createdAt))
+          .limit(limit + (page - 1) * limit)
+      : Promise.resolve([] as never[]),
+    includeComments
+      ? db
+          .select({
+            id: comment.id,
+            createdAt: comment.createdAt,
+            authorId: comment.userId,
+            authorName: user.name,
+            content: comment.content,
+            videoId: comment.videoId,
+            videoTitle: video.title,
+          })
+          .from(comment)
+          .leftJoin(user, eq(user.id, comment.userId))
+          .leftJoin(video, eq(video.id, comment.videoId))
+          .where(commentWhere)
+          .orderBy(desc(comment.createdAt))
+          .limit(limit + (page - 1) * limit)
+      : Promise.resolve([] as never[]),
+    includeVideos
+      ? db.select({ count: sql<number>`count(*)::int` }).from(video).where(videoWhere)
+      : Promise.resolve([{ count: 0 }]),
+    includeComments
+      ? db.select({ count: sql<number>`count(*)::int` }).from(comment).where(commentWhere)
+      : Promise.resolve([{ count: 0 }]),
+  ]);
+
+  const merged = [
+    ...videoRows.map((r) => ({ type: "video" as const, ...r })),
+    ...commentRows.map((r) => ({ type: "comment" as const, ...r })),
+  ].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+
+  const start = (page - 1) * limit;
+  const items = merged.slice(start, start + limit);
+  const total = (videoTotal[0]?.count ?? 0) + (commentTotal[0]?.count ?? 0);
+
+  return c.json({ items, page, limit, total });
+});
+
+modOnly.post("/videos/:id/approve", async (c) => {
+  const id = c.req.param("id");
+  const actor = c.get("user");
+  const [existing] = await db.select({ id: video.id }).from(video).where(eq(video.id, id)).limit(1);
+  if (!existing) throw new NotFoundError("Video");
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(video)
+      .set({ reviewedAt: new Date(), reviewedBy: actor.id })
+      .where(eq(video.id, id));
+    await logModerationAction(tx, {
+      actorId: actor.id,
+      action: "approve_video",
+      targetType: "video",
+      targetId: id,
+    });
+  });
+  return c.json({ ok: true });
+});
+
+modOnly.post("/comments/:id/approve", async (c) => {
+  const id = c.req.param("id");
+  const actor = c.get("user");
+  const [existing] = await db
+    .select({ id: comment.id })
+    .from(comment)
+    .where(eq(comment.id, id))
+    .limit(1);
+  if (!existing) throw new NotFoundError("Comment");
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(comment)
+      .set({ reviewedAt: new Date(), reviewedBy: actor.id })
+      .where(eq(comment.id, id));
+    await logModerationAction(tx, {
+      actorId: actor.id,
+      action: "approve_comment",
+      targetType: "comment",
       targetId: id,
     });
   });

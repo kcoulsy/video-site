@@ -20,6 +20,8 @@ export const moderationActionEnum = pgEnum("moderation_action_kind", [
   "delete_user",
   "resolve_report",
   "dismiss_report",
+  "approve_video",
+  "approve_comment",
 ]);
 
 export const moderationTargetEnum = pgEnum("moderation_target_kind", [

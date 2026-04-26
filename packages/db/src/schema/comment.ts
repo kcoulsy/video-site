@@ -34,11 +34,15 @@ export const comment = pgTable(
     deletedAt: timestamp("deleted_at"),
     removedBy: text("removed_by"),
     removalReason: text("removal_reason"),
+
+    reviewedAt: timestamp("reviewed_at"),
+    reviewedBy: text("reviewed_by"),
   },
   (table) => [
     index("comment_video_id_idx").on(table.videoId),
     index("comment_parent_id_idx").on(table.parentId),
     index("comment_user_id_idx").on(table.userId),
     index("comment_video_id_created_at_idx").on(table.videoId, table.createdAt),
+    index("comment_reviewed_at_idx").on(table.reviewedAt),
   ],
 );

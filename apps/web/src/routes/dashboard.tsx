@@ -202,36 +202,63 @@ function VideoRow({
     },
   });
 
+  const isReady = status === "ready";
+  const thumbnail = (
+    <>
+      {video.thumbnailUrl ? (
+        <img
+          src={`${env.VITE_SERVER_URL}${video.thumbnailUrl}`}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
+          <Film className="h-6 w-6 text-muted-foreground/20" />
+        </div>
+      )}
+      {video.duration != null && (
+        <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">
+          {formatDuration(video.duration)}
+        </span>
+      )}
+      {(status === "processing" || status === "uploading") && progress != null && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+          <span className="text-xs font-medium text-white tabular-nums">
+            {Math.round(progress)}%
+          </span>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-secondary/30">
-      <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-md bg-secondary">
-        {video.thumbnailUrl ? (
-          <img
-            src={`${env.VITE_SERVER_URL}${video.thumbnailUrl}`}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-            <Film className="h-6 w-6 text-muted-foreground/20" />
-          </div>
-        )}
-        {video.duration != null && (
-          <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">
-            {formatDuration(video.duration)}
-          </span>
-        )}
-        {(status === "processing" || status === "uploading") && progress != null && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-            <span className="text-xs font-medium text-white tabular-nums">
-              {Math.round(progress)}%
-            </span>
-          </div>
-        )}
-      </div>
+      {isReady ? (
+        <Link
+          to="/watch/$videoId"
+          params={{ videoId: video.id }}
+          className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-md bg-secondary"
+        >
+          {thumbnail}
+        </Link>
+      ) : (
+        <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-md bg-secondary">
+          {thumbnail}
+        </div>
+      )}
 
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-medium">{video.title}</h3>
+        {isReady ? (
+          <Link
+            to="/watch/$videoId"
+            params={{ videoId: video.id }}
+            className="block truncate text-sm font-medium hover:underline"
+          >
+            {video.title}
+          </Link>
+        ) : (
+          <h3 className="truncate text-sm font-medium">{video.title}</h3>
+        )}
         <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
           <VideoStatusBadge status={status} progressPercent={progress} />
           <span className="capitalize">{video.visibility}</span>

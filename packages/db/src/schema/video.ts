@@ -51,6 +51,9 @@ export const video = pgTable(
     removedBy: text("removed_by"),
     removalReason: text("removal_reason"),
 
+    reviewedAt: timestamp("reviewed_at"),
+    reviewedBy: text("reviewed_by"),
+
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -64,5 +67,6 @@ export const video = pgTable(
     index("video_created_at_idx").on(table.createdAt),
     index("video_visibility_status_idx").on(table.visibility, table.status),
     index("video_deleted_at_idx").on(table.deletedAt),
+    index("video_reviewed_at_idx").on(table.reviewedAt),
   ],
 );

@@ -157,7 +157,7 @@ function UploadPage() {
   const isBusy = isUploading || isProcessing;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8">
       <button
         type="button"
         onClick={() => navigate({ to: "/dashboard" })}
@@ -168,200 +168,206 @@ function UploadPage() {
         Back to dashboard
       </button>
 
-      <div className="mb-6">
+      <div className="mb-8">
         <h1 className="text-2xl font-semibold">Upload Video</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Share your video with the world.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {!file ? (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-colors ${
-              dragOver
-                ? "border-primary bg-primary/5"
-                : "border-border hover:border-muted-foreground"
-            }`}
-          >
-            <Upload
-              className={`mb-4 h-10 w-10 ${dragOver ? "text-primary" : "text-muted-foreground"}`}
-            />
-            <p className="text-sm font-medium">
-              {dragOver ? "Drop video here" : "Drag & drop a video file"}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">or click to browse</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-          </div>
-        ) : (
-          <div className="flex items-center gap-4 rounded-xl border border-border bg-secondary/30 p-4">
-            <Film className="h-8 w-8 shrink-0 text-primary" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{file.name}</p>
-              <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
-            </div>
-            {!isBusy && (
-              <button
-                type="button"
-                onClick={() => setFile(null)}
-                className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        )}
-
-        {isUploading && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Uploading...</span>
-              <span className="font-medium text-primary tabular-nums">{progress}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-secondary">
-              <div
-                className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: `${progress}%` }}
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">
+          {!file ? (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`flex aspect-video cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-colors ${
+                dragOver
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-muted-foreground"
+              }`}
+            >
+              <Upload
+                className={`mb-4 h-12 w-12 ${dragOver ? "text-primary" : "text-muted-foreground"}`}
+              />
+              <p className="text-base font-medium">
+                {dragOver ? "Drop video here" : "Drag & drop a video file"}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">or click to browse</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/*"
+                onChange={handleFileSelect}
+                className="hidden"
               />
             </div>
-          </div>
-        )}
-
-        {isProcessing && (
-          <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
-            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" />
-            <div className="min-w-0">
-              <p className="font-medium text-foreground">Upload complete — processing</p>
-              <p className="text-xs text-muted-foreground">
-                We're transcoding your video in the background. You can leave this page and keep
-                browsing.
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Label htmlFor="upload-title">Title</Label>
-          <Input
-            id="upload-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Give your video a title"
-            disabled={isBusy}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="upload-desc">Description</Label>
-          <textarea
-            id="upload-desc"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Tell viewers about your video"
-            rows={4}
-            disabled={isBusy}
-            className="w-full resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Tags</Label>
-          {tagOptions.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No tags available yet. An admin needs to create tags before they can be applied.
-            </p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {tagOptions.map((t) => {
-                const active = selectedTagIds.includes(t.id);
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedTagIds((prev) =>
-                        prev.includes(t.id) ? prev.filter((id) => id !== t.id) : [...prev, t.id],
-                      )
-                    }
-                    disabled={isBusy}
-                    className={`rounded-full border px-3 py-1 text-xs transition-colors disabled:opacity-50 ${
-                      active
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:border-muted-foreground"
-                    }`}
-                  >
-                    {t.name}
-                  </button>
-                );
-              })}
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-secondary/30 p-4">
+              <Film className="h-8 w-8 shrink-0 text-primary" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{file.name}</p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+              </div>
+              {!isBusy && (
+                <button
+                  type="button"
+                  onClick={() => setFile(null)}
+                  className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {isUploading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Uploading...</span>
+                <span className="font-medium text-primary tabular-nums">{progress}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {isProcessing && (
+            <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+              <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" />
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">Upload complete — processing</p>
+                <p className="text-xs text-muted-foreground">
+                  We're transcoding your video in the background. You can leave this page and keep
+                  browsing.
+                </p>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label>Visibility</Label>
-          <div className="flex gap-2">
-            {(["public", "unlisted", "private"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setVisibility(v)}
-                disabled={isBusy}
-                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm capitalize transition-colors disabled:opacity-50 ${
-                  visibility === v
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-muted-foreground"
-                }`}
-              >
-                {v === "private" ? (
-                  <EyeOff className="h-3.5 w-3.5" />
-                ) : (
-                  <Eye className="h-3.5 w-3.5" />
-                )}
-                {v}
-              </button>
-            ))}
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="upload-title">Title</Label>
+            <Input
+              id="upload-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Give your video a title"
+              disabled={isBusy}
+              required
+            />
           </div>
-        </div>
 
-        <div className="flex justify-end gap-3 pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => navigate({ to: "/dashboard" })}
-            disabled={isUploading}
-          >
-            Cancel
-          </Button>
-          {!isProcessing && (
-            <Button type="submit" disabled={!file || !title.trim() || isUploading}>
-              {isUploading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload
-                </>
-              )}
+          <div className="space-y-2">
+            <Label htmlFor="upload-desc">Description</Label>
+            <textarea
+              id="upload-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Tell viewers about your video"
+              rows={6}
+              disabled={isBusy}
+              className="w-full resize-none rounded-lg border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            {tagOptions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No tags available yet. An admin needs to create tags before they can be applied.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {tagOptions.map((t) => {
+                  const active = selectedTagIds.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() =>
+                        setSelectedTagIds((prev) =>
+                          prev.includes(t.id)
+                            ? prev.filter((id) => id !== t.id)
+                            : [...prev, t.id],
+                        )
+                      }
+                      disabled={isBusy}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors disabled:opacity-50 ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-muted-foreground"
+                      }`}
+                    >
+                      {t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Visibility</Label>
+            <div className="flex flex-wrap gap-2">
+              {(["public", "unlisted", "private"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setVisibility(v)}
+                  disabled={isBusy}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm capitalize transition-colors disabled:opacity-50 ${
+                    visibility === v
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:border-muted-foreground"
+                  }`}
+                >
+                  {v === "private" ? (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate({ to: "/dashboard" })}
+              disabled={isUploading}
+            >
+              Cancel
             </Button>
-          )}
+            {!isProcessing && (
+              <Button type="submit" disabled={!file || !title.trim() || isUploading}>
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </form>
     </div>

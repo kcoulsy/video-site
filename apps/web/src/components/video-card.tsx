@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Play } from "lucide-react";
 
 import { formatDuration, formatViewCount, formatRelativeTime } from "@/lib/format";
 
+import { HoverPreview } from "./hover-preview";
 import { WatchProgressBar } from "./watch-progress-bar";
 
 export interface VideoCardProps {
@@ -30,28 +30,22 @@ export function VideoCard({
     <Link to="/watch/$videoId" params={{ videoId: id }} className="group block">
       {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden bg-secondary">
-        {thumbnailUrl ? (
-          <img
-            src={thumbnailUrl}
-            alt={title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-            <Play className="h-10 w-10 text-muted-foreground/30" />
-          </div>
-        )}
+        <HoverPreview
+          videoId={id}
+          title={title}
+          thumbnailUrl={thumbnailUrl}
+          duration={duration}
+        />
 
         {/* Duration badge */}
         {duration != null && (
-          <span className="absolute bottom-2 right-2 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+          <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/80 px-1.5 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
             {formatDuration(duration)}
           </span>
         )}
 
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-primary/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="pointer-events-none absolute inset-0 bg-primary/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
         {progressPercent != null && <WatchProgressBar progressPercent={progressPercent} />}
       </div>

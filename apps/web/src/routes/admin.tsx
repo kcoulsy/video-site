@@ -2,6 +2,7 @@ import { Link, Outlet, createFileRoute, redirect } from "@tanstack/react-router"
 import {
   FileClock,
   Flag,
+  Inbox,
   Layers,
   LayoutDashboard,
   MessageSquare,
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/admin")({
 function navItemsForRole(role: string | undefined) {
   const base = [
     { to: "/admin", label: "Overview", Icon: LayoutDashboard, exact: true },
+    { to: "/admin/queue", label: "Queue", Icon: Inbox, exact: false },
     { to: "/admin/videos", label: "Videos", Icon: Video, exact: false },
     { to: "/admin/users", label: "Users", Icon: Users, exact: false },
     { to: "/admin/comments", label: "Comments", Icon: MessageSquare, exact: false },

@@ -19,7 +19,9 @@ type ModerationActionName =
   | "role_change"
   | "delete_user"
   | "resolve_report"
-  | "dismiss_report";
+  | "dismiss_report"
+  | "approve_video"
+  | "approve_comment";
 
 type ModerationTarget = "user" | "video" | "comment" | "report";
 

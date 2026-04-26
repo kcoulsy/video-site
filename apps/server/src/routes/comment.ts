@@ -202,6 +202,8 @@ commentRoutes.post("/videos/:videoId/comments", ...requireNotMuted, async (c) =>
       deletedAt: null,
       removedBy: null,
       removalReason: null,
+      reviewedAt: null,
+      reviewedBy: null,
       user: {
         id: currentUser.id,
         name: currentUser.name,
@@ -272,6 +274,8 @@ commentRoutes.post("/videos/:videoId/comments/:id/replies", ...requireNotMuted, 
       deletedAt: null,
       removedBy: null,
       removalReason: null,
+      reviewedAt: null,
+      reviewedBy: null,
       user: {
         id: currentUser.id,
         name: currentUser.name,

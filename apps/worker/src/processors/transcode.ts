@@ -24,11 +24,17 @@ interface Resolution {
   profile: "main" | "high";
 }
 
-const RESOLUTION_LADDER: Resolution[] = [
+const MANIFEST_LADDER: Resolution[] = [
   { width: 640, height: 360, bitrate: "800k", profile: "main" },
   { width: 1280, height: 720, bitrate: "2500k", profile: "main" },
-  { width: 1920, height: 1080, bitrate: "5000k", profile: "high" },
 ];
+
+const EXTRA_RENDITION: Resolution = {
+  width: 1920,
+  height: 1080,
+  bitrate: "5000k",
+  profile: "high",
+};
 
 function probe(filePath: string): Promise<ffmpeg.FfprobeData> {
   return new Promise((resolve, reject) => {
@@ -53,6 +59,49 @@ function extractThumbnail(
       .output(outputPath)
       .on("end", () => resolve())
       .on("error", reject)
+      .run();
+  });
+}
+
+function transcodeToMp4(
+  inputPath: string,
+  outputPath: string,
+  resolution: Resolution,
+  hasAudio: boolean,
+  onProgress: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let cmd = ffmpeg(inputPath)
+      .outputOptions(
+        "-map",
+        "0:v",
+        "-c:v",
+        "libx264",
+        "-b:v",
+        resolution.bitrate,
+        "-vf",
+        `scale=${resolution.width}:-2`,
+        "-profile:v",
+        resolution.profile,
+        "-preset",
+        "veryfast",
+        "-movflags",
+        "+faststart",
+      );
+
+    if (hasAudio) {
+      cmd = cmd.outputOptions("-map", "0:a?", "-c:a", "aac", "-b:a", "128k", "-ar", "44100");
+    }
+
+    cmd
+      .output(outputPath)
+      .on("progress", (p) => {
+        if (typeof p.percent === "number" && Number.isFinite(p.percent)) {
+          onProgress(Math.max(0, Math.min(100, p.percent)));
+        }
+      })
+      .on("end", () => resolve())
+      .on("error", (err) => reject(err))
       .run();
   });
 }
@@ -174,9 +223,9 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
 
     await job.updateProgress({ stage: "thumbnail", percent: 10 });
 
-    let targetResolutions = RESOLUTION_LADDER.filter((r) => r.height <= sourceHeight);
+    let targetResolutions = MANIFEST_LADDER.filter((r) => r.height <= sourceHeight);
     if (targetResolutions.length === 0) {
-      targetResolutions = [RESOLUTION_LADDER[0]!];
+      targetResolutions = [MANIFEST_LADDER[0]!];
     }
 
     const transcodedDir = await storage.ensureTranscodedDir(videoId);
@@ -186,10 +235,24 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
       targetResolutions,
       Boolean(audioStream),
       (ffmpegPercent) => {
-        const overall = 10 + ffmpegPercent * 0.85;
+        const overall = 10 + ffmpegPercent * 0.75;
         void job.updateProgress({ stage: "transcoding", percent: overall });
       },
     );
+
+    if (sourceHeight >= EXTRA_RENDITION.height) {
+      const extraOutput = path.posix.join(transcodedDir, `${EXTRA_RENDITION.height}p.mp4`);
+      await transcodeToMp4(
+        rawPath,
+        extraOutput,
+        EXTRA_RENDITION,
+        Boolean(audioStream),
+        (ffmpegPercent) => {
+          const overall = 85 + ffmpegPercent * 0.1;
+          void job.updateProgress({ stage: "transcoding-1080p", percent: overall });
+        },
+      );
+    }
 
     await db
       .update(video)
