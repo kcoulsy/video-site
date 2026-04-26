@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
 import { errorHandler } from "./middleware/error-handler";
+import { originCheck } from "./middleware/origin-check";
 import { adminRoutes } from "./routes/admin";
 import { analyticsRoutes } from "./routes/analytics";
 import { commentRoutes } from "./routes/comment";
@@ -56,6 +57,8 @@ app.use(
     credentials: true,
   }),
 );
+
+app.use("/api/*", originCheck);
 
 app.onError(errorHandler);
 

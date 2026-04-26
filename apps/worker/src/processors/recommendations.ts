@@ -27,6 +27,11 @@ const USER_SIM_TOP_NEIGHBORS = 50;
 const USER_RECS_TOP = 200;
 const USER_RECS_MIN_INTERACTIONS = 3;
 
+// Cap each actor's contribution before pairwise self-joins. Without this, a
+// single power user with thousands of interactions makes the pairs CTE blow up
+// quadratically.
+const MAX_INTERACTIONS_PER_ACTOR = 300;
+
 export async function processRecsBuildSimilarity(_job: Job<RecsJobData>) {
   const startedAt = Date.now();
 
@@ -89,11 +94,19 @@ export async function processRecsBuildSimilarity(_job: Job<RecsJobData>) {
         AND v.status = 'ready'
         AND v.visibility = 'public'
     ),
-    agg AS (
+    agg_raw AS (
       SELECT actor, video_id, SUM(w) AS w
       FROM actor_affinity
       GROUP BY actor, video_id
       HAVING SUM(w) > 0
+    ),
+    agg AS (
+      SELECT actor, video_id, w FROM (
+        SELECT actor, video_id, w,
+          ROW_NUMBER() OVER (PARTITION BY actor ORDER BY w DESC) AS rn
+        FROM agg_raw
+      ) t
+      WHERE rn <= ${sql.raw(String(MAX_INTERACTIONS_PER_ACTOR))}
     ),
     norms AS (
       SELECT video_id, SQRT(SUM(w * w)) AS norm
@@ -250,9 +263,13 @@ export async function processRecsBuildUserCf(_job: Job<RecsJobData>) {
         AND c.created_at > NOW() - INTERVAL '${sql.raw(String(SIM_LOOKBACK_DAYS))} days'
         AND v.deleted_at IS NULL AND v.status = 'ready' AND v.visibility = 'public'
     )
-    SELECT user_id, video_id, SUM(w)::real AS w
-    FROM raw
-    GROUP BY user_id, video_id
+    SELECT user_id, video_id, w FROM (
+      SELECT user_id, video_id, SUM(w)::real AS w,
+        ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY SUM(w) DESC) AS rn
+      FROM raw
+      GROUP BY user_id, video_id
+    ) t
+    WHERE rn <= ${sql.raw(String(MAX_INTERACTIONS_PER_ACTOR))}
   `);
 
     await tx.execute(sql`CREATE INDEX ON _user_affinity (user_id)`);

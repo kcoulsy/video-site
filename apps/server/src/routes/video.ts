@@ -12,6 +12,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 
 import { ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
+import { detectThumbnailBuffer } from "../lib/file-validation";
 import { activeAuthorWhere, visibleVideoWhere } from "../lib/moderation-filters";
 import { cleanupQueue, thumbnailQueue, transcodeQueue } from "../lib/queue";
 import { getRedisClient } from "../lib/redis";
@@ -498,15 +499,19 @@ videoRoutes.post("/:id/thumbnail", requireAuth, async (c) => {
   if (!(file instanceof File)) {
     throw new ValidationError("No thumbnail file provided");
   }
-  if (!file.type.startsWith("image/")) {
-    throw new ValidationError("File must be an image");
-  }
   if (file.size > 5 * 1024 * 1024) {
     throw new ValidationError("Thumbnail must be under 5MB");
   }
 
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  try {
+    await detectThumbnailBuffer(bytes);
+  } catch (err) {
+    throw new ValidationError(err instanceof Error ? err.message : "Invalid image");
+  }
+
   const tempPath = storage.resolve("temp", `thumb-${id}-${Date.now()}`);
-  await Bun.write(tempPath, file);
+  await Bun.write(tempPath, bytes);
 
   await thumbnailQueue.add("thumbnail", {
     videoId: id,

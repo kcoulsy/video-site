@@ -24,7 +24,9 @@ async function cleanupStaleUploads() {
     .where(and(eq(video.status, "uploading"), lt(video.createdAt, cutoff)));
 
   for (const row of stale) {
-    await storage.deleteVideoFiles(row.id).catch(() => {});
+    await storage.deleteVideoFiles(row.id).catch((err) => {
+      console.error(`[cleanup] failed to delete files for ${row.id}:`, err);
+    });
     await db.delete(video).where(eq(video.id, row.id));
     console.log(`[cleanup] removed stale upload ${row.id}`);
   }
@@ -59,15 +61,22 @@ async function cleanupFailedVideos() {
     .where(and(eq(video.status, "failed"), lt(video.updatedAt, cutoff)));
 
   for (const row of failed) {
-    await storage.deleteVideoFiles(row.id).catch(() => {});
+    await storage.deleteVideoFiles(row.id).catch((err) => {
+      console.error(`[cleanup] failed to delete files for ${row.id}:`, err);
+    });
     await db.delete(video).where(eq(video.id, row.id));
     console.log(`[cleanup] removed failed video ${row.id}`);
   }
 }
 
 async function deleteVideo(videoId: string) {
-  await storage.deleteVideoFiles(videoId).catch(() => {});
-  console.log(`[cleanup] deleted video files ${videoId}`);
+  try {
+    await storage.deleteVideoFiles(videoId);
+    console.log(`[cleanup] deleted video files ${videoId}`);
+  } catch (err) {
+    console.error(`[cleanup] failed to delete files for ${videoId}:`, err);
+    throw err;
+  }
 }
 
 export async function processCleanup(job: Job<CleanupJobData>) {

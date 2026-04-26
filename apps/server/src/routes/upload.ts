@@ -7,6 +7,7 @@ import { db } from "@video-site/db";
 import { video } from "@video-site/db/schema/video";
 import { eq } from "drizzle-orm";
 
+import { detectVideoFile } from "../lib/file-validation";
 import { transcodeQueue } from "../lib/queue";
 import { storage } from "../lib/storage";
 
@@ -61,6 +62,19 @@ const tusServer = new Server({
     }
 
     const tusFilePath = path.posix.join(storage.getTusDir(), upload.id);
+
+    try {
+      await detectVideoFile(tusFilePath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid video file";
+      await db
+        .update(video)
+        .set({ status: "failed", processingError: message })
+        .where(eq(video.id, videoId));
+      await storage.deleteFile(tusFilePath).catch(() => {});
+      throw { status_code: 415, body: message };
+    }
+
     const filename = upload.metadata?.filename ?? `${videoId}.bin`;
     const rawPath = await storage.saveRawUpload(videoId, tusFilePath, filename);
 
