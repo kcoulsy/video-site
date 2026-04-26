@@ -213,12 +213,26 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
     await job.updateProgress({ stage: "probing", percent: 5 });
 
     const thumbnailDir = storage.getThumbnailPath(videoId);
-    const thumbnailFile = path.posix.join(thumbnailDir, "thumbnail.jpg");
     const { mkdir } = await import("node:fs/promises");
     await mkdir(thumbnailDir, { recursive: true });
-    await extractThumbnail(rawPath, thumbnailFile, duration * 0.25);
 
-    await db.update(video).set({ thumbnailPath: thumbnailFile }).where(eq(video.id, videoId));
+    const STILL_FRACTIONS = [0.1, 0.3, 0.5, 0.7, 0.9];
+    const stillFiles = STILL_FRACTIONS.map((_, i) =>
+      path.posix.join(thumbnailDir, `still-${i}.jpg`),
+    );
+    for (let i = 0; i < STILL_FRACTIONS.length; i++) {
+      await extractThumbnail(rawPath, stillFiles[i]!, duration * STILL_FRACTIONS[i]!);
+    }
+
+    const defaultStillIndex = 1;
+    await db
+      .update(video)
+      .set({
+        thumbnailPath: stillFiles[defaultStillIndex]!,
+        thumbnailStillsCount: STILL_FRACTIONS.length,
+        thumbnailStillIndex: defaultStillIndex,
+      })
+      .where(eq(video.id, videoId));
 
     await job.updateProgress({ stage: "thumbnail", percent: 10 });
 

@@ -35,6 +35,8 @@ export const video = pgTable(
     rawPath: text("raw_path"),
     manifestPath: text("manifest_path"),
     thumbnailPath: text("thumbnail_path"),
+    thumbnailStillsCount: integer("thumbnail_stills_count").default(0).notNull(),
+    thumbnailStillIndex: integer("thumbnail_still_index"),
 
     fileHash: text("file_hash"),
 

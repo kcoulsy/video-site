@@ -32,6 +32,8 @@ interface VideoDetailResponse {
   tags: string[] | null;
   thumbnailUrl: string | null;
   userId: string;
+  thumbnailStillsCount: number;
+  thumbnailStillIndex: number | null;
 }
 
 interface TagOption {
@@ -115,6 +117,28 @@ function EditVideoPage() {
     },
   });
 
+  const [pendingStillIndex, setPendingStillIndex] = useState<number | null>(null);
+
+  const selectThumbnailMutation = useMutation({
+    mutationFn: (index: number) =>
+      apiClient(`/api/videos/${videoId}/thumbnail/select`, {
+        method: "POST",
+        body: JSON.stringify({ index }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["video", videoId] });
+      void queryClient.invalidateQueries({ queryKey: ["videos", "my"] });
+      setPendingStillIndex(null);
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : "Failed to update thumbnail";
+      toast.error(msg);
+      setPendingStillIndex(null);
+    },
+  });
+
+  const activeStillIndex = pendingStillIndex ?? video?.thumbnailStillIndex ?? null;
+
   const isBusy = saveMutation.isPending;
   const canSubmit = useMemo(
     () => hydrated && title.trim().length > 0 && !isBusy,
@@ -164,19 +188,62 @@ function EditVideoPage() {
         <p className="mt-1 text-sm text-muted-foreground">Update your video's details.</p>
       </div>
 
-      <div className="mb-6 aspect-video w-full overflow-hidden rounded-lg border border-border bg-secondary">
-        {video.thumbnailUrl ? (
-          <img
-            src={`${env.VITE_SERVER_URL}${video.thumbnailUrl}`}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-            <Film className="h-10 w-10 text-muted-foreground/30" />
+      {video.thumbnailStillsCount > 0 ? (
+        <div className="mb-6 space-y-2">
+          <Label>Thumbnail</Label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {Array.from({ length: video.thumbnailStillsCount }).map((_, i) => {
+              const isActive = activeStillIndex === i;
+              const isPending = selectThumbnailMutation.isPending && pendingStillIndex === i;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    if (isActive || selectThumbnailMutation.isPending) return;
+                    setPendingStillIndex(i);
+                    selectThumbnailMutation.mutate(i);
+                  }}
+                  disabled={selectThumbnailMutation.isPending}
+                  className={`relative aspect-video overflow-hidden rounded-md border-2 bg-secondary transition-all disabled:cursor-not-allowed ${
+                    isActive
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-border hover:border-muted-foreground"
+                  }`}
+                >
+                  <img
+                    src={`${env.VITE_SERVER_URL}/api/stream/${videoId}/thumbnail/still/${i}`}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                  {isPending ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                      <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
-        )}
-      </div>
+          <p className="text-xs text-muted-foreground">
+            Pick a frame to use as your video's thumbnail.
+          </p>
+        </div>
+      ) : (
+        <div className="mb-6 aspect-video w-full overflow-hidden rounded-lg border border-border bg-secondary">
+          {video.thumbnailUrl ? (
+            <img
+              src={`${env.VITE_SERVER_URL}${video.thumbnailUrl}`}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
+              <Film className="h-10 w-10 text-muted-foreground/30" />
+            </div>
+          )}
+        </div>
+      )}
 
       <form
         onSubmit={(e) => {

@@ -60,6 +60,7 @@ type CandidateRow = {
   id: string;
   title: string;
   thumbnailPath: string | null;
+  thumbnailStillIndex: number | null;
   duration: number | null;
   viewCount: number;
   likeCount: number;
@@ -77,15 +78,21 @@ type HomeEntry = {
   fromUserCf: boolean;
 };
 
-function thumbnailUrlFor(videoId: string, thumbnailPath: string | null): string | null {
-  return thumbnailPath ? `/api/stream/${videoId}/thumbnail` : null;
+function thumbnailUrlFor(
+  videoId: string,
+  thumbnailPath: string | null,
+  stillIndex: number | null,
+): string | null {
+  if (!thumbnailPath) return null;
+  const base = `/api/stream/${videoId}/thumbnail`;
+  return stillIndex == null ? base : `${base}?v=${stillIndex}`;
 }
 
 function rowToCard(r: CandidateRow): VideoCard {
   return {
     id: r.id,
     title: r.title,
-    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath),
+    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath, r.thumbnailStillIndex),
     duration: r.duration,
     viewCount: r.viewCount,
     createdAt: r.createdAt,
@@ -97,6 +104,7 @@ const baseVideoSelect = {
   id: video.id,
   title: video.title,
   thumbnailPath: video.thumbnailPath,
+  thumbnailStillIndex: video.thumbnailStillIndex,
   duration: video.duration,
   viewCount: video.viewCount,
   likeCount: video.likeCount,

@@ -26,8 +26,14 @@ function streamUrlFor(videoId: string, status: string): string | null {
   return status === "ready" ? `/api/stream/${videoId}/manifest.mpd` : null;
 }
 
-function thumbnailUrlFor(videoId: string, thumbnailPath: string | null): string | null {
-  return thumbnailPath ? `/api/stream/${videoId}/thumbnail` : null;
+function thumbnailUrlFor(
+  videoId: string,
+  thumbnailPath: string | null,
+  stillIndex?: number | null,
+): string | null {
+  if (!thumbnailPath) return null;
+  const base = `/api/stream/${videoId}/thumbnail`;
+  return stillIndex == null ? base : `${base}?v=${stillIndex}`;
 }
 
 function hashIpUa(c: {
@@ -169,7 +175,7 @@ videoRoutes.get("/my", requireAuth, async (c) => {
 
   const items = rows.map((r) => ({
     ...r,
-    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath),
+    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath, r.thumbnailStillIndex),
     isRemoved: r.deletedAt != null,
   }));
 
@@ -243,6 +249,7 @@ videoRoutes.get("/", async (c) => {
       id: video.id,
       title: video.title,
       thumbnailPath: video.thumbnailPath,
+      thumbnailStillIndex: video.thumbnailStillIndex,
       duration: video.duration,
       viewCount: video.viewCount,
       createdAt: video.createdAt,
@@ -263,7 +270,7 @@ videoRoutes.get("/", async (c) => {
     id: r.id,
     title: r.title,
     thumbnailPath: r.thumbnailPath,
-    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath),
+    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath, r.thumbnailStillIndex),
     duration: r.duration,
     viewCount: r.viewCount,
     createdAt: r.createdAt,
@@ -316,7 +323,7 @@ videoRoutes.get("/:id", async (c) => {
   return c.json({
     ...row.v,
     streamUrl: streamUrlFor(row.v.id, row.v.status),
-    thumbnailUrl: thumbnailUrlFor(row.v.id, row.v.thumbnailPath),
+    thumbnailUrl: thumbnailUrlFor(row.v.id, row.v.thumbnailPath, row.v.thumbnailStillIndex),
     user: { id: row.v.userId, name: row.userName, image: row.userImage },
   });
 });
@@ -522,6 +529,52 @@ videoRoutes.post("/:id/thumbnail", requireAuth, async (c) => {
     videoId: id,
     thumbnailSourcePath: tempPath,
   });
+
+  return c.json({ ok: true });
+});
+
+const selectThumbnailSchema = z.object({
+  index: z.number().int().min(0).max(99),
+});
+
+videoRoutes.post("/:id/thumbnail/select", requireAuth, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = selectThumbnailSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid body");
+  }
+  const { index } = parsed.data;
+
+  const [existing] = await db
+    .select({
+      userId: video.userId,
+      stillsCount: video.thumbnailStillsCount,
+    })
+    .from(video)
+    .where(eq(video.id, id))
+    .limit(1);
+  if (!existing) {
+    throw new NotFoundError("Video");
+  }
+  if (existing.userId !== currentUser.id) {
+    throw new ForbiddenError();
+  }
+  if (existing.stillsCount <= 0) {
+    throw new ValidationError("Thumbnail candidates not available yet");
+  }
+  if (index >= existing.stillsCount) {
+    throw new ValidationError("Invalid thumbnail index");
+  }
+
+  const stillPath = storage.resolve("videos", id, "thumbnails", `still-${index}.jpg`);
+
+  await db
+    .update(video)
+    .set({ thumbnailPath: stillPath, thumbnailStillIndex: index })
+    .where(eq(video.id, id));
 
   return c.json({ ok: true });
 });

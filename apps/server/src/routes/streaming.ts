@@ -148,6 +148,54 @@ streamingRoutes.get("/:videoId/thumbnail", async (c) => {
   });
 });
 
+streamingRoutes.get("/:videoId/thumbnail/still/:index", async (c) => {
+  const videoId = c.req.param("videoId");
+  const indexStr = c.req.param("index");
+  const index = Number.parseInt(indexStr, 10);
+  if (!Number.isInteger(index) || index < 0 || index > 99) {
+    return c.json({ error: "Invalid index" }, 400);
+  }
+
+  const [row] = await db
+    .select({
+      stillsCount: video.thumbnailStillsCount,
+      visibility: video.visibility,
+      userId: video.userId,
+      deletedAt: video.deletedAt,
+      authorBannedAt: user.bannedAt,
+      authorSuspendedUntil: user.suspendedUntil,
+    })
+    .from(video)
+    .innerJoin(user, eq(user.id, video.userId))
+    .where(eq(video.id, videoId))
+    .limit(1);
+
+  if (!row) return c.notFound();
+  if (index >= row.stillsCount) return c.notFound();
+  if (row.deletedAt) return c.notFound();
+  if (row.authorBannedAt) return c.notFound();
+  if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) return c.notFound();
+
+  if (row.visibility === "private") {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session || session.user.id !== row.userId) {
+      return c.notFound();
+    }
+  }
+
+  const filePath = storage.resolve("videos", videoId, "thumbnails", `still-${index}.jpg`);
+  if (!(await storage.fileExists(filePath))) return c.notFound();
+
+  const file = Bun.file(filePath);
+  return new Response(file.stream(), {
+    headers: {
+      "Content-Type": file.type || "image/jpeg",
+      "Content-Length": String(file.size),
+      "Cache-Control": "public, max-age=3600",
+    },
+  });
+});
+
 streamingRoutes.get("/:videoId/:filename", async (c) => {
   const { videoId, filename } = c.req.param();
 
