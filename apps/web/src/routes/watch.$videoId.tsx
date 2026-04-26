@@ -10,6 +10,8 @@ import { LikeButton } from "@/components/like-button";
 import Loader from "@/components/loader";
 import { CommentSection } from "@/components/comments/comment-section";
 import { ReportButton } from "@/components/report-button";
+import { SaveToPlaylistMenu } from "@/components/save-to-playlist-menu";
+import { WatchLaterButton } from "@/components/watch-later-button";
 import { WatchNext } from "@/components/watch-next";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
@@ -230,6 +232,10 @@ function WatchPage() {
                 dislikeCount={video.dislikeCount}
                 isAuthenticated={isAuthenticated}
               />
+
+              <WatchLaterButton videoId={video.id} isAuthenticated={isAuthenticated} />
+
+              <SaveToPlaylistMenu videoId={video.id} isAuthenticated={isAuthenticated} />
 
               <Button variant="secondary" size="sm" className="gap-1.5 rounded-full">
                 <Share2 className="h-4 w-4" />

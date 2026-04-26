@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 import { env } from "@video-site/env/web";
 import {
+  ChartBar,
   CheckCircle,
   Edit2,
   ExternalLink,
@@ -12,6 +13,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
 import {
@@ -22,6 +24,7 @@ import {
 } from "@video-site/ui/components/dropdown-menu";
 
 import { VideoStatusBadge, type VideoStatus } from "@/components/video-status-badge";
+import { ViewsBarChart } from "@/components/views-bar-chart";
 import { getUser } from "@/functions/get-user";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/format";
@@ -112,6 +115,8 @@ function DashboardPage() {
           </div>
         ))}
       </div>
+
+      <CreatorAnalyticsSection />
 
       <div className="overflow-hidden rounded-xl border border-border">
         <div className="border-b border-border bg-card/50 px-4 py-3">
@@ -286,6 +291,12 @@ function VideoRow({ video, onDeleted }: { video: DashboardVideo; onDeleted: () =
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
+            render={<Link to="/videos/$videoId/analytics" params={{ videoId: video.id }} />}
+          >
+            <ChartBar className="mr-2 h-4 w-4" />
+            Analytics
+          </DropdownMenuItem>
+          <DropdownMenuItem
             render={<Link to="/videos/$videoId/edit" params={{ videoId: video.id }} />}
           >
             <Edit2 className="mr-2 h-4 w-4" />
@@ -297,6 +308,80 @@ function VideoRow({ video, onDeleted }: { video: DashboardVideo; onDeleted: () =
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    </div>
+  );
+}
+
+interface CreatorAnalyticsResponse {
+  range: "7d" | "30d" | "90d";
+  rangeViews: number;
+  viewsByDay: { date: string; views: number }[];
+  topVideos: {
+    id: string;
+    title: string;
+    thumbnailUrl: string | null;
+    viewsInRange: number;
+    totalViews: number;
+  }[];
+}
+
+function CreatorAnalyticsSection() {
+  const [range, setRange] = useState<"7d" | "30d" | "90d">("30d");
+  const { data, isLoading } = useQuery<CreatorAnalyticsResponse>({
+    queryKey: ["creator-analytics", range],
+    queryFn: () => apiClient<CreatorAnalyticsResponse>(`/api/creator/analytics?range=${range}`),
+  });
+
+  return (
+    <div className="mb-8 overflow-hidden rounded-xl border border-border">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-card/50 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <ChartBar className="h-4 w-4" />
+          <h2 className="text-sm font-medium">Channel analytics</h2>
+        </div>
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value as "7d" | "30d" | "90d")}
+          className="rounded-md border border-border bg-transparent px-2 py-1 text-xs"
+        >
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+          <option value="90d">Last 90 days</option>
+        </select>
+      </div>
+      <div className="grid gap-4 p-4 md:grid-cols-[1fr_280px]">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Views in range</p>
+          <p className="mt-1 text-2xl font-semibold">
+            {isLoading ? "—" : formatViewCount(data?.rangeViews ?? 0)}
+          </p>
+          <div className="mt-3">
+            <ViewsBarChart data={data?.viewsByDay ?? []} />
+          </div>
+        </div>
+        <div>
+          <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Top videos</p>
+          <div className="space-y-1">
+            {(data?.topVideos ?? []).slice(0, 5).map((v, i) => (
+              <Link
+                key={v.id}
+                to="/videos/$videoId/analytics"
+                params={{ videoId: v.id }}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-secondary/50"
+              >
+                <span className="w-4 text-muted-foreground">{i + 1}</span>
+                <span className="line-clamp-1 flex-1">{v.title}</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {formatViewCount(v.viewsInRange)}
+                </span>
+              </Link>
+            ))}
+            {(data?.topVideos ?? []).length === 0 && !isLoading && (
+              <p className="px-2 py-2 text-xs text-muted-foreground">No views yet.</p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

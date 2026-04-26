@@ -3,6 +3,7 @@ import { db, generateId } from "@video-site/db";
 import { user } from "@video-site/db/schema/auth";
 import { category, categoryTag, tag, videoTag } from "@video-site/db/schema/tags";
 import { video } from "@video-site/db/schema/video";
+import { viewEvent } from "@video-site/db/schema/view-event";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -338,10 +339,17 @@ videoRoutes.post("/:id/view", async (c) => {
     return c.json({ counted: false });
   }
 
-  await db
-    .update(video)
-    .set({ viewCount: sql`${video.viewCount} + 1` })
-    .where(eq(video.id, videoId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(video)
+      .set({ viewCount: sql`${video.viewCount} + 1` })
+      .where(eq(video.id, videoId));
+    await tx.insert(viewEvent).values({
+      id: generateId(),
+      videoId,
+      userId: session?.user.id ?? null,
+    });
+  });
 
   return c.json({ counted: true });
 });

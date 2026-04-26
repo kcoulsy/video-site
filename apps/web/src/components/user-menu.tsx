@@ -42,6 +42,12 @@ export default function UserMenu() {
             Dashboard
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => navigate({ to: "/history" })}>History</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate({ to: "/watch-later" })}>
+            Watch Later
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate({ to: "/playlists" })}>
+            Playlists
+          </DropdownMenuItem>
           {(session.user as { role?: string }).role === "admin" && (
             <DropdownMenuItem onClick={() => navigate({ to: "/admin" })}>Admin</DropdownMenuItem>
           )}

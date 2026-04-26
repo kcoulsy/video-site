@@ -14,8 +14,8 @@ type SortMode = "relevance" | "date" | "views";
 
 interface SearchSearchParams {
   q: string;
-  sort: SortMode;
-  page: number;
+  sort?: SortMode;
+  page?: number;
 }
 
 const SORT_VALUES = new Set<SortMode>(["relevance", "date", "views"]);
@@ -69,7 +69,9 @@ function absoluteUrl(path: string | null): string | null {
 }
 
 function SearchPage() {
-  const { q, sort, page } = Route.useSearch();
+  const { q, sort: sortParam, page: pageParam } = Route.useSearch();
+  const sort: SortMode = sortParam ?? "relevance";
+  const page: number = pageParam ?? 1;
   const navigate = Route.useNavigate();
 
   const trimmed = q.trim();

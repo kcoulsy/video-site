@@ -14,7 +14,7 @@ import { authClient } from "@/lib/auth-client";
 type SortOption = "newest" | "popular" | "oldest";
 
 interface IndexSearchParams {
-  sort: SortOption;
+  sort?: SortOption;
   category?: string;
   page?: number;
 }
@@ -62,7 +62,8 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { sort, category, page: pageParam } = Route.useSearch();
+  const { sort: sortParam, category, page: pageParam } = Route.useSearch();
+  const sort: SortOption = sortParam ?? "newest";
   const page = pageParam ?? 1;
   const navigate = Route.useNavigate();
 

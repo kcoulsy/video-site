@@ -6,10 +6,12 @@ import { logger } from "hono/logger";
 
 import { errorHandler } from "./middleware/error-handler";
 import { adminRoutes } from "./routes/admin";
+import { analyticsRoutes } from "./routes/analytics";
 import { commentRoutes } from "./routes/comment";
 import { commentLikeRoutes } from "./routes/comment-like";
 import { likeRoutes } from "./routes/like";
 import { moderationRoutes } from "./routes/moderation";
+import { playlistRoutes } from "./routes/playlist";
 import { searchRoutes } from "./routes/search";
 import { streamingRoutes } from "./routes/streaming";
 import { tagRoutes } from "./routes/tags";
@@ -68,6 +70,9 @@ app.route("/api", tagRoutes);
 app.route("/api", commentRoutes);
 app.route("/api", commentLikeRoutes);
 app.route("/api", watchHistoryRoutes);
+app.route("/api", watchLaterRoutes);
+app.route("/api", playlistRoutes);
+app.route("/api", analyticsRoutes);
 
 app.all("/api/uploads", (c) => handleTusRequest(c.req.raw));
 app.all("/api/uploads/*", (c) => handleTusRequest(c.req.raw));
