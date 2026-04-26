@@ -2,7 +2,7 @@ import { db, generateId } from "@video-site/db";
 import { session, user } from "@video-site/db/schema/auth";
 import { comment } from "@video-site/db/schema/comment";
 import { moderationAction, report } from "@video-site/db/schema/moderation";
-import { video } from "@video-site/db/schema/video";
+import { removedVideoHash, video } from "@video-site/db/schema/video";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -423,7 +423,11 @@ modOnly.post("/videos/:id/remove", async (c) => {
   const parsed = z.object({ reason: requiredReasonSchema }).safeParse(body);
   if (!parsed.success) throw new ValidationError("Invalid body");
 
-  const [existing] = await db.select({ id: video.id }).from(video).where(eq(video.id, id)).limit(1);
+  const [existing] = await db
+    .select({ id: video.id, fileHash: video.fileHash })
+    .from(video)
+    .where(eq(video.id, id))
+    .limit(1);
   if (!existing) throw new NotFoundError("Video");
 
   await db.transaction(async (tx) => {
@@ -431,6 +435,17 @@ modOnly.post("/videos/:id/remove", async (c) => {
       .update(video)
       .set({ deletedAt: new Date(), removedBy: actor.id, removalReason: parsed.data.reason })
       .where(eq(video.id, id));
+    if (existing.fileHash) {
+      await tx
+        .insert(removedVideoHash)
+        .values({
+          hash: existing.fileHash,
+          originalVideoId: id,
+          removedBy: actor.id,
+          reason: parsed.data.reason,
+        })
+        .onConflictDoNothing({ target: removedVideoHash.hash });
+    }
     await logModerationAction(tx, {
       actorId: actor.id,
       action: "remove_video",
@@ -445,7 +460,11 @@ modOnly.post("/videos/:id/remove", async (c) => {
 modOnly.post("/videos/:id/restore", async (c) => {
   const id = c.req.param("id");
   const actor = c.get("user");
-  const [existing] = await db.select({ id: video.id }).from(video).where(eq(video.id, id)).limit(1);
+  const [existing] = await db
+    .select({ id: video.id, fileHash: video.fileHash })
+    .from(video)
+    .where(eq(video.id, id))
+    .limit(1);
   if (!existing) throw new NotFoundError("Video");
 
   await db.transaction(async (tx) => {
@@ -453,6 +472,9 @@ modOnly.post("/videos/:id/restore", async (c) => {
       .update(video)
       .set({ deletedAt: null, removedBy: null, removalReason: null })
       .where(eq(video.id, id));
+    if (existing.fileHash) {
+      await tx.delete(removedVideoHash).where(eq(removedVideoHash.hash, existing.fileHash));
+    }
     await logModerationAction(tx, {
       actorId: actor.id,
       action: "restore_video",
@@ -691,10 +713,25 @@ adminOnly.use("*", ...requireAdmin);
 adminOnly.delete("/videos/:id", async (c) => {
   const id = c.req.param("id");
   const actor = c.get("user");
-  const [existing] = await db.select({ id: video.id }).from(video).where(eq(video.id, id)).limit(1);
+  const [existing] = await db
+    .select({ id: video.id, fileHash: video.fileHash, removalReason: video.removalReason })
+    .from(video)
+    .where(eq(video.id, id))
+    .limit(1);
   if (!existing) throw new NotFoundError("Video");
 
   await db.transaction(async (tx) => {
+    if (existing.fileHash) {
+      await tx
+        .insert(removedVideoHash)
+        .values({
+          hash: existing.fileHash,
+          originalVideoId: id,
+          removedBy: actor.id,
+          reason: existing.removalReason ?? "hard_delete",
+        })
+        .onConflictDoNothing({ target: removedVideoHash.hash });
+    }
     await tx.delete(video).where(eq(video.id, id));
     await logModerationAction(tx, {
       actorId: actor.id,

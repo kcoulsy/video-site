@@ -36,6 +36,8 @@ export const video = pgTable(
     manifestPath: text("manifest_path"),
     thumbnailPath: text("thumbnail_path"),
 
+    fileHash: text("file_hash"),
+
     tusUploadId: text("tus_upload_id"),
 
     viewCount: integer("view_count").default(0).notNull(),
@@ -68,5 +70,14 @@ export const video = pgTable(
     index("video_visibility_status_idx").on(table.visibility, table.status),
     index("video_deleted_at_idx").on(table.deletedAt),
     index("video_reviewed_at_idx").on(table.reviewedAt),
+    index("video_file_hash_idx").on(table.fileHash),
   ],
 );
+
+export const removedVideoHash = pgTable("removed_video_hash", {
+  hash: text("hash").primaryKey(),
+  originalVideoId: text("original_video_id"),
+  removedBy: text("removed_by").references(() => user.id, { onDelete: "set null" }),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

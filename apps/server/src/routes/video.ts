@@ -12,6 +12,7 @@ import type { Context } from "hono";
 import { z } from "zod";
 
 import { ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
+import { assertHashAllowed } from "../lib/upload-guard";
 import { detectThumbnailBuffer } from "../lib/file-validation";
 import { activeAuthorWhere, visibleVideoWhere } from "../lib/moderation-filters";
 import { cleanupQueue, thumbnailQueue, transcodeQueue } from "../lib/queue";
@@ -77,6 +78,7 @@ const createVideoSchema = z.object({
     .int()
     .positive()
     .max(MAX_FILE_SIZE, `File size must be <= ${MAX_FILE_SIZE} bytes`),
+  fileHash: z.string().regex(/^[a-f0-9]{64}$/, "fileHash must be a 64-char lowercase hex SHA-256"),
 });
 
 const updateVideoSchema = z.object({
@@ -122,6 +124,8 @@ videoRoutes.post("/", ...requireNotMuted, async (c) => {
   const currentUser = c.get("user");
   const id = generateId();
 
+  await assertHashAllowed(parsed.data.fileHash, { uploaderId: currentUser.id });
+
   const uniqueTagIds = parsed.data.tagIds ? [...new Set(parsed.data.tagIds)] : [];
   const slugs = await resolveTagSlugs(uniqueTagIds);
 
@@ -135,6 +139,7 @@ videoRoutes.post("/", ...requireNotMuted, async (c) => {
       originalFilename: parsed.data.filename,
       mimeType: parsed.data.mimeType,
       fileSize: parsed.data.fileSize,
+      fileHash: parsed.data.fileHash,
       userId: currentUser.id,
       status: "uploading",
     });

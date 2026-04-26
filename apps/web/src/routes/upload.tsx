@@ -32,6 +32,43 @@ interface CreateVideoResponse {
   uploadUrl: string;
 }
 
+async function hashFileSha256(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  const bytes = new Uint8Array(digest);
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    out += bytes[i].toString(16).padStart(2, "0");
+  }
+  return out;
+}
+
+function showDuplicateOrRemovedToast(err: ApiError): void {
+  const code = err.code;
+  if (code === "removed_by_moderator") {
+    toast.error("This video has been removed by a moderator and cannot be re-uploaded.");
+    return;
+  }
+  if (code === "duplicate") {
+    const existingId =
+      typeof err.body?.existingVideoId === "string" ? err.body.existingVideoId : null;
+    if (existingId) {
+      toast.error("This video has already been uploaded.", {
+        action: {
+          label: "View video",
+          onClick: () => {
+            window.location.href = `/watch/${existingId}`;
+          },
+        },
+      });
+    } else {
+      toast.error("This video has already been uploaded.");
+    }
+    return;
+  }
+  toast.error(err.message);
+}
+
 interface TagOption {
   id: string;
   slug: string;
@@ -56,7 +93,7 @@ function UploadPage() {
   });
   const tagOptions = tagData?.items ?? [];
   const [visibility, setVisibility] = useState<"public" | "unlisted" | "private">("public");
-  const [phase, setPhase] = useState<"idle" | "uploading" | "processing">("idle");
+  const [phase, setPhase] = useState<"idle" | "hashing" | "uploading" | "processing">("idle");
   const [progress, setProgress] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,8 +127,19 @@ function UploadPage() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!file) return;
-      setPhase("uploading");
+      setPhase("hashing");
       setProgress(0);
+
+      let fileHash: string;
+      try {
+        fileHash = await hashFileSha256(file);
+      } catch {
+        toast.error("Could not read the selected file.");
+        setPhase("idle");
+        return;
+      }
+
+      setPhase("uploading");
 
       let videoId: string;
       try {
@@ -105,12 +153,17 @@ function UploadPage() {
             filename: file.name,
             mimeType: file.type || "video/mp4",
             fileSize: file.size,
+            fileHash,
           }),
         });
         videoId = created.id;
       } catch (err) {
-        const msg = err instanceof ApiError ? err.message : "Failed to create video record";
-        toast.error(msg);
+        if (err instanceof ApiError && err.status === 409) {
+          showDuplicateOrRemovedToast(err);
+        } else {
+          const msg = err instanceof ApiError ? err.message : "Failed to create video record";
+          toast.error(msg);
+        }
         setPhase("idle");
         return;
       }
@@ -146,23 +199,33 @@ function UploadPage() {
           void navigate({ to: "/dashboard" });
         })
         .catch((err: Error) => {
-          toast.error(`Upload failed: ${err.message}`);
+          const detailed = err as Error & {
+            originalResponse?: { getStatus(): number; getBody(): string };
+          };
+          const status = detailed.originalResponse?.getStatus();
+          const body = detailed.originalResponse?.getBody();
+          if (status === 409 || status === 400) {
+            toast.error(body || "Upload rejected.");
+          } else {
+            toast.error(`Upload failed: ${err.message}`);
+          }
           setPhase("idle");
         });
     },
     [file, title, description, selectedTagIds, visibility, navigate, queryClient],
   );
 
+  const isHashing = phase === "hashing";
   const isUploading = phase === "uploading";
   const isProcessing = phase === "processing";
-  const isBusy = isUploading || isProcessing;
+  const isBusy = isHashing || isUploading || isProcessing;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8">
       <button
         type="button"
         onClick={() => navigate({ to: "/dashboard" })}
-        disabled={isUploading}
+        disabled={isBusy}
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -225,6 +288,13 @@ function UploadPage() {
                   <X className="h-4 w-4" />
                 </button>
               )}
+            </div>
+          )}
+
+          {isHashing && (
+            <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+              <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" />
+              <p className="font-medium text-foreground">Checking file…</p>
             </div>
           )}
 
@@ -348,13 +418,18 @@ function UploadPage() {
               type="button"
               variant="outline"
               onClick={() => navigate({ to: "/dashboard" })}
-              disabled={isUploading}
+              disabled={isBusy}
             >
               Cancel
             </Button>
             {!isProcessing && (
-              <Button type="submit" disabled={!file || !title.trim() || isUploading}>
-                {isUploading ? (
+              <Button type="submit" disabled={!file || !title.trim() || isBusy}>
+                {isHashing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Checking…
+                  </>
+                ) : isUploading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Uploading...

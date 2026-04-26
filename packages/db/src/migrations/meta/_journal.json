@@ -43,6 +43,13 @@
       "when": 1777208603758,
       "tag": "0005_wild_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777211139785,
+      "tag": "0006_closed_guardsmen",
+      "breakpoints": true
     }
   ]
 }
