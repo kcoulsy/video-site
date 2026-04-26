@@ -19,6 +19,7 @@ import { cleanupQueue, thumbnailQueue, transcodeQueue } from "../lib/queue";
 import { getRedisClient } from "../lib/redis";
 import { storage } from "../lib/storage";
 import { requireAuth } from "../middleware/auth";
+import { rateLimit } from "../middleware/rate-limit";
 import { requireNotMuted } from "../middleware/require-active-user";
 import type { AppVariables } from "../types";
 
@@ -131,7 +132,11 @@ const myListQuerySchema = z.object({
 
 export const videoRoutes = new Hono<{ Variables: AppVariables }>();
 
-videoRoutes.post("/", ...requireNotMuted, async (c) => {
+videoRoutes.post(
+  "/",
+  ...requireNotMuted,
+  rateLimit({ name: "video:create", limit: 10, windowSeconds: 3600 }),
+  async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createVideoSchema.safeParse(body);
   if (!parsed.success) {
@@ -355,7 +360,10 @@ videoRoutes.get("/:id", async (c) => {
   });
 });
 
-videoRoutes.post("/:id/view", async (c) => {
+videoRoutes.post(
+  "/:id/view",
+  rateLimit({ name: "video:view", limit: 120, windowSeconds: 60 }),
+  async (c) => {
   const videoId = c.req.param("id");
 
   const [row] = await db
@@ -517,7 +525,11 @@ videoRoutes.get("/:id/status", requireAuth, async (c) => {
   });
 });
 
-videoRoutes.post("/:id/thumbnail", requireAuth, async (c) => {
+videoRoutes.post(
+  "/:id/thumbnail",
+  requireAuth,
+  rateLimit({ name: "video:thumbnail", limit: 20, windowSeconds: 600 }),
+  async (c) => {
   const id = c.req.param("id");
   const currentUser = c.get("user");
 

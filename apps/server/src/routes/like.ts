@@ -5,6 +5,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { NotFoundError } from "../lib/errors";
+import { rateLimit } from "../middleware/rate-limit";
 import { requireActiveUser } from "../middleware/require-active-user";
 import type { AppVariables } from "../types";
 
@@ -28,7 +29,11 @@ likeRoutes.get("/:videoId/like", ...requireActiveUser, async (c) => {
   return c.json({ type: existing?.type ?? null });
 });
 
-likeRoutes.post("/:videoId/like", ...requireActiveUser, async (c) => {
+likeRoutes.post(
+  "/:videoId/like",
+  ...requireActiveUser,
+  rateLimit({ name: "video:like", limit: 60, windowSeconds: 60 }),
+  async (c) => {
   const userId = c.get("user").id;
   const videoId = c.req.param("videoId");
 
@@ -76,7 +81,11 @@ likeRoutes.post("/:videoId/like", ...requireActiveUser, async (c) => {
   return c.json({ type: resultType });
 });
 
-likeRoutes.post("/:videoId/dislike", ...requireActiveUser, async (c) => {
+likeRoutes.post(
+  "/:videoId/dislike",
+  ...requireActiveUser,
+  rateLimit({ name: "video:like", limit: 60, windowSeconds: 60 }),
+  async (c) => {
   const userId = c.get("user").id;
   const videoId = c.req.param("videoId");
 

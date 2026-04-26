@@ -5,12 +5,17 @@ import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { NotFoundError } from "../lib/errors";
+import { rateLimit } from "../middleware/rate-limit";
 import { requireNotMuted } from "../middleware/require-active-user";
 import type { AppVariables } from "../types";
 
 export const commentLikeRoutes = new Hono<{ Variables: AppVariables }>();
 
-commentLikeRoutes.post("/comments/:commentId/like", ...requireNotMuted, async (c) => {
+commentLikeRoutes.post(
+  "/comments/:commentId/like",
+  ...requireNotMuted,
+  rateLimit({ name: "comment:like", limit: 60, windowSeconds: 60 }),
+  async (c) => {
   const userId = c.get("user").id;
   const commentId = c.req.param("commentId");
 

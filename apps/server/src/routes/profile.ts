@@ -11,6 +11,7 @@ import { detectThumbnailBuffer } from "../lib/file-validation";
 import { activeAuthorWhere, visibleVideoWhere } from "../lib/moderation-filters";
 import { storage } from "../lib/storage";
 import { requireAuth } from "../middleware/auth";
+import { rateLimit } from "../middleware/rate-limit";
 import type { AppVariables } from "../types";
 
 export const profileRoutes = new Hono<{ Variables: AppVariables }>();
@@ -62,7 +63,11 @@ profileRoutes.get("/profile/me", requireAuth, async (c) => {
   });
 });
 
-profileRoutes.patch("/profile/me", requireAuth, async (c) => {
+profileRoutes.patch(
+  "/profile/me",
+  requireAuth,
+  rateLimit({ name: "profile:update", limit: 20, windowSeconds: 600 }),
+  async (c) => {
   const currentUser = c.get("user");
   const body = await c.req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
@@ -124,8 +129,17 @@ async function handleImageUpload(c: Context<{ Variables: AppVariables }>, kind: 
   return c.json({ ok: true, url: `/api/profile/${currentUser.id}/image/${kind}?v=${Date.now()}` });
 }
 
-profileRoutes.post("/profile/me/avatar", requireAuth, (c) => handleImageUpload(c, "avatar"));
-profileRoutes.post("/profile/me/banner", requireAuth, (c) => handleImageUpload(c, "banner"));
+const profileImageRateLimit = rateLimit({
+  name: "profile:image",
+  limit: 10,
+  windowSeconds: 600,
+});
+profileRoutes.post("/profile/me/avatar", requireAuth, profileImageRateLimit, (c) =>
+  handleImageUpload(c, "avatar"),
+);
+profileRoutes.post("/profile/me/banner", requireAuth, profileImageRateLimit, (c) =>
+  handleImageUpload(c, "banner"),
+);
 
 profileRoutes.get("/profile/:userId/image/:kind", async (c) => {
   const userId = c.req.param("userId");
