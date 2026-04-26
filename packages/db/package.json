@@ -14,7 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
-    "db:search-migration": "psql $DATABASE_URL -f src/migrations/0001_search_vector.sql"
+    "db:reset": "bun run src/reset.ts"
   },
   "dependencies": {
     "@video-site/env": "workspace:*",

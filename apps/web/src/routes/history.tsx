@@ -152,14 +152,8 @@ function HistoryPage() {
             Continue Watching
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {continueItems.map((item, i) => (
-              <div
-                key={`continue-${item.videoId}`}
-                className="animate-fade-slide-up"
-                style={{ animationDelay: `${i * 50}ms` }}
-              >
-                <ContinueCard item={item} />
-              </div>
+            {continueItems.map((item) => (
+              <ContinueCard key={`continue-${item.videoId}`} item={item} />
             ))}
           </div>
         </section>
@@ -171,18 +165,13 @@ function HistoryPage() {
           All History
         </h2>
         <div className="space-y-2">
-          {items.map((item, i) => (
-            <div
+          {items.map((item) => (
+            <HistoryRow
               key={`${item.videoId}-history`}
-              className="animate-fade-slide-up"
-              style={{ animationDelay: `${i * 40}ms` }}
-            >
-              <HistoryRow
-                item={item}
-                onRemove={() => removeMutation.mutate(item.videoId)}
-                removing={removeMutation.isPending && removeMutation.variables === item.videoId}
-              />
-            </div>
+              item={item}
+              onRemove={() => removeMutation.mutate(item.videoId)}
+              removing={removeMutation.isPending && removeMutation.variables === item.videoId}
+            />
           ))}
         </div>
       </section>
@@ -194,7 +183,7 @@ function ContinueCard({ item }: { item: HistoryItem }) {
   const thumbnail = absoluteUrl(item.video.thumbnailUrl);
   return (
     <Link to="/watch/$videoId" params={{ videoId: item.videoId }} className="group block">
-      <div className="relative aspect-video overflow-hidden rounded-xl bg-secondary">
+      <div className="relative aspect-video overflow-hidden bg-secondary">
         {thumbnail ? (
           <img
             src={thumbnail}
@@ -253,7 +242,7 @@ function HistoryRow({
         params={{ videoId: item.videoId }}
         className="flex min-w-0 flex-1 items-center gap-4"
       >
-        <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-secondary">
+        <div className="relative aspect-video w-40 shrink-0 overflow-hidden bg-secondary">
           {thumbnail ? (
             <img
               src={thumbnail}

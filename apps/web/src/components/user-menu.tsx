@@ -42,6 +42,9 @@ export default function UserMenu() {
             Dashboard
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => navigate({ to: "/history" })}>History</DropdownMenuItem>
+          {(session.user as { role?: string }).role === "admin" && (
+            <DropdownMenuItem onClick={() => navigate({ to: "/admin" })}>Admin</DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
           <DropdownMenuItem

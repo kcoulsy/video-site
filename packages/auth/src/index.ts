@@ -17,6 +17,16 @@ export function createAuth() {
     emailAndPassword: {
       enabled: true,
     },
+    user: {
+      additionalFields: {
+        role: {
+          type: "string",
+          required: false,
+          defaultValue: "user",
+          input: false,
+        },
+      },
+    },
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     advanced: {

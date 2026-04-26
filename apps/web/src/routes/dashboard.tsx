@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
-import { useState } from "react";
 import {
   CheckCircle,
   Edit2,
@@ -21,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from "@video-site/ui/components/dropdown-menu";
 
-import { UploadModal } from "@/components/upload-modal";
 import { VideoStatusBadge, type VideoStatus } from "@/components/video-status-badge";
 import { getUser } from "@/functions/get-user";
 import { ApiError, apiClient } from "@/lib/api-client";
@@ -62,7 +60,6 @@ interface MyVideosResponse {
 
 function DashboardPage() {
   const { session } = Route.useRouteContext();
-  const [uploadOpen, setUploadOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<MyVideosResponse>({
@@ -86,7 +83,7 @@ function DashboardPage() {
             Manage your videos, {session?.user.name}
           </p>
         </div>
-        <Button onClick={() => setUploadOpen(true)} className="gap-2">
+        <Button render={<Link to="/upload" />} className="gap-2">
           <Upload className="h-4 w-4" />
           Upload Video
         </Button>
@@ -126,18 +123,17 @@ function DashboardPage() {
           <div className="flex flex-col items-center justify-center py-16">
             <Film className="h-12 w-12 text-muted-foreground/20" />
             <p className="mt-4 text-sm text-muted-foreground">No videos yet</p>
-            <Button variant="outline" className="mt-4 gap-2" onClick={() => setUploadOpen(true)}>
+            <Button variant="outline" className="mt-4 gap-2" render={<Link to="/upload" />}>
               <Upload className="h-4 w-4" />
               Upload your first video
             </Button>
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {videos.map((video, i) => (
+            {videos.map((video) => (
               <VideoRow
                 key={video.id}
                 video={video}
-                index={i}
                 onDeleted={() => {
                   void queryClient.invalidateQueries({
                     queryKey: ["videos", "my"],
@@ -149,13 +145,6 @@ function DashboardPage() {
         )}
       </div>
 
-      <UploadModal
-        open={uploadOpen}
-        onClose={() => setUploadOpen(false)}
-        onUploaded={() => {
-          void queryClient.invalidateQueries({ queryKey: ["videos", "my"] });
-        }}
-      />
     </div>
   );
 }
@@ -189,11 +178,9 @@ function useVideoStatus(videoId: string, status: VideoStatus) {
 
 function VideoRow({
   video,
-  index,
   onDeleted,
 }: {
   video: DashboardVideo;
-  index: number;
   onDeleted: () => void;
 }) {
   const liveStatus = useVideoStatus(video.id, video.status);
@@ -214,11 +201,8 @@ function VideoRow({
   });
 
   return (
-    <div
-      className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-secondary/30 animate-fade-slide-up"
-      style={{ animationDelay: `${index * 40}ms` }}
-    >
-      <div className="relative aspect-video w-32 shrink-0 overflow-hidden rounded-lg bg-secondary">
+    <div className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-secondary/30">
+      <div className="relative aspect-video w-32 shrink-0 overflow-hidden bg-secondary">
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
           <Film className="h-6 w-6 text-muted-foreground/20" />
         </div>

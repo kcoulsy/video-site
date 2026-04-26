@@ -29,7 +29,7 @@ export function VideoCard({
   return (
     <Link to="/watch/$videoId" params={{ videoId: id }} className="group block">
       {/* Thumbnail */}
-      <div className="relative aspect-video overflow-hidden rounded-xl bg-secondary">
+      <div className="relative aspect-video overflow-hidden bg-secondary">
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}

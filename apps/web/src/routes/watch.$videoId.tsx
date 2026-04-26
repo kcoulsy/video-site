@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Monitor, MonitorOff, Share2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Share2 } from "lucide-react";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
 
@@ -9,6 +9,7 @@ import { VideoPlayer } from "@/components/video-player";
 import { LikeButton } from "@/components/like-button";
 import Loader from "@/components/loader";
 import { CommentSection } from "@/components/comments/comment-section";
+import { WatchNext } from "@/components/watch-next";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { formatDate, formatViewCount } from "@/lib/format";
@@ -82,17 +83,6 @@ function WatchPage() {
   useEffect(() => {
     durationRef.current = video?.duration ?? null;
   }, [video?.duration]);
-
-  useEffect(() => {
-    if (cinemaMode) {
-      document.documentElement.setAttribute("data-cinema", "");
-    } else {
-      document.documentElement.removeAttribute("data-cinema");
-    }
-    return () => {
-      document.documentElement.removeAttribute("data-cinema");
-    };
-  }, [cinemaMode]);
 
   useEffect(() => {
     viewReported.current = false;
@@ -195,29 +185,26 @@ function WatchPage() {
   const initialTime = progress && progress.progressPercent < 0.9 ? progress.watchedSeconds : 0;
 
   return (
-    <>
-      {cinemaMode && (
+    <div className="mx-auto max-w-[1800px] px-4 pt-4">
+      <div className="grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_402px]">
         <div
-          className="fixed inset-0 z-[45] bg-black/90 animate-fade-in"
-          onClick={() => setCinemaMode(false)}
-        />
-      )}
-
-      <div className={`transition-all duration-500 ${cinemaMode ? "relative z-[50]" : ""}`}>
-        <div className={cinemaMode ? "w-full px-0" : "mx-auto max-w-5xl px-4 pt-4"}>
-          <div className={cinemaMode ? "mx-auto max-w-[1400px]" : ""}>
-            <VideoPlayer
-              manifestUrl={absoluteUrl(video.streamUrl)}
-              thumbnailUrl={absoluteUrl(video.thumbnailUrl) ?? null}
-              initialTime={initialTime}
-              onTimeUpdate={handleTimeUpdate}
-            />
-          </div>
+          className={
+            cinemaMode
+              ? "mx-auto w-full max-w-[calc((100vh-6rem)*16/9)] lg:col-span-2"
+              : "lg:col-start-1"
+          }
+        >
+          <VideoPlayer
+            manifestUrl={absoluteUrl(video.streamUrl)}
+            thumbnailUrl={absoluteUrl(video.thumbnailUrl) ?? null}
+            initialTime={initialTime}
+            onTimeUpdate={handleTimeUpdate}
+            cinemaMode={cinemaMode}
+            onToggleCinema={() => setCinemaMode((c) => !c)}
+          />
         </div>
 
-        <div
-          className={`mx-auto max-w-5xl px-4 py-4 ${cinemaMode ? "opacity-60 transition-opacity hover:opacity-100" : ""}`}
-        >
+        <div className="min-w-0 lg:col-start-1">
           <h1 className="text-xl font-semibold leading-snug">{video.title}</h1>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
@@ -236,25 +223,6 @@ function WatchPage() {
               <Button variant="secondary" size="sm" className="gap-1.5 rounded-full">
                 <Share2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Share</span>
-              </Button>
-
-              <Button
-                variant={cinemaMode ? "default" : "secondary"}
-                size="sm"
-                className="gap-1.5 rounded-full"
-                onClick={() => setCinemaMode(!cinemaMode)}
-              >
-                {cinemaMode ? (
-                  <>
-                    <MonitorOff className="h-4 w-4" />
-                    <span className="hidden sm:inline">Exit Cinema</span>
-                  </>
-                ) : (
-                  <>
-                    <Monitor className="h-4 w-4" />
-                    <span className="hidden sm:inline">Cinema</span>
-                  </>
-                )}
               </Button>
             </div>
           </div>
@@ -309,7 +277,13 @@ function WatchPage() {
 
           <CommentSection videoId={video.id} commentCount={video.commentCount} />
         </div>
+
+        <aside
+          className={`lg:col-start-2 ${cinemaMode ? "" : "lg:row-start-1 lg:row-span-2"}`}
+        >
+          <WatchNext currentVideoId={video.id} />
+        </aside>
       </div>
-    </>
+    </div>
   );
 }

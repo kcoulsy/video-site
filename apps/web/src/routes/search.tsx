@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Clock, Flame, Search, SearchX, Sparkles } from "lucide-react";
+import { Clock, Flame, Search, SearchX, Sparkles } from "lucide-react";
 import { env } from "@video-site/env/web";
 
 import Loader from "@/components/loader";
+import { Pagination } from "@/components/pagination";
 import { SearchResultItem } from "@/components/search-result-item";
 import { apiClient } from "@/lib/api-client";
 
@@ -177,60 +178,27 @@ function SearchPage() {
       ) : (
         <>
           <div className="space-y-1">
-            {results.map((result, i) => (
-              <div
+            {results.map((result) => (
+              <SearchResultItem
                 key={result.id}
-                className="animate-fade-slide-up"
-                style={{ animationDelay: `${i * 30}ms` }}
-              >
-                <SearchResultItem
-                  id={result.id}
-                  title={result.title}
-                  descriptionSnippet={result.descriptionSnippet}
-                  thumbnailUrl={absoluteUrl(result.thumbnailUrl)}
-                  duration={result.duration}
-                  viewCount={result.viewCount}
-                  createdAt={result.createdAt}
-                  user={result.user}
-                  tags={result.tags}
-                />
-              </div>
+                id={result.id}
+                title={result.title}
+                descriptionSnippet={result.descriptionSnippet}
+                thumbnailUrl={absoluteUrl(result.thumbnailUrl)}
+                duration={result.duration}
+                viewCount={result.viewCount}
+                createdAt={result.createdAt}
+                user={result.user}
+                tags={result.tags}
+              />
             ))}
           </div>
 
-          {totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-3 text-sm">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() =>
-                  navigate({
-                    search: (prev) => ({ ...prev, page: Math.max(1, page - 1) }),
-                  })
-                }
-                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </button>
-              <span className="text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() =>
-                  navigate({
-                    search: (prev) => ({ ...prev, page: Math.min(totalPages, page + 1) }),
-                  })
-                }
-                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onChange={(next) => navigate({ search: (prev) => ({ ...prev, page: next }) })}
+          />
         </>
       )}
     </div>

@@ -1,8 +1,9 @@
 import { auth } from "@video-site/auth";
 import { db, generateId } from "@video-site/db";
 import { user } from "@video-site/db/schema/auth";
+import { category, categoryTag, tag, videoTag } from "@video-site/db/schema/tags";
 import { video } from "@video-site/db/schema/video";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -36,11 +37,13 @@ const MAX_FILE_SIZE = 500 * 1024 * 1024;
 
 const visibilitySchema = z.enum(["public", "unlisted", "private"]);
 
+const tagIdsSchema = z.array(z.string().min(1).max(80)).max(20);
+
 const createVideoSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional().default(""),
   visibility: visibilitySchema.default("public"),
-  tags: z.array(z.string().max(50)).max(20).optional(),
+  tagIds: tagIdsSchema.optional(),
   filename: z.string().min(1),
   mimeType: z.string().refine((v) => v.startsWith("video/"), {
     message: "mimeType must start with 'video/'",
@@ -56,13 +59,26 @@ const updateVideoSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(5000).optional(),
   visibility: visibilitySchema.optional(),
-  tags: z.array(z.string().max(50)).max(20).optional(),
+  tagIds: tagIdsSchema.optional(),
 });
+
+async function resolveTagSlugs(tagIds: string[]): Promise<string[]> {
+  if (tagIds.length === 0) return [];
+  const rows = await db
+    .select({ id: tag.id, slug: tag.slug })
+    .from(tag)
+    .where(inArray(tag.id, tagIds));
+  if (rows.length !== tagIds.length) {
+    throw new ValidationError("One or more tagIds are invalid");
+  }
+  return rows.map((r) => r.slug);
+}
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(24),
   sort: z.enum(["newest", "oldest", "popular"]).default("newest"),
+  category: z.string().trim().min(1).max(80).optional(),
 });
 
 const myListQuerySchema = z.object({
@@ -82,17 +98,27 @@ videoRoutes.post("/", requireAuth, async (c) => {
   const currentUser = c.get("user");
   const id = generateId();
 
-  await db.insert(video).values({
-    id,
-    title: parsed.data.title,
-    description: parsed.data.description,
-    visibility: parsed.data.visibility,
-    tags: parsed.data.tags,
-    originalFilename: parsed.data.filename,
-    mimeType: parsed.data.mimeType,
-    fileSize: parsed.data.fileSize,
-    userId: currentUser.id,
-    status: "uploading",
+  const uniqueTagIds = parsed.data.tagIds ? [...new Set(parsed.data.tagIds)] : [];
+  const slugs = await resolveTagSlugs(uniqueTagIds);
+
+  await db.transaction(async (tx) => {
+    await tx.insert(video).values({
+      id,
+      title: parsed.data.title,
+      description: parsed.data.description,
+      visibility: parsed.data.visibility,
+      tags: slugs.length > 0 ? slugs : null,
+      originalFilename: parsed.data.filename,
+      mimeType: parsed.data.mimeType,
+      fileSize: parsed.data.fileSize,
+      userId: currentUser.id,
+      status: "uploading",
+    });
+    if (uniqueTagIds.length > 0) {
+      await tx
+        .insert(videoTag)
+        .values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
+    }
   });
 
   return c.json({ id, uploadUrl: "/api/uploads" }, 201);
@@ -128,16 +154,44 @@ videoRoutes.get("/", async (c) => {
   if (!parsed.success) {
     throw new ValidationError("Invalid query");
   }
-  const { page, limit, sort } = parsed.data;
+  const { page, limit, sort, category: categorySlug } = parsed.data;
 
   const orderBy =
     sort === "oldest"
-      ? video.createdAt
+      ? asc(video.createdAt)
       : sort === "popular"
         ? desc(video.viewCount)
         : desc(video.createdAt);
 
-  const where = and(eq(video.status, "ready"), eq(video.visibility, "public"));
+  let categoryFilter: ReturnType<typeof sql> | undefined;
+  if (categorySlug) {
+    const [cat] = await db
+      .select({ id: category.id, mode: category.mode })
+      .from(category)
+      .where(eq(category.slug, categorySlug))
+      .limit(1);
+    if (!cat) {
+      return c.json({ items: [], page, limit, total: 0, totalPages: 0 });
+    }
+    const tagRows = await db
+      .select({ slug: tag.slug })
+      .from(categoryTag)
+      .innerJoin(tag, eq(tag.id, categoryTag.tagId))
+      .where(eq(categoryTag.categoryId, cat.id));
+    if (tagRows.length === 0) {
+      return c.json({ items: [], page, limit, total: 0, totalPages: 0 });
+    }
+    const slugs = tagRows.map((r) => r.slug);
+    categoryFilter =
+      cat.mode === "all"
+        ? sql`${video.tags} @> ${slugs}::text[]`
+        : sql`${video.tags} && ${slugs}::text[]`;
+  }
+
+  const baseConditions = [eq(video.status, "ready"), eq(video.visibility, "public")];
+  const where = categoryFilter
+    ? and(...baseConditions, categoryFilter)
+    : and(...baseConditions);
 
   const rows = await db
     .select({
@@ -150,6 +204,7 @@ videoRoutes.get("/", async (c) => {
       userId: video.userId,
       userName: user.name,
       userImage: user.image,
+      totalCount: sql<number>`count(*) over()::int`,
     })
     .from(video)
     .innerJoin(user, eq(user.id, video.userId))
@@ -158,6 +213,7 @@ videoRoutes.get("/", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
+  const total = rows[0]?.totalCount ?? 0;
   const items = rows.map((r) => ({
     id: r.id,
     title: r.title,
@@ -169,7 +225,13 @@ videoRoutes.get("/", async (c) => {
     user: { id: r.userId, name: r.userName, image: r.userImage },
   }));
 
-  return c.json({ items, page, limit });
+  return c.json({
+    items,
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  });
 });
 
 videoRoutes.get("/:id", async (c) => {
@@ -267,7 +329,28 @@ videoRoutes.patch("/:id", requireAuth, async (c) => {
     throw new ForbiddenError();
   }
 
-  await db.update(video).set(parsed.data).where(eq(video.id, id));
+  const uniqueTagIds = parsed.data.tagIds ? [...new Set(parsed.data.tagIds)] : undefined;
+  const slugs = uniqueTagIds ? await resolveTagSlugs(uniqueTagIds) : undefined;
+
+  const fields: Partial<typeof video.$inferInsert> = {};
+  if (parsed.data.title !== undefined) fields.title = parsed.data.title;
+  if (parsed.data.description !== undefined) fields.description = parsed.data.description;
+  if (parsed.data.visibility !== undefined) fields.visibility = parsed.data.visibility;
+  if (slugs !== undefined) fields.tags = slugs.length > 0 ? slugs : null;
+
+  await db.transaction(async (tx) => {
+    if (Object.keys(fields).length > 0) {
+      await tx.update(video).set(fields).where(eq(video.id, id));
+    }
+    if (uniqueTagIds !== undefined) {
+      await tx.delete(videoTag).where(eq(videoTag.videoId, id));
+      if (uniqueTagIds.length > 0) {
+        await tx
+          .insert(videoTag)
+          .values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
+      }
+    }
+  });
 
   return c.json({ ok: true });
 });

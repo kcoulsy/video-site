@@ -3,6 +3,7 @@ import { relations } from "drizzle-orm";
 import { account, session, user } from "./auth";
 import { comment } from "./comment";
 import { videoLike } from "./like";
+import { category, categoryTag, tag, videoTag } from "./tags";
 import { video } from "./video";
 import { watchHistory } from "./watch-history";
 
@@ -37,6 +38,38 @@ export const videoRelations = relations(video, ({ one, many }) => ({
   comments: many(comment),
   likes: many(videoLike),
   watchHistory: many(watchHistory),
+  videoTags: many(videoTag),
+}));
+
+export const tagRelations = relations(tag, ({ many }) => ({
+  videoTags: many(videoTag),
+  categoryTags: many(categoryTag),
+}));
+
+export const categoryRelations = relations(category, ({ many }) => ({
+  categoryTags: many(categoryTag),
+}));
+
+export const categoryTagRelations = relations(categoryTag, ({ one }) => ({
+  category: one(category, {
+    fields: [categoryTag.categoryId],
+    references: [category.id],
+  }),
+  tag: one(tag, {
+    fields: [categoryTag.tagId],
+    references: [tag.id],
+  }),
+}));
+
+export const videoTagRelations = relations(videoTag, ({ one }) => ({
+  video: one(video, {
+    fields: [videoTag.videoId],
+    references: [video.id],
+  }),
+  tag: one(tag, {
+    fields: [videoTag.tagId],
+    references: [tag.id],
+  }),
 }));
 
 export const commentRelations = relations(comment, ({ one, many }) => ({

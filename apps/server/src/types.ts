@@ -1,6 +1,8 @@
 import type { Session, User } from "better-auth";
 
+export type AppUser = User & { role?: string | null };
+
 export type AppVariables = {
-  user: User;
+  user: AppUser;
   session: Session;
 };

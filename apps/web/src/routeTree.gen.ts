@@ -9,13 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UploadRouteImport } from './routes/upload'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as WatchVideoIdRouteImport } from './routes/watch.$videoId'
+import { Route as AdminVideosRouteImport } from './routes/admin.videos'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminTagsRouteImport } from './routes/admin.tags'
+import { Route as AdminCommentsRouteImport } from './routes/admin.comments'
+import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -36,24 +49,67 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const WatchVideoIdRoute = WatchVideoIdRouteImport.update({
   id: '/watch/$videoId',
   path: '/watch/$videoId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminVideosRoute = AdminVideosRouteImport.update({
+  id: '/videos',
+  path: '/videos',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTagsRoute = AdminTagsRouteImport.update({
+  id: '/tags',
+  path: '/tags',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCommentsRoute = AdminCommentsRouteImport.update({
+  id: '/comments',
+  path: '/comments',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/search': typeof SearchRoute
+  '/upload': typeof UploadRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/comments': typeof AdminCommentsRoute
+  '/admin/tags': typeof AdminTagsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/videos': typeof AdminVideosRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -61,49 +117,102 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/search': typeof SearchRoute
+  '/upload': typeof UploadRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/comments': typeof AdminCommentsRoute
+  '/admin/tags': typeof AdminTagsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/videos': typeof AdminVideosRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/search': typeof SearchRoute
+  '/upload': typeof UploadRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/comments': typeof AdminCommentsRoute
+  '/admin/tags': typeof AdminTagsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/videos': typeof AdminVideosRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/dashboard'
     | '/history'
     | '/login'
     | '/search'
+    | '/upload'
+    | '/admin/categories'
+    | '/admin/comments'
+    | '/admin/tags'
+    | '/admin/users'
+    | '/admin/videos'
     | '/watch/$videoId'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/history' | '/login' | '/search' | '/watch/$videoId'
-  id:
-    | '__root__'
+  to:
     | '/'
     | '/dashboard'
     | '/history'
     | '/login'
     | '/search'
+    | '/upload'
+    | '/admin/categories'
+    | '/admin/comments'
+    | '/admin/tags'
+    | '/admin/users'
+    | '/admin/videos'
     | '/watch/$videoId'
+    | '/admin'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/dashboard'
+    | '/history'
+    | '/login'
+    | '/search'
+    | '/upload'
+    | '/admin/categories'
+    | '/admin/comments'
+    | '/admin/tags'
+    | '/admin/users'
+    | '/admin/videos'
+    | '/watch/$videoId'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   HistoryRoute: typeof HistoryRoute
   LoginRoute: typeof LoginRoute
   SearchRoute: typeof SearchRoute
+  UploadRoute: typeof UploadRoute
   WatchVideoIdRoute: typeof WatchVideoIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/search': {
       id: '/search'
       path: '/search'
@@ -132,12 +241,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/watch/$videoId': {
       id: '/watch/$videoId'
@@ -146,15 +269,72 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WatchVideoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/videos': {
+      id: '/admin/videos'
+      path: '/videos'
+      fullPath: '/admin/videos'
+      preLoaderRoute: typeof AdminVideosRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/tags': {
+      id: '/admin/tags'
+      path: '/tags'
+      fullPath: '/admin/tags'
+      preLoaderRoute: typeof AdminTagsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/comments': {
+      id: '/admin/comments'
+      path: '/comments'
+      fullPath: '/admin/comments'
+      preLoaderRoute: typeof AdminCommentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/categories': {
+      id: '/admin/categories'
+      path: '/categories'
+      fullPath: '/admin/categories'
+      preLoaderRoute: typeof AdminCategoriesRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminCategoriesRoute: typeof AdminCategoriesRoute
+  AdminCommentsRoute: typeof AdminCommentsRoute
+  AdminTagsRoute: typeof AdminTagsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminVideosRoute: typeof AdminVideosRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCategoriesRoute: AdminCategoriesRoute,
+  AdminCommentsRoute: AdminCommentsRoute,
+  AdminTagsRoute: AdminTagsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminVideosRoute: AdminVideosRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   DashboardRoute: DashboardRoute,
   HistoryRoute: HistoryRoute,
   LoginRoute: LoginRoute,
   SearchRoute: SearchRoute,
+  UploadRoute: UploadRoute,
   WatchVideoIdRoute: WatchVideoIdRoute,
 }
 export const routeTree = rootRouteImport

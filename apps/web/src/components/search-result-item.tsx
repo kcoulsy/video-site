@@ -36,7 +36,7 @@ export function SearchResultItem({
       params={{ videoId: id }}
       className="group flex flex-col gap-3 rounded-xl p-2 transition-colors hover:bg-secondary/50 sm:flex-row sm:gap-4"
     >
-      <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-lg bg-secondary sm:w-60 md:w-72">
+      <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-secondary sm:w-60 md:w-72">
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}

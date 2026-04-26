@@ -18,7 +18,7 @@ function LoginPage() {
         <div className="absolute -top-1/2 left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-primary/[0.04] blur-[100px]" />
       </div>
 
-      <div className="relative w-full max-w-md animate-fade-slide-up">
+      <div className="relative w-full max-w-md">
         {showSignIn ? (
           <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
         ) : (
