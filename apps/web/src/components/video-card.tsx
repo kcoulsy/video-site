@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { formatDuration, formatViewCount, formatRelativeTime } from "@/lib/format";
 
 import { HoverPreview } from "./hover-preview";
+import { VideoCardWatchLater } from "./video-card-watch-later";
 import { WatchProgressBar } from "./watch-progress-bar";
 
 export interface VideoCardProps {
@@ -41,6 +42,8 @@ export function VideoCard({
 
         {/* Hover overlay */}
         <div className="pointer-events-none absolute inset-0 bg-primary/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+        <VideoCardWatchLater videoId={id} />
 
         {progressPercent != null && <WatchProgressBar progressPercent={progressPercent} />}
       </div>
