@@ -4,7 +4,7 @@ import { videoLike } from "@video-site/db/schema/like";
 import { userRecs, videoSimilarity } from "@video-site/db/schema/recommendations";
 import { video } from "@video-site/db/schema/video";
 import { watchHistory } from "@video-site/db/schema/watch-history";
-import { and, desc, eq, gt, isNull, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 
 import { activeAuthorWhere, visibleVideoWhere } from "../lib/moderation-filters";
 import { getRedisClient } from "../lib/redis";
@@ -38,6 +38,11 @@ const RELATED_SIM_OVERFETCH = 6;
 
 // Trending fetch overfetch — pull extra in case excluded ids cluster at the top.
 const TRENDING_OVERFETCH_BUFFER = 20;
+
+// Home feed: continue-watching items merged into the top of the feed.
+const HOME_CONTINUE_WATCHING_LIMIT = 8;
+// Top N items of the home feed are shuffled so repeat visits feel fresh.
+const HOME_SHUFFLE_TOP_N = 16;
 
 // ---------- types ----------
 
@@ -223,7 +228,10 @@ async function getItemCfCandidates(userId: string): Promise<Map<string, number>>
         SELECT video_id, other_video_id, score,
           ROW_NUMBER() OVER (PARTITION BY video_id ORDER BY score DESC) AS rn
         FROM video_similarity
-        WHERE video_id = ANY(${seeds})
+        WHERE video_id IN (${sql.join(
+          seeds.map((s) => sql`${s}`),
+          sql`, `,
+        )})
       ) t
       WHERE rn <= ${ITEM_CF_PER_SEED}
     `)
@@ -264,7 +272,7 @@ export async function getRelated(videoId: string, limit = 15): Promise<VideoCard
       .select(baseVideoSelect)
       .from(video)
       .innerJoin(user, eq(user.id, video.userId))
-      .where(and(publicReadyWhere, sql`${video.id} = ANY(${ids})`, ne(video.id, videoId)));
+      .where(and(publicReadyWhere, inArray(video.id, ids), ne(video.id, videoId)));
 
     const scored: ScoredCandidate[] = rows.map((r) => ({
       row: r,
@@ -302,7 +310,7 @@ export async function getTrending(limit: number, exclude: string[] = []): Promis
         .select(baseVideoSelect)
         .from(video)
         .innerJoin(user, eq(user.id, video.userId))
-        .where(and(publicReadyWhere, sql`${video.id} = ANY(${filtered})`));
+        .where(and(publicReadyWhere, inArray(video.id, filtered)));
 
       const order = new Map(filtered.map((id, i) => [id, i]));
       rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
@@ -359,10 +367,26 @@ export async function getContinueWatching(
   }));
 }
 
+function shuffleTop<T>(arr: T[], n: number): T[] {
+  const top = arr.slice(0, n);
+  for (let i = top.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [top[i], top[j]] = [top[j]!, top[i]!];
+  }
+  return [...top, ...arr.slice(n)];
+}
+
 export async function getHomeFeed(userId: string | null, limit: number): Promise<VideoCard[]> {
-  if (!userId) return getTrending(limit);
+  if (!userId) {
+    // Overfetch then shuffle the top so guests see a fresh order on each refresh.
+    const pool = await getTrending(Math.max(limit, HOME_SHUFFLE_TOP_N));
+    return shuffleTop(pool, HOME_SHUFFLE_TOP_N).slice(0, limit);
+  }
 
   const targetCount = limit * HOME_CANDIDATE_OVERFETCH;
+
+  const continueWatching = await getContinueWatching(userId, HOME_CONTINUE_WATCHING_LIMIT);
+  const cwIds = new Set(continueWatching.map((c) => c.id));
 
   const userCfRows = await db
     .select({
@@ -387,6 +411,7 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
 
   for (const r of userCfRows) {
     if (r.completedAt) continue;
+    if (cwIds.has(r.id)) continue;
     const base =
       r.cfScore * freshnessBoost(r.createdAt) * qualityMultiplier(r.likeCount, r.dislikeCount);
     const itemBonus = itemCfScores.get(r.id);
@@ -407,11 +432,12 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
           and(eq(watchHistory.userId, userId), eq(watchHistory.videoId, video.id)),
         )
         .where(
-          and(publicReadyWhere, ne(video.userId, userId), sql`${video.id} = ANY(${missingIds})`),
+          and(publicReadyWhere, ne(video.userId, userId), inArray(video.id, missingIds)),
         );
 
       for (const r of missingRows) {
         if (r.completedAt) continue;
+        if (cwIds.has(r.id)) continue;
         const itemScore = itemCfScores.get(r.id) ?? 0;
         const base =
           itemScore *
@@ -425,18 +451,28 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
     }
   }
 
-  if (entries.size === 0) return getTrending(limit);
+  const cwCards: VideoCard[] = continueWatching.map(({ progressPercent: _p, watchedSeconds: _w, ...rest }) => {
+    void _p;
+    void _w;
+    return rest;
+  });
 
-  const sorted = [...entries.values()].sort((a, b) => b.baseScore - a.baseScore);
-  const diversified = mmrRerank(sorted, limit);
-  const result = diversified.map(rowToCard);
-
-  if (result.length < limit) {
-    const fallback = await getTrending(
-      limit - result.length,
-      result.map((r) => r.id),
-    );
-    return [...result, ...fallback];
+  let recommended: VideoCard[];
+  if (entries.size === 0) {
+    recommended = await getTrending(limit, [...cwIds]);
+  } else {
+    const sorted = [...entries.values()].sort((a, b) => b.baseScore - a.baseScore);
+    const diversified = mmrRerank(sorted, limit);
+    recommended = diversified.map(rowToCard);
+    if (recommended.length < limit) {
+      const fallback = await getTrending(limit - recommended.length, [
+        ...cwIds,
+        ...recommended.map((r) => r.id),
+      ]);
+      recommended = [...recommended, ...fallback];
+    }
   }
-  return result;
+
+  const combined = [...cwCards, ...recommended].slice(0, limit);
+  return shuffleTop(combined, HOME_SHUFFLE_TOP_N);
 }

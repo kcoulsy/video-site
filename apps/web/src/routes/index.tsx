@@ -4,7 +4,6 @@ import { Clock, Film, Flame, Sparkles, TrendingUp } from "lucide-react";
 import { env } from "@video-site/env/web";
 
 import { CategorySidebar } from "@/components/category-sidebar";
-import { ContinueWatching } from "@/components/continue-watching";
 import Loader from "@/components/loader";
 import { Pagination } from "@/components/pagination";
 import { VideoGrid } from "@/components/video-grid";
@@ -74,7 +73,7 @@ function HomePage() {
   const { data: sessionData } = authClient.useSession();
   const isAuthed = !!sessionData?.user;
 
-  const sort: SortOption = sortParam ?? (isAuthed ? "for-you" : "trending");
+  const sort: SortOption = sortParam ?? "for-you";
   const isPersonalized = PERSONALIZED_SORTS.has(sort);
   // Personalized feeds and category browsing don't share endpoints; reset page when switching.
   const page = isPersonalized || category == null ? (pageParam ?? 1) : (pageParam ?? 1);
@@ -138,29 +137,21 @@ function HomePage() {
     value: SortOption;
     label: string;
     icon: React.ReactNode;
-    requiresAuth?: boolean;
   }[] = [
-    {
-      value: "for-you",
-      label: "For You",
-      icon: <Sparkles className="h-3.5 w-3.5" />,
-      requiresAuth: true,
-    },
+    { value: "for-you", label: "For You", icon: <Sparkles className="h-3.5 w-3.5" /> },
     { value: "trending", label: "Trending", icon: <TrendingUp className="h-3.5 w-3.5" /> },
     { value: "newest", label: "Newest", icon: <Clock className="h-3.5 w-3.5" /> },
     { value: "popular", label: "Most Viewed", icon: <Flame className="h-3.5 w-3.5" /> },
     { value: "oldest", label: "Oldest", icon: <Clock className="h-3.5 w-3.5" /> },
   ];
 
-  const visibleSortOptions = sortOptions.filter((o) => !o.requiresAuth || isAuthed);
+  const visibleSortOptions = sortOptions;
 
   return (
     <div className="mx-auto flex max-w-[1400px] gap-6 px-4 py-6">
       <CategorySidebar selected={category} />
 
       <div className="min-w-0 flex-1">
-        {isAuthed && !category && sort === "for-you" && <ContinueWatching />}
-
         <div className="mb-6 flex flex-wrap items-center gap-2">
           {visibleSortOptions.map((option) => (
             <button
