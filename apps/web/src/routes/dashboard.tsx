@@ -28,6 +28,7 @@ import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/forma
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
+  head: () => ({ meta: [{ title: "Your videos — Watchbox" }] }),
   beforeLoad: async () => {
     const session = await getUser();
     return { session };

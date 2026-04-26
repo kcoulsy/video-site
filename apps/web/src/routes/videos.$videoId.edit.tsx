@@ -75,6 +75,14 @@ function EditVideoPage() {
   const isOwner = video && session?.user.id === video.userId;
 
   useEffect(() => {
+    const previous = document.title;
+    document.title = video?.title ? `Edit: ${video.title} — Watchbox` : "Edit video — Watchbox";
+    return () => {
+      document.title = previous;
+    };
+  }, [video?.title]);
+
+  useEffect(() => {
     if (!video || !tagData || hydrated) return;
     setTitle(video.title);
     setDescription(video.description ?? "");

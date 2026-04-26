@@ -10,6 +10,7 @@ import { formatRelativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/admin/queue")({
   component: AdminQueue,
+  head: () => ({ meta: [{ title: "Moderation queue — Admin" }] }),
 });
 
 interface VideoQueueItem {

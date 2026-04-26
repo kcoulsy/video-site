@@ -6,6 +6,7 @@ import SignUpForm from "@/components/sign-up-form";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
+  head: () => ({ meta: [{ title: "Sign in — Watchbox" }] }),
 });
 
 function LoginPage() {

@@ -11,6 +11,7 @@ import { ApiError, apiClient } from "@/lib/api-client";
 
 export const Route = createFileRoute("/admin/categories")({
   component: AdminCategories,
+  head: () => ({ meta: [{ title: "Categories — Admin" }] }),
 });
 
 interface AdminCategoryRow {

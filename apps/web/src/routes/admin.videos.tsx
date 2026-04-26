@@ -19,6 +19,7 @@ import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/forma
 
 export const Route = createFileRoute("/admin/videos")({
   component: AdminVideos,
+  head: () => ({ meta: [{ title: "Manage videos — Admin" }] }),
 });
 
 interface AdminVideo {

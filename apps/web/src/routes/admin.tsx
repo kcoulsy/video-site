@@ -16,6 +16,7 @@ import { getUser } from "@/functions/get-user";
 
 export const Route = createFileRoute("/admin")({
   component: AdminLayout,
+  head: () => ({ meta: [{ title: "Admin — Watchbox" }] }),
   beforeLoad: async () => {
     const session = await getUser();
     if (!session) throw redirect({ to: "/login" });

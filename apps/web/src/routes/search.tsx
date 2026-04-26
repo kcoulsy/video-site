@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Clock, Flame, Search, SearchX, Sparkles } from "lucide-react";
+import { useEffect } from "react";
 import { env } from "@video-site/env/web";
 
 import Loader from "@/components/loader";
@@ -72,6 +73,17 @@ function SearchPage() {
   const navigate = Route.useNavigate();
 
   const trimmed = q.trim();
+
+  useEffect(() => {
+    const previous = document.title;
+    document.title = trimmed
+      ? `Search: ${trimmed} — Watchbox`
+      : "Search — Watchbox";
+    return () => {
+      document.title = previous;
+    };
+  }, [trimmed]);
+
   const params = new URLSearchParams({
     q: trimmed,
     sort,

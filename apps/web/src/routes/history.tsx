@@ -13,6 +13,7 @@ import { formatDuration, formatRelativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/history")({
   component: HistoryPage,
+  head: () => ({ meta: [{ title: "Watch history — Watchbox" }] }),
   beforeLoad: async () => {
     const session = await getUser();
     return { session };

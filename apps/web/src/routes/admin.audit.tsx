@@ -9,6 +9,7 @@ import { formatRelativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/admin/audit")({
   component: AdminAudit,
+  head: () => ({ meta: [{ title: "Audit log — Admin" }] }),
 });
 
 interface AuditRow {

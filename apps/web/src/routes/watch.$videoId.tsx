@@ -82,6 +82,16 @@ function WatchPage() {
   }, [videoId]);
 
   useEffect(() => {
+    if (video?.title) {
+      const previous = document.title;
+      document.title = `${video.title} — Watchbox`;
+      return () => {
+        document.title = previous;
+      };
+    }
+  }, [video?.title]);
+
+  useEffect(() => {
     durationRef.current = video?.duration ?? null;
   }, [video?.duration]);
 

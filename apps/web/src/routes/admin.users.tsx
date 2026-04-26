@@ -27,6 +27,7 @@ import { formatDate } from "@/lib/format";
 
 export const Route = createFileRoute("/admin/users")({
   component: AdminUsers,
+  head: () => ({ meta: [{ title: "Manage users — Admin" }] }),
 });
 
 interface AdminUserRow {

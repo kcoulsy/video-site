@@ -47,6 +47,7 @@ interface HistoryProgressResponse {
 
 export const Route = createFileRoute("/")({
   component: HomePage,
+  head: () => ({ meta: [{ title: "Watchbox — Watch and share videos" }] }),
   validateSearch: (search: Record<string, unknown>): IndexSearchParams => {
     const sortRaw = typeof search.sort === "string" ? (search.sort as SortOption) : "newest";
     const sort: SortOption = SORT_VALUES.has(sortRaw) ? sortRaw : "newest";

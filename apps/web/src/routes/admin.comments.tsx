@@ -11,6 +11,7 @@ import { formatRelativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/admin/comments")({
   component: AdminComments,
+  head: () => ({ meta: [{ title: "Manage comments — Admin" }] }),
 });
 
 interface AdminCommentRow {

@@ -6,7 +6,6 @@ import {
   PictureInPicture2,
   Play,
   RectangleHorizontal,
-  Settings,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -24,9 +23,17 @@ interface VideoPlayerProps {
 }
 
 interface QualityOption {
+  id: string;
   index: number;
   height: number;
   bitrate: number;
+}
+
+interface DashRepresentation {
+  id: string;
+  index: number;
+  height: number;
+  bandwidth: number;
 }
 
 interface DashPlayer {
@@ -35,9 +42,9 @@ interface DashPlayer {
   on: (event: string, cb: (...args: unknown[]) => void) => void;
   seek: (t: number) => void;
   destroy: () => void;
-  getBitrateInfoListFor: (type: string) => Array<{ height: number; bitrate: number; qualityIndex: number }>;
-  setQualityFor: (type: string, index: number) => void;
-  getQualityFor: (type: string) => number;
+  getRepresentationsByType: (type: string) => DashRepresentation[];
+  setRepresentationForTypeById: (type: string, id: string, forceReplace?: boolean) => void;
+  setRepresentationForTypeByIndex: (type: string, index: number, forceReplace?: boolean) => void;
 }
 
 export function VideoPlayer({
@@ -67,7 +74,7 @@ export function VideoPlayer({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [qualities, setQualities] = useState<QualityOption[]>([]);
-  const [currentQuality, setCurrentQuality] = useState<number>(-1); // -1 = auto
+  const [currentQuality, setCurrentQuality] = useState<string | null>(null); // null = auto
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pipActive, setPipActive] = useState(false);
 
@@ -107,16 +114,18 @@ export function VideoPlayer({
           seeked = true;
         });
 
-        player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, () => {
-          const list = player.getBitrateInfoListFor("video") || [];
+        const refreshQualities = () => {
+          const list = player.getRepresentationsByType("video") || [];
           setQualities(
-            list.map((b) => ({
-              index: b.qualityIndex,
-              height: b.height,
-              bitrate: b.bitrate,
+            list.map((r) => ({
+              id: r.id,
+              index: r.index,
+              height: r.height,
+              bitrate: r.bandwidth,
             })),
           );
-        });
+        };
+        player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, refreshQualities);
 
         playerRef.current = player;
       })
@@ -235,22 +244,30 @@ export function VideoPlayer({
     }
   }, []);
 
-  const setQuality = useCallback((index: number) => {
-    const player = playerRef.current;
-    if (!player) return;
-    if (index === -1) {
-      player.updateSettings({
-        streaming: { abr: { autoSwitchBitrate: { video: true } } },
-      });
-    } else {
-      player.updateSettings({
-        streaming: { abr: { autoSwitchBitrate: { video: false } } },
-      });
-      player.setQualityFor("video", index);
-    }
-    setCurrentQuality(index);
-    setSettingsOpen(false);
-  }, []);
+  const setQuality = useCallback(
+    (option: QualityOption | null) => {
+      const player = playerRef.current;
+      if (!player) return;
+      if (option === null) {
+        player.updateSettings({
+          streaming: { abr: { autoSwitchBitrate: { video: true } } },
+        });
+        setCurrentQuality(null);
+      } else {
+        player.updateSettings({
+          streaming: { abr: { autoSwitchBitrate: { video: false } } },
+        });
+        try {
+          player.setRepresentationForTypeById("video", option.id, true);
+        } catch {
+          player.setRepresentationForTypeByIndex("video", option.index, true);
+        }
+        setCurrentQuality(option.id);
+      }
+      setSettingsOpen(false);
+    },
+    [],
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -495,39 +512,50 @@ export function VideoPlayer({
                 <button
                   type="button"
                   onClick={() => setSettingsOpen((s) => !s)}
-                  className="rounded p-1.5 hover:bg-white/10"
-                  aria-label="Settings"
+                  className="rounded px-2 py-1 text-xs font-medium tabular-nums hover:bg-white/10"
+                  aria-label="Quality"
+                  aria-haspopup="menu"
+                  aria-expanded={settingsOpen}
                 >
-                  <Settings className="h-5 w-5" />
+                  {currentQuality === null
+                    ? "Auto"
+                    : `${qualities.find((q) => q.id === currentQuality)?.height ?? ""}p`}
                 </button>
                 {settingsOpen && (
-                  <div className="absolute bottom-full right-0 mb-2 min-w-[140px] rounded-md bg-black/90 py-1 text-sm shadow-lg">
+                  <div
+                    role="menu"
+                    className="absolute bottom-full right-0 mb-2 min-w-[140px] rounded-md bg-black/90 py-1 text-sm shadow-lg"
+                  >
                     <div className="px-3 py-1 text-xs uppercase tracking-wide text-white/50">
                       Quality
                     </div>
                     <button
                       type="button"
-                      onClick={() => setQuality(-1)}
+                      role="menuitemradio"
+                      aria-checked={currentQuality === null}
+                      onClick={() => setQuality(null)}
                       className={`flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 ${
-                        currentQuality === -1 ? "text-white" : "text-white/80"
+                        currentQuality === null ? "text-white" : "text-white/80"
                       }`}
                     >
                       Auto
-                      {currentQuality === -1 && <span>•</span>}
+                      {currentQuality === null && <span>•</span>}
                     </button>
                     {[...qualities]
                       .sort((a, b) => b.height - a.height)
                       .map((q) => (
                         <button
-                          key={q.index}
+                          key={q.id}
                           type="button"
-                          onClick={() => setQuality(q.index)}
+                          role="menuitemradio"
+                          aria-checked={currentQuality === q.id}
+                          onClick={() => setQuality(q)}
                           className={`flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-white/10 ${
-                            currentQuality === q.index ? "text-white" : "text-white/80"
+                            currentQuality === q.id ? "text-white" : "text-white/80"
                           }`}
                         >
                           {q.height}p
-                          {currentQuality === q.index && <span>•</span>}
+                          {currentQuality === q.id && <span>•</span>}
                         </button>
                       ))}
                   </div>

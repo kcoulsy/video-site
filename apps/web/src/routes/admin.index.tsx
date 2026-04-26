@@ -7,6 +7,7 @@ import { formatViewCount } from "@/lib/format";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminOverview,
+  head: () => ({ meta: [{ title: "Admin overview — Watchbox" }] }),
 });
 
 interface AdminStats {
