@@ -13,6 +13,7 @@ import { commentLikeRoutes } from "./routes/comment-like";
 import { likeRoutes } from "./routes/like";
 import { moderationRoutes } from "./routes/moderation";
 import { playlistRoutes } from "./routes/playlist";
+import { profileRoutes } from "./routes/profile";
 import { recommendationsRoutes } from "./routes/recommendations";
 import { searchRoutes } from "./routes/search";
 import { streamingRoutes } from "./routes/streaming";
@@ -76,6 +77,7 @@ app.route("/api", commentLikeRoutes);
 app.route("/api", watchHistoryRoutes);
 app.route("/api", watchLaterRoutes);
 app.route("/api", playlistRoutes);
+app.route("/api", profileRoutes);
 app.route("/api", analyticsRoutes);
 app.route("/api", recommendationsRoutes);
 

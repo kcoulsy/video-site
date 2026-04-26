@@ -36,6 +36,17 @@ function thumbnailUrlFor(
   return stillIndex == null ? base : `${base}?v=${stillIndex}`;
 }
 
+function storyboardUrlFor(videoId: string, storyboardPath: string | null): string | null {
+  if (!storyboardPath) return null;
+  return `/api/stream/${videoId}/storyboard`;
+}
+
+function userAvatarUrlFor(userId: string, image: string | null): string | null {
+  if (!image) return null;
+  if (/^https?:\/\//.test(image)) return image;
+  return `/api/profile/${userId}/image/avatar`;
+}
+
 function hashIpUa(c: {
   req: { raw: Request; header: (name: string) => string | undefined };
 }): string {
@@ -274,7 +285,7 @@ videoRoutes.get("/", async (c) => {
     duration: r.duration,
     viewCount: r.viewCount,
     createdAt: r.createdAt,
-    user: { id: r.userId, name: r.userName, image: r.userImage },
+    user: { id: r.userId, name: r.userName, image: userAvatarUrlFor(r.userId, r.userImage) },
   }));
 
   return c.json({
@@ -296,6 +307,7 @@ videoRoutes.get("/:id", async (c) => {
       v: video,
       userName: user.name,
       userImage: user.image,
+      userHandle: user.handle,
       authorBannedAt: user.bannedAt,
       authorSuspendedUntil: user.suspendedUntil,
     })
@@ -324,7 +336,22 @@ videoRoutes.get("/:id", async (c) => {
     ...row.v,
     streamUrl: streamUrlFor(row.v.id, row.v.status),
     thumbnailUrl: thumbnailUrlFor(row.v.id, row.v.thumbnailPath, row.v.thumbnailStillIndex),
-    user: { id: row.v.userId, name: row.userName, image: row.userImage },
+    storyboardUrl: storyboardUrlFor(row.v.id, row.v.storyboardPath),
+    storyboard: row.v.storyboardPath
+      ? {
+          interval: row.v.storyboardInterval,
+          cols: row.v.storyboardCols,
+          rows: row.v.storyboardRows,
+          tileWidth: row.v.storyboardTileWidth,
+          tileHeight: row.v.storyboardTileHeight,
+        }
+      : null,
+    user: {
+      id: row.v.userId,
+      name: row.userName,
+      image: userAvatarUrlFor(row.v.userId, row.userImage),
+      handle: row.userHandle,
+    },
   });
 });
 

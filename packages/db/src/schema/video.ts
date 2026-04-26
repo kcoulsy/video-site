@@ -38,6 +38,13 @@ export const video = pgTable(
     thumbnailStillsCount: integer("thumbnail_stills_count").default(0).notNull(),
     thumbnailStillIndex: integer("thumbnail_still_index"),
 
+    storyboardPath: text("storyboard_path"),
+    storyboardInterval: integer("storyboard_interval"),
+    storyboardCols: integer("storyboard_cols"),
+    storyboardRows: integer("storyboard_rows"),
+    storyboardTileWidth: integer("storyboard_tile_width"),
+    storyboardTileHeight: integer("storyboard_tile_height"),
+
     fileHash: text("file_hash"),
 
     tusUploadId: text("tus_upload_id"),

@@ -151,6 +151,48 @@ streamingRoutes.get("/:videoId/thumbnail", async (c) => {
   });
 });
 
+streamingRoutes.get("/:videoId/storyboard", async (c) => {
+  const videoId = c.req.param("videoId");
+  if (!VIDEO_ID_RE.test(videoId)) return c.notFound();
+
+  const [row] = await db
+    .select({
+      storyboardPath: video.storyboardPath,
+      visibility: video.visibility,
+      userId: video.userId,
+      deletedAt: video.deletedAt,
+      authorBannedAt: user.bannedAt,
+      authorSuspendedUntil: user.suspendedUntil,
+    })
+    .from(video)
+    .innerJoin(user, eq(user.id, video.userId))
+    .where(eq(video.id, videoId))
+    .limit(1);
+
+  if (!row || !row.storyboardPath) return c.notFound();
+  if (row.deletedAt) return c.notFound();
+  if (row.authorBannedAt) return c.notFound();
+  if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) return c.notFound();
+
+  if (row.visibility === "private") {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session || session.user.id !== row.userId) {
+      return c.notFound();
+    }
+  }
+
+  if (!(await storage.fileExists(row.storyboardPath))) return c.notFound();
+
+  const file = Bun.file(row.storyboardPath);
+  return new Response(file.stream(), {
+    headers: {
+      "Content-Type": file.type || "image/jpeg",
+      "Content-Length": String(file.size),
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+});
+
 streamingRoutes.get("/:videoId/thumbnail/still/:index", async (c) => {
   const videoId = c.req.param("videoId");
   if (!VIDEO_ID_RE.test(videoId)) return c.notFound();

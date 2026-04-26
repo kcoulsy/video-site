@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Share2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
 
@@ -79,7 +80,15 @@ interface VideoResponse {
   createdAt: string;
   streamUrl: string | null;
   thumbnailUrl: string | null;
-  user: { id: string; name: string; image: string | null };
+  storyboardUrl: string | null;
+  storyboard: {
+    interval: number;
+    cols: number;
+    rows: number;
+    tileWidth: number;
+    tileHeight: number;
+  } | null;
+  user: { id: string; name: string; image: string | null; handle: string | null };
 }
 
 interface ProgressResponse {
@@ -254,6 +263,18 @@ function WatchPage() {
           <VideoPlayer
             manifestUrl={absoluteUrl(video.streamUrl)}
             thumbnailUrl={absoluteUrl(video.thumbnailUrl) ?? null}
+            storyboard={
+              video.storyboard && video.storyboardUrl
+                ? {
+                    url: absoluteUrl(video.storyboardUrl)!,
+                    interval: video.storyboard.interval,
+                    cols: video.storyboard.cols,
+                    rows: video.storyboard.rows,
+                    tileWidth: video.storyboard.tileWidth,
+                    tileHeight: video.storyboard.tileHeight,
+                  }
+                : null
+            }
             initialTime={initialTime}
             onTimeUpdate={handleTimeUpdate}
             cinemaMode={cinemaMode}
@@ -296,22 +317,31 @@ function WatchPage() {
 
           <div className="mt-4 rounded-xl bg-secondary/50 p-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
-                {video.user.image ? (
-                  <img
-                    src={video.user.image}
-                    alt={video.user.name}
-                    className="h-full w-full object-cover"
+              {video.user.handle ? (
+                <Link
+                  to="/u/$handle"
+                  params={{ handle: video.user.handle }}
+                  className="flex flex-1 items-center gap-3 group/author"
+                >
+                  <AuthorAvatar
+                    user={{ ...video.user, image: absoluteUrl(video.user.image) ?? null }}
                   />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-muted-foreground">
-                    {video.user.name.charAt(0)}
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold transition-colors group-hover/author:text-primary">
+                      {video.user.name}
+                    </p>
                   </div>
-                )}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold">{video.user.name}</p>
-              </div>
+                </Link>
+              ) : (
+                <div className="flex flex-1 items-center gap-3">
+                  <AuthorAvatar
+                    user={{ ...video.user, image: absoluteUrl(video.user.image) ?? null }}
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">{video.user.name}</p>
+                  </div>
+                </div>
+              )}
               <Button size="sm" className="rounded-full">
                 Subscribe
               </Button>
@@ -349,6 +379,20 @@ function WatchPage() {
           <WatchNext currentVideoId={video.id} />
         </aside>
       </div>
+    </div>
+  );
+}
+
+function AuthorAvatar({ user }: { user: { name: string; image: string | null } }) {
+  return (
+    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
+      {user.image ? (
+        <img src={user.image} alt={user.name} className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-muted-foreground">
+          {user.name.charAt(0)}
+        </div>
+      )}
     </div>
   );
 }

@@ -63,6 +63,54 @@ function extractThumbnail(
   });
 }
 
+const STORYBOARD_TILE_WIDTH = 160;
+const STORYBOARD_TILE_HEIGHT = 90;
+const STORYBOARD_MAX_TILES = 100;
+
+interface StoryboardLayout {
+  interval: number;
+  cols: number;
+  rows: number;
+  tileWidth: number;
+  tileHeight: number;
+}
+
+function computeStoryboardLayout(durationSec: number): StoryboardLayout {
+  const interval = Math.max(2, Math.ceil(durationSec / STORYBOARD_MAX_TILES));
+  const tileCount = Math.max(1, Math.ceil(durationSec / interval));
+  const cols = Math.min(10, Math.ceil(Math.sqrt(tileCount)));
+  const rows = Math.max(1, Math.ceil(tileCount / cols));
+  return {
+    interval,
+    cols,
+    rows,
+    tileWidth: STORYBOARD_TILE_WIDTH,
+    tileHeight: STORYBOARD_TILE_HEIGHT,
+  };
+}
+
+function generateStoryboard(
+  inputPath: string,
+  outputPath: string,
+  layout: StoryboardLayout,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .outputOptions(
+        "-vf",
+        `fps=1/${layout.interval},scale=${layout.tileWidth}:${layout.tileHeight}:force_original_aspect_ratio=decrease,pad=${layout.tileWidth}:${layout.tileHeight}:(ow-iw)/2:(oh-ih)/2:black,tile=${layout.cols}x${layout.rows}`,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "4",
+      )
+      .output(outputPath)
+      .on("end", () => resolve())
+      .on("error", reject)
+      .run();
+  });
+}
+
 function transcodeToMp4(
   inputPath: string,
   outputPath: string,
@@ -233,6 +281,25 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
         thumbnailStillIndex: defaultStillIndex,
       })
       .where(eq(video.id, videoId));
+
+    const storyboardLayout = computeStoryboardLayout(duration);
+    const storyboardPath = path.posix.join(thumbnailDir, "storyboard.jpg");
+    try {
+      await generateStoryboard(rawPath, storyboardPath, storyboardLayout);
+      await db
+        .update(video)
+        .set({
+          storyboardPath,
+          storyboardInterval: storyboardLayout.interval,
+          storyboardCols: storyboardLayout.cols,
+          storyboardRows: storyboardLayout.rows,
+          storyboardTileWidth: storyboardLayout.tileWidth,
+          storyboardTileHeight: storyboardLayout.tileHeight,
+        })
+        .where(eq(video.id, videoId));
+    } catch (err) {
+      console.error(`[transcode ${videoId}] storyboard generation failed:`, err);
+    }
 
     await job.updateProgress({ stage: "thumbnail", percent: 10 });
 

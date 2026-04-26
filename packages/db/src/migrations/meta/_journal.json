@@ -57,6 +57,13 @@
       "when": 1777211682195,
       "tag": "0007_clever_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777215229760,
+      "tag": "0008_cloudy_cannonball",
+      "breakpoints": true
     }
   ]
 }

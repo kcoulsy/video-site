@@ -8,472 +8,512 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as WatchLaterRouteImport } from "./routes/watch-later";
-import { Route as UploadRouteImport } from "./routes/upload";
-import { Route as SearchRouteImport } from "./routes/search";
-import { Route as PlaylistsRouteImport } from "./routes/playlists";
-import { Route as LoginRouteImport } from "./routes/login";
-import { Route as HistoryRouteImport } from "./routes/history";
-import { Route as DashboardRouteImport } from "./routes/dashboard";
-import { Route as AdminRouteImport } from "./routes/admin";
-import { Route as IndexRouteImport } from "./routes/index";
-import { Route as AdminIndexRouteImport } from "./routes/admin.index";
-import { Route as WatchVideoIdRouteImport } from "./routes/watch.$videoId";
-import { Route as PlaylistPlaylistIdRouteImport } from "./routes/playlist.$playlistId";
-import { Route as AdminVideosRouteImport } from "./routes/admin.videos";
-import { Route as AdminUsersRouteImport } from "./routes/admin.users";
-import { Route as AdminTagsRouteImport } from "./routes/admin.tags";
-import { Route as AdminReportsRouteImport } from "./routes/admin.reports";
-import { Route as AdminQueueRouteImport } from "./routes/admin.queue";
-import { Route as AdminCommentsRouteImport } from "./routes/admin.comments";
-import { Route as AdminCategoriesRouteImport } from "./routes/admin.categories";
-import { Route as AdminAuditRouteImport } from "./routes/admin.audit";
-import { Route as VideosVideoIdEditRouteImport } from "./routes/videos.$videoId.edit";
-import { Route as VideosVideoIdAnalyticsRouteImport } from "./routes/videos.$videoId.analytics";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as WatchLaterRouteImport } from './routes/watch-later'
+import { Route as UploadRouteImport } from './routes/upload'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as PlaylistsRouteImport } from './routes/playlists'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as HistoryRouteImport } from './routes/history'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as WatchVideoIdRouteImport } from './routes/watch.$videoId'
+import { Route as UHandleRouteImport } from './routes/u.$handle'
+import { Route as PlaylistPlaylistIdRouteImport } from './routes/playlist.$playlistId'
+import { Route as AdminVideosRouteImport } from './routes/admin.videos'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminTagsRouteImport } from './routes/admin.tags'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminQueueRouteImport } from './routes/admin.queue'
+import { Route as AdminCommentsRouteImport } from './routes/admin.comments'
+import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as VideosVideoIdEditRouteImport } from './routes/videos.$videoId.edit'
+import { Route as VideosVideoIdAnalyticsRouteImport } from './routes/videos.$videoId.analytics'
 
 const WatchLaterRoute = WatchLaterRouteImport.update({
-  id: "/watch-later",
-  path: "/watch-later",
+  id: '/watch-later',
+  path: '/watch-later',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const UploadRoute = UploadRouteImport.update({
-  id: "/upload",
-  path: "/upload",
+  id: '/upload',
+  path: '/upload',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
-  id: "/search",
-  path: "/search",
+  id: '/search',
+  path: '/search',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const PlaylistsRoute = PlaylistsRouteImport.update({
-  id: "/playlists",
-  path: "/playlists",
+  id: '/playlists',
+  path: '/playlists',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const LoginRoute = LoginRouteImport.update({
-  id: "/login",
-  path: "/login",
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const HistoryRoute = HistoryRouteImport.update({
-  id: "/history",
-  path: "/history",
+  id: '/history',
+  path: '/history',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
-  id: "/dashboard",
-  path: "/dashboard",
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AdminRoute = AdminRouteImport.update({
-  id: "/admin",
-  path: "/admin",
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const WatchVideoIdRoute = WatchVideoIdRouteImport.update({
-  id: "/watch/$videoId",
-  path: "/watch/$videoId",
+  id: '/watch/$videoId',
+  path: '/watch/$videoId',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
+const UHandleRoute = UHandleRouteImport.update({
+  id: '/u/$handle',
+  path: '/u/$handle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlaylistPlaylistIdRoute = PlaylistPlaylistIdRouteImport.update({
-  id: "/playlist/$playlistId",
-  path: "/playlist/$playlistId",
+  id: '/playlist/$playlistId',
+  path: '/playlist/$playlistId',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const AdminVideosRoute = AdminVideosRouteImport.update({
-  id: "/videos",
-  path: "/videos",
+  id: '/videos',
+  path: '/videos',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: "/users",
-  path: "/users",
+  id: '/users',
+  path: '/users',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const AdminTagsRoute = AdminTagsRouteImport.update({
-  id: "/tags",
-  path: "/tags",
+  id: '/tags',
+  path: '/tags',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const AdminReportsRoute = AdminReportsRouteImport.update({
-  id: "/reports",
-  path: "/reports",
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const AdminQueueRoute = AdminQueueRouteImport.update({
-  id: "/queue",
-  path: "/queue",
+  id: '/queue',
+  path: '/queue',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const AdminCommentsRoute = AdminCommentsRouteImport.update({
-  id: "/comments",
-  path: "/comments",
+  id: '/comments',
+  path: '/comments',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
-  id: "/categories",
-  path: "/categories",
+  id: '/categories',
+  path: '/categories',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const AdminAuditRoute = AdminAuditRouteImport.update({
-  id: "/audit",
-  path: "/audit",
+  id: '/audit',
+  path: '/audit',
   getParentRoute: () => AdminRoute,
-} as any);
+} as any)
 const VideosVideoIdEditRoute = VideosVideoIdEditRouteImport.update({
-  id: "/videos/$videoId/edit",
-  path: "/videos/$videoId/edit",
+  id: '/videos/$videoId/edit',
+  path: '/videos/$videoId/edit',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 const VideosVideoIdAnalyticsRoute = VideosVideoIdAnalyticsRouteImport.update({
-  id: "/videos/$videoId/analytics",
-  path: "/videos/$videoId/analytics",
+  id: '/videos/$videoId/analytics',
+  path: '/videos/$videoId/analytics',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute;
-  "/admin": typeof AdminRouteWithChildren;
-  "/dashboard": typeof DashboardRoute;
-  "/history": typeof HistoryRoute;
-  "/login": typeof LoginRoute;
-  "/playlists": typeof PlaylistsRoute;
-  "/search": typeof SearchRoute;
-  "/upload": typeof UploadRoute;
-  "/watch-later": typeof WatchLaterRoute;
-  "/admin/audit": typeof AdminAuditRoute;
-  "/admin/categories": typeof AdminCategoriesRoute;
-  "/admin/comments": typeof AdminCommentsRoute;
-  "/admin/queue": typeof AdminQueueRoute;
-  "/admin/reports": typeof AdminReportsRoute;
-  "/admin/tags": typeof AdminTagsRoute;
-  "/admin/users": typeof AdminUsersRoute;
-  "/admin/videos": typeof AdminVideosRoute;
-  "/playlist/$playlistId": typeof PlaylistPlaylistIdRoute;
-  "/watch/$videoId": typeof WatchVideoIdRoute;
-  "/admin/": typeof AdminIndexRoute;
-  "/videos/$videoId/analytics": typeof VideosVideoIdAnalyticsRoute;
-  "/videos/$videoId/edit": typeof VideosVideoIdEditRoute;
+  '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
+  '/login': typeof LoginRoute
+  '/playlists': typeof PlaylistsRoute
+  '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
+  '/upload': typeof UploadRoute
+  '/watch-later': typeof WatchLaterRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/comments': typeof AdminCommentsRoute
+  '/admin/queue': typeof AdminQueueRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/tags': typeof AdminTagsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/videos': typeof AdminVideosRoute
+  '/playlist/$playlistId': typeof PlaylistPlaylistIdRoute
+  '/u/$handle': typeof UHandleRoute
+  '/watch/$videoId': typeof WatchVideoIdRoute
+  '/admin/': typeof AdminIndexRoute
+  '/videos/$videoId/analytics': typeof VideosVideoIdAnalyticsRoute
+  '/videos/$videoId/edit': typeof VideosVideoIdEditRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute;
-  "/dashboard": typeof DashboardRoute;
-  "/history": typeof HistoryRoute;
-  "/login": typeof LoginRoute;
-  "/playlists": typeof PlaylistsRoute;
-  "/search": typeof SearchRoute;
-  "/upload": typeof UploadRoute;
-  "/watch-later": typeof WatchLaterRoute;
-  "/admin/audit": typeof AdminAuditRoute;
-  "/admin/categories": typeof AdminCategoriesRoute;
-  "/admin/comments": typeof AdminCommentsRoute;
-  "/admin/queue": typeof AdminQueueRoute;
-  "/admin/reports": typeof AdminReportsRoute;
-  "/admin/tags": typeof AdminTagsRoute;
-  "/admin/users": typeof AdminUsersRoute;
-  "/admin/videos": typeof AdminVideosRoute;
-  "/playlist/$playlistId": typeof PlaylistPlaylistIdRoute;
-  "/watch/$videoId": typeof WatchVideoIdRoute;
-  "/admin": typeof AdminIndexRoute;
-  "/videos/$videoId/analytics": typeof VideosVideoIdAnalyticsRoute;
-  "/videos/$videoId/edit": typeof VideosVideoIdEditRoute;
+  '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
+  '/login': typeof LoginRoute
+  '/playlists': typeof PlaylistsRoute
+  '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
+  '/upload': typeof UploadRoute
+  '/watch-later': typeof WatchLaterRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/comments': typeof AdminCommentsRoute
+  '/admin/queue': typeof AdminQueueRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/tags': typeof AdminTagsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/videos': typeof AdminVideosRoute
+  '/playlist/$playlistId': typeof PlaylistPlaylistIdRoute
+  '/u/$handle': typeof UHandleRoute
+  '/watch/$videoId': typeof WatchVideoIdRoute
+  '/admin': typeof AdminIndexRoute
+  '/videos/$videoId/analytics': typeof VideosVideoIdAnalyticsRoute
+  '/videos/$videoId/edit': typeof VideosVideoIdEditRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  "/": typeof IndexRoute;
-  "/admin": typeof AdminRouteWithChildren;
-  "/dashboard": typeof DashboardRoute;
-  "/history": typeof HistoryRoute;
-  "/login": typeof LoginRoute;
-  "/playlists": typeof PlaylistsRoute;
-  "/search": typeof SearchRoute;
-  "/upload": typeof UploadRoute;
-  "/watch-later": typeof WatchLaterRoute;
-  "/admin/audit": typeof AdminAuditRoute;
-  "/admin/categories": typeof AdminCategoriesRoute;
-  "/admin/comments": typeof AdminCommentsRoute;
-  "/admin/queue": typeof AdminQueueRoute;
-  "/admin/reports": typeof AdminReportsRoute;
-  "/admin/tags": typeof AdminTagsRoute;
-  "/admin/users": typeof AdminUsersRoute;
-  "/admin/videos": typeof AdminVideosRoute;
-  "/playlist/$playlistId": typeof PlaylistPlaylistIdRoute;
-  "/watch/$videoId": typeof WatchVideoIdRoute;
-  "/admin/": typeof AdminIndexRoute;
-  "/videos/$videoId/analytics": typeof VideosVideoIdAnalyticsRoute;
-  "/videos/$videoId/edit": typeof VideosVideoIdEditRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
+  '/login': typeof LoginRoute
+  '/playlists': typeof PlaylistsRoute
+  '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
+  '/upload': typeof UploadRoute
+  '/watch-later': typeof WatchLaterRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/comments': typeof AdminCommentsRoute
+  '/admin/queue': typeof AdminQueueRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/tags': typeof AdminTagsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/videos': typeof AdminVideosRoute
+  '/playlist/$playlistId': typeof PlaylistPlaylistIdRoute
+  '/u/$handle': typeof UHandleRoute
+  '/watch/$videoId': typeof WatchVideoIdRoute
+  '/admin/': typeof AdminIndexRoute
+  '/videos/$videoId/analytics': typeof VideosVideoIdAnalyticsRoute
+  '/videos/$videoId/edit': typeof VideosVideoIdEditRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
+  fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | "/"
-    | "/admin"
-    | "/dashboard"
-    | "/history"
-    | "/login"
-    | "/playlists"
-    | "/search"
-    | "/upload"
-    | "/watch-later"
-    | "/admin/audit"
-    | "/admin/categories"
-    | "/admin/comments"
-    | "/admin/queue"
-    | "/admin/reports"
-    | "/admin/tags"
-    | "/admin/users"
-    | "/admin/videos"
-    | "/playlist/$playlistId"
-    | "/watch/$videoId"
-    | "/admin/"
-    | "/videos/$videoId/analytics"
-    | "/videos/$videoId/edit";
-  fileRoutesByTo: FileRoutesByTo;
+    | '/'
+    | '/admin'
+    | '/dashboard'
+    | '/history'
+    | '/login'
+    | '/playlists'
+    | '/search'
+    | '/settings'
+    | '/upload'
+    | '/watch-later'
+    | '/admin/audit'
+    | '/admin/categories'
+    | '/admin/comments'
+    | '/admin/queue'
+    | '/admin/reports'
+    | '/admin/tags'
+    | '/admin/users'
+    | '/admin/videos'
+    | '/playlist/$playlistId'
+    | '/u/$handle'
+    | '/watch/$videoId'
+    | '/admin/'
+    | '/videos/$videoId/analytics'
+    | '/videos/$videoId/edit'
+  fileRoutesByTo: FileRoutesByTo
   to:
-    | "/"
-    | "/dashboard"
-    | "/history"
-    | "/login"
-    | "/playlists"
-    | "/search"
-    | "/upload"
-    | "/watch-later"
-    | "/admin/audit"
-    | "/admin/categories"
-    | "/admin/comments"
-    | "/admin/queue"
-    | "/admin/reports"
-    | "/admin/tags"
-    | "/admin/users"
-    | "/admin/videos"
-    | "/playlist/$playlistId"
-    | "/watch/$videoId"
-    | "/admin"
-    | "/videos/$videoId/analytics"
-    | "/videos/$videoId/edit";
+    | '/'
+    | '/dashboard'
+    | '/history'
+    | '/login'
+    | '/playlists'
+    | '/search'
+    | '/settings'
+    | '/upload'
+    | '/watch-later'
+    | '/admin/audit'
+    | '/admin/categories'
+    | '/admin/comments'
+    | '/admin/queue'
+    | '/admin/reports'
+    | '/admin/tags'
+    | '/admin/users'
+    | '/admin/videos'
+    | '/playlist/$playlistId'
+    | '/u/$handle'
+    | '/watch/$videoId'
+    | '/admin'
+    | '/videos/$videoId/analytics'
+    | '/videos/$videoId/edit'
   id:
-    | "__root__"
-    | "/"
-    | "/admin"
-    | "/dashboard"
-    | "/history"
-    | "/login"
-    | "/playlists"
-    | "/search"
-    | "/upload"
-    | "/watch-later"
-    | "/admin/audit"
-    | "/admin/categories"
-    | "/admin/comments"
-    | "/admin/queue"
-    | "/admin/reports"
-    | "/admin/tags"
-    | "/admin/users"
-    | "/admin/videos"
-    | "/playlist/$playlistId"
-    | "/watch/$videoId"
-    | "/admin/"
-    | "/videos/$videoId/analytics"
-    | "/videos/$videoId/edit";
-  fileRoutesById: FileRoutesById;
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/dashboard'
+    | '/history'
+    | '/login'
+    | '/playlists'
+    | '/search'
+    | '/settings'
+    | '/upload'
+    | '/watch-later'
+    | '/admin/audit'
+    | '/admin/categories'
+    | '/admin/comments'
+    | '/admin/queue'
+    | '/admin/reports'
+    | '/admin/tags'
+    | '/admin/users'
+    | '/admin/videos'
+    | '/playlist/$playlistId'
+    | '/u/$handle'
+    | '/watch/$videoId'
+    | '/admin/'
+    | '/videos/$videoId/analytics'
+    | '/videos/$videoId/edit'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute;
-  AdminRoute: typeof AdminRouteWithChildren;
-  DashboardRoute: typeof DashboardRoute;
-  HistoryRoute: typeof HistoryRoute;
-  LoginRoute: typeof LoginRoute;
-  PlaylistsRoute: typeof PlaylistsRoute;
-  SearchRoute: typeof SearchRoute;
-  UploadRoute: typeof UploadRoute;
-  WatchLaterRoute: typeof WatchLaterRoute;
-  PlaylistPlaylistIdRoute: typeof PlaylistPlaylistIdRoute;
-  WatchVideoIdRoute: typeof WatchVideoIdRoute;
-  VideosVideoIdAnalyticsRoute: typeof VideosVideoIdAnalyticsRoute;
-  VideosVideoIdEditRoute: typeof VideosVideoIdEditRoute;
+  IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  DashboardRoute: typeof DashboardRoute
+  HistoryRoute: typeof HistoryRoute
+  LoginRoute: typeof LoginRoute
+  PlaylistsRoute: typeof PlaylistsRoute
+  SearchRoute: typeof SearchRoute
+  SettingsRoute: typeof SettingsRoute
+  UploadRoute: typeof UploadRoute
+  WatchLaterRoute: typeof WatchLaterRoute
+  PlaylistPlaylistIdRoute: typeof PlaylistPlaylistIdRoute
+  UHandleRoute: typeof UHandleRoute
+  WatchVideoIdRoute: typeof WatchVideoIdRoute
+  VideosVideoIdAnalyticsRoute: typeof VideosVideoIdAnalyticsRoute
+  VideosVideoIdEditRoute: typeof VideosVideoIdEditRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/watch-later": {
-      id: "/watch-later";
-      path: "/watch-later";
-      fullPath: "/watch-later";
-      preLoaderRoute: typeof WatchLaterRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/upload": {
-      id: "/upload";
-      path: "/upload";
-      fullPath: "/upload";
-      preLoaderRoute: typeof UploadRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/search": {
-      id: "/search";
-      path: "/search";
-      fullPath: "/search";
-      preLoaderRoute: typeof SearchRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/playlists": {
-      id: "/playlists";
-      path: "/playlists";
-      fullPath: "/playlists";
-      preLoaderRoute: typeof PlaylistsRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/login": {
-      id: "/login";
-      path: "/login";
-      fullPath: "/login";
-      preLoaderRoute: typeof LoginRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/history": {
-      id: "/history";
-      path: "/history";
-      fullPath: "/history";
-      preLoaderRoute: typeof HistoryRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/dashboard": {
-      id: "/dashboard";
-      path: "/dashboard";
-      fullPath: "/dashboard";
-      preLoaderRoute: typeof DashboardRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/admin": {
-      id: "/admin";
-      path: "/admin";
-      fullPath: "/admin";
-      preLoaderRoute: typeof AdminRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/": {
-      id: "/";
-      path: "/";
-      fullPath: "/";
-      preLoaderRoute: typeof IndexRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/admin/": {
-      id: "/admin/";
-      path: "/";
-      fullPath: "/admin/";
-      preLoaderRoute: typeof AdminIndexRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/watch/$videoId": {
-      id: "/watch/$videoId";
-      path: "/watch/$videoId";
-      fullPath: "/watch/$videoId";
-      preLoaderRoute: typeof WatchVideoIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/playlist/$playlistId": {
-      id: "/playlist/$playlistId";
-      path: "/playlist/$playlistId";
-      fullPath: "/playlist/$playlistId";
-      preLoaderRoute: typeof PlaylistPlaylistIdRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/admin/videos": {
-      id: "/admin/videos";
-      path: "/videos";
-      fullPath: "/admin/videos";
-      preLoaderRoute: typeof AdminVideosRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/admin/users": {
-      id: "/admin/users";
-      path: "/users";
-      fullPath: "/admin/users";
-      preLoaderRoute: typeof AdminUsersRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/admin/tags": {
-      id: "/admin/tags";
-      path: "/tags";
-      fullPath: "/admin/tags";
-      preLoaderRoute: typeof AdminTagsRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/admin/reports": {
-      id: "/admin/reports";
-      path: "/reports";
-      fullPath: "/admin/reports";
-      preLoaderRoute: typeof AdminReportsRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/admin/queue": {
-      id: "/admin/queue";
-      path: "/queue";
-      fullPath: "/admin/queue";
-      preLoaderRoute: typeof AdminQueueRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/admin/comments": {
-      id: "/admin/comments";
-      path: "/comments";
-      fullPath: "/admin/comments";
-      preLoaderRoute: typeof AdminCommentsRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/admin/categories": {
-      id: "/admin/categories";
-      path: "/categories";
-      fullPath: "/admin/categories";
-      preLoaderRoute: typeof AdminCategoriesRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/admin/audit": {
-      id: "/admin/audit";
-      path: "/audit";
-      fullPath: "/admin/audit";
-      preLoaderRoute: typeof AdminAuditRouteImport;
-      parentRoute: typeof AdminRoute;
-    };
-    "/videos/$videoId/edit": {
-      id: "/videos/$videoId/edit";
-      path: "/videos/$videoId/edit";
-      fullPath: "/videos/$videoId/edit";
-      preLoaderRoute: typeof VideosVideoIdEditRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/videos/$videoId/analytics": {
-      id: "/videos/$videoId/analytics";
-      path: "/videos/$videoId/analytics";
-      fullPath: "/videos/$videoId/analytics";
-      preLoaderRoute: typeof VideosVideoIdAnalyticsRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+    '/watch-later': {
+      id: '/watch-later'
+      path: '/watch-later'
+      fullPath: '/watch-later'
+      preLoaderRoute: typeof WatchLaterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playlists': {
+      id: '/playlists'
+      path: '/playlists'
+      fullPath: '/playlists'
+      preLoaderRoute: typeof PlaylistsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/watch/$videoId': {
+      id: '/watch/$videoId'
+      path: '/watch/$videoId'
+      fullPath: '/watch/$videoId'
+      preLoaderRoute: typeof WatchVideoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$handle': {
+      id: '/u/$handle'
+      path: '/u/$handle'
+      fullPath: '/u/$handle'
+      preLoaderRoute: typeof UHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playlist/$playlistId': {
+      id: '/playlist/$playlistId'
+      path: '/playlist/$playlistId'
+      fullPath: '/playlist/$playlistId'
+      preLoaderRoute: typeof PlaylistPlaylistIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/videos': {
+      id: '/admin/videos'
+      path: '/videos'
+      fullPath: '/admin/videos'
+      preLoaderRoute: typeof AdminVideosRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/tags': {
+      id: '/admin/tags'
+      path: '/tags'
+      fullPath: '/admin/tags'
+      preLoaderRoute: typeof AdminTagsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/queue': {
+      id: '/admin/queue'
+      path: '/queue'
+      fullPath: '/admin/queue'
+      preLoaderRoute: typeof AdminQueueRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/comments': {
+      id: '/admin/comments'
+      path: '/comments'
+      fullPath: '/admin/comments'
+      preLoaderRoute: typeof AdminCommentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/categories': {
+      id: '/admin/categories'
+      path: '/categories'
+      fullPath: '/admin/categories'
+      preLoaderRoute: typeof AdminCategoriesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/videos/$videoId/edit': {
+      id: '/videos/$videoId/edit'
+      path: '/videos/$videoId/edit'
+      fullPath: '/videos/$videoId/edit'
+      preLoaderRoute: typeof VideosVideoIdEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/videos/$videoId/analytics': {
+      id: '/videos/$videoId/analytics'
+      path: '/videos/$videoId/analytics'
+      fullPath: '/videos/$videoId/analytics'
+      preLoaderRoute: typeof VideosVideoIdAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AdminRouteChildren {
-  AdminAuditRoute: typeof AdminAuditRoute;
-  AdminCategoriesRoute: typeof AdminCategoriesRoute;
-  AdminCommentsRoute: typeof AdminCommentsRoute;
-  AdminQueueRoute: typeof AdminQueueRoute;
-  AdminReportsRoute: typeof AdminReportsRoute;
-  AdminTagsRoute: typeof AdminTagsRoute;
-  AdminUsersRoute: typeof AdminUsersRoute;
-  AdminVideosRoute: typeof AdminVideosRoute;
-  AdminIndexRoute: typeof AdminIndexRoute;
+  AdminAuditRoute: typeof AdminAuditRoute
+  AdminCategoriesRoute: typeof AdminCategoriesRoute
+  AdminCommentsRoute: typeof AdminCommentsRoute
+  AdminQueueRoute: typeof AdminQueueRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminTagsRoute: typeof AdminTagsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminVideosRoute: typeof AdminVideosRoute
+  AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -486,9 +526,9 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AdminVideosRoute: AdminVideosRoute,
   AdminIndexRoute: AdminIndexRoute,
-};
+}
 
-const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren);
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -498,22 +538,24 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PlaylistsRoute: PlaylistsRoute,
   SearchRoute: SearchRoute,
+  SettingsRoute: SettingsRoute,
   UploadRoute: UploadRoute,
   WatchLaterRoute: WatchLaterRoute,
   PlaylistPlaylistIdRoute: PlaylistPlaylistIdRoute,
+  UHandleRoute: UHandleRoute,
   WatchVideoIdRoute: WatchVideoIdRoute,
   VideosVideoIdAnalyticsRoute: VideosVideoIdAnalyticsRoute,
   VideosVideoIdEditRoute: VideosVideoIdEditRoute,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx";
-import type { createStart } from "@tanstack/react-start";
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
-    ssr: true;
-    router: Awaited<ReturnType<typeof getRouter>>;
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
   }
 }

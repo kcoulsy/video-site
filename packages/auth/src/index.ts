@@ -29,6 +29,21 @@ export function createAuth() {
           defaultValue: "user",
           input: false,
         },
+        handle: {
+          type: "string",
+          required: false,
+          input: false,
+        },
+        bio: {
+          type: "string",
+          required: false,
+          input: false,
+        },
+        bannerPath: {
+          type: "string",
+          required: false,
+          input: false,
+        },
       },
     },
     databaseHooks: {
