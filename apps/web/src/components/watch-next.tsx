@@ -26,11 +26,11 @@ interface WatchNextProps {
 
 export function WatchNext({ currentVideoId }: WatchNextProps) {
   const { data, isLoading } = useQuery<FeedResponse>({
-    queryKey: ["videos", "watch-next"],
-    queryFn: () => apiClient<FeedResponse>(`/api/videos?sort=popular&page=1&limit=20`),
+    queryKey: ["videos", "related", currentVideoId],
+    queryFn: () => apiClient<FeedResponse>(`/api/videos/${currentVideoId}/related?limit=15`),
   });
 
-  const items = (data?.items ?? []).filter((v) => v.id !== currentVideoId).slice(0, 15);
+  const items = data?.items ?? [];
 
   return (
     <div className="flex flex-col gap-2">

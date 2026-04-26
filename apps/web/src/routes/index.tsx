@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Clock, Film, Flame } from "lucide-react";
+import { Clock, Film, Flame, Sparkles, TrendingUp } from "lucide-react";
 import { env } from "@video-site/env/web";
 
 import { CategorySidebar } from "@/components/category-sidebar";
+import { ContinueWatching } from "@/components/continue-watching";
 import Loader from "@/components/loader";
 import { Pagination } from "@/components/pagination";
 import { VideoGrid } from "@/components/video-grid";
@@ -11,7 +12,7 @@ import type { VideoCardProps } from "@/components/video-card";
 import { apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 
-type SortOption = "newest" | "popular" | "oldest";
+type SortOption = "for-you" | "trending" | "newest" | "popular" | "oldest";
 
 interface IndexSearchParams {
   sort?: SortOption;
@@ -19,13 +20,14 @@ interface IndexSearchParams {
   page?: number;
 }
 
-const SORT_VALUES = new Set<SortOption>(["newest", "popular", "oldest"]);
+const SORT_VALUES = new Set<SortOption>(["for-you", "trending", "newest", "popular", "oldest"]);
 const PAGE_SIZE = 24;
+const PERSONALIZED_SORTS = new Set<SortOption>(["for-you", "trending"]);
 
 interface FeedItem {
   id: string;
   title: string;
-  thumbnailPath: string | null;
+  thumbnailPath?: string | null;
   thumbnailUrl: string | null;
   duration: number | null;
   viewCount: number;
@@ -33,12 +35,16 @@ interface FeedItem {
   user: { id: string; name: string; image: string | null };
 }
 
-interface FeedResponse {
+interface PaginatedFeedResponse {
   items: FeedItem[];
   page: number;
   limit: number;
   total: number;
   totalPages: number;
+}
+
+interface SimpleFeedResponse {
+  items: FeedItem[];
 }
 
 interface HistoryProgressResponse {
@@ -49,8 +55,8 @@ export const Route = createFileRoute("/")({
   component: HomePage,
   head: () => ({ meta: [{ title: "Watchbox — Watch and share videos" }] }),
   validateSearch: (search: Record<string, unknown>): IndexSearchParams => {
-    const sortRaw = typeof search.sort === "string" ? (search.sort as SortOption) : "newest";
-    const sort: SortOption = SORT_VALUES.has(sortRaw) ? sortRaw : "newest";
+    const sortRaw = typeof search.sort === "string" ? (search.sort as SortOption) : undefined;
+    const sort: SortOption | undefined = sortRaw && SORT_VALUES.has(sortRaw) ? sortRaw : undefined;
     const category =
       typeof search.category === "string" && search.category.trim().length > 0
         ? search.category.trim()
@@ -63,21 +69,44 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { sort: sortParam, category, page: pageParam } = Route.useSearch();
-  const sort: SortOption = sortParam ?? "newest";
-  const page = pageParam ?? 1;
   const navigate = Route.useNavigate();
-
-  const params = new URLSearchParams({ sort, page: String(page), limit: String(PAGE_SIZE) });
-  if (category) params.set("category", category);
-
-  const { data, isLoading } = useQuery<FeedResponse>({
-    queryKey: ["videos", "feed", sort, category ?? null, page],
-    queryFn: () => apiClient<FeedResponse>(`/api/videos?${params.toString()}`),
-    placeholderData: (prev) => prev,
-  });
 
   const { data: sessionData } = authClient.useSession();
   const isAuthed = !!sessionData?.user;
+
+  const sort: SortOption = sortParam ?? (isAuthed ? "for-you" : "trending");
+  const isPersonalized = PERSONALIZED_SORTS.has(sort);
+  // Personalized feeds and category browsing don't share endpoints; reset page when switching.
+  const page = isPersonalized || category == null ? (pageParam ?? 1) : (pageParam ?? 1);
+
+  const personalizedEndpoint =
+    sort === "for-you" ? "/api/recommendations/feed" : "/api/recommendations/trending";
+
+  const catalogParams = new URLSearchParams({
+    sort: sort === "popular" ? "popular" : sort === "oldest" ? "oldest" : "newest",
+    page: String(page),
+    limit: String(PAGE_SIZE),
+  });
+  if (category) catalogParams.set("category", category);
+
+  const { data: paginatedData, isLoading: paginatedLoading } = useQuery<PaginatedFeedResponse>({
+    queryKey: ["videos", "feed", sort, category ?? null, page],
+    queryFn: () => apiClient<PaginatedFeedResponse>(`/api/videos?${catalogParams.toString()}`),
+    placeholderData: (prev) => prev,
+    enabled: !isPersonalized || category != null,
+  });
+
+  const { data: personalizedData, isLoading: personalizedLoading } = useQuery<SimpleFeedResponse>({
+    queryKey: ["recommendations", sort, isAuthed],
+    queryFn: () => apiClient<SimpleFeedResponse>(`${personalizedEndpoint}?limit=${PAGE_SIZE}`),
+    enabled: isPersonalized && category == null,
+  });
+
+  const usingPersonalized = isPersonalized && category == null;
+  const items: FeedItem[] = usingPersonalized
+    ? (personalizedData?.items ?? [])
+    : (paginatedData?.items ?? []);
+  const isLoading = usingPersonalized ? personalizedLoading : paginatedLoading;
 
   const { data: historyData } = useQuery<HistoryProgressResponse>({
     queryKey: ["history", "progress-map"],
@@ -92,37 +121,48 @@ function HomePage() {
     }
   }
 
-  const videos: VideoCardProps[] =
-    data?.items.map((v) => ({
-      id: v.id,
-      title: v.title,
-      thumbnailUrl: v.thumbnailUrl ? `${env.VITE_SERVER_URL}${v.thumbnailUrl}` : null,
-      duration: v.duration,
-      viewCount: v.viewCount,
-      createdAt: v.createdAt,
-      user: { name: v.user.name, image: v.user.image },
-      progressPercent: progressByVideoId.get(v.id),
-    })) ?? [];
+  const videos: VideoCardProps[] = items.map((v) => ({
+    id: v.id,
+    title: v.title,
+    thumbnailUrl: v.thumbnailUrl ? `${env.VITE_SERVER_URL}${v.thumbnailUrl}` : null,
+    duration: v.duration,
+    viewCount: v.viewCount,
+    createdAt: v.createdAt,
+    user: { name: v.user.name, image: v.user.image },
+    progressPercent: progressByVideoId.get(v.id),
+  }));
 
-  const totalPages = data?.totalPages ?? 0;
+  const totalPages = usingPersonalized ? 0 : (paginatedData?.totalPages ?? 0);
 
   const sortOptions: {
     value: SortOption;
     label: string;
     icon: React.ReactNode;
+    requiresAuth?: boolean;
   }[] = [
+    {
+      value: "for-you",
+      label: "For You",
+      icon: <Sparkles className="h-3.5 w-3.5" />,
+      requiresAuth: true,
+    },
+    { value: "trending", label: "Trending", icon: <TrendingUp className="h-3.5 w-3.5" /> },
     { value: "newest", label: "Newest", icon: <Clock className="h-3.5 w-3.5" /> },
     { value: "popular", label: "Most Viewed", icon: <Flame className="h-3.5 w-3.5" /> },
     { value: "oldest", label: "Oldest", icon: <Clock className="h-3.5 w-3.5" /> },
   ];
+
+  const visibleSortOptions = sortOptions.filter((o) => !o.requiresAuth || isAuthed);
 
   return (
     <div className="mx-auto flex max-w-[1400px] gap-6 px-4 py-6">
       <CategorySidebar selected={category} />
 
       <div className="min-w-0 flex-1">
-        <div className="mb-6 flex items-center gap-2">
-          {sortOptions.map((option) => (
+        {isAuthed && !category && sort === "for-you" && <ContinueWatching />}
+
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          {visibleSortOptions.map((option) => (
             <button
               key={option.value}
               onClick={() =>
@@ -143,7 +183,7 @@ function HomePage() {
           ))}
         </div>
 
-        {isLoading && !data ? (
+        {isLoading && items.length === 0 ? (
           <div className="py-16">
             <Loader />
           </div>
@@ -153,21 +193,25 @@ function HomePage() {
             <p className="mt-4 text-sm text-muted-foreground">
               {category
                 ? "No videos match this category yet."
-                : "No videos yet — be the first to upload one."}
+                : sort === "for-you"
+                  ? "Watch a few videos and we'll start tailoring your feed."
+                  : "No videos yet — be the first to upload one."}
             </p>
           </div>
         ) : (
           <>
             <VideoGrid videos={videos} />
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              onChange={(next) =>
-                navigate({
-                  search: (prev) => ({ ...prev, page: next === 1 ? undefined : next }),
-                })
-              }
-            />
+            {!usingPersonalized && (
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onChange={(next) =>
+                  navigate({
+                    search: (prev) => ({ ...prev, page: next === 1 ? undefined : next }),
+                  })
+                }
+              />
+            )}
           </>
         )}
       </div>

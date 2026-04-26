@@ -9,4 +9,5 @@ export * from "./playlist";
 export * from "./view-event";
 export * from "./tags";
 export * from "./moderation";
+export * from "./recommendations";
 export * from "./relations";

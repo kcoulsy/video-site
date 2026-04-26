@@ -11,10 +11,13 @@ export const viewEvent = pgTable(
       .notNull()
       .references(() => video.id, { onDelete: "cascade" }),
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    sessionId: text("session_id"),
     viewedAt: timestamp("viewed_at").defaultNow().notNull(),
   },
   (table) => [
     index("view_event_video_id_viewed_at_idx").on(table.videoId, table.viewedAt),
     index("view_event_viewed_at_idx").on(table.viewedAt),
+    index("view_event_user_id_viewed_at_idx").on(table.userId, table.viewedAt),
+    index("view_event_session_id_viewed_at_idx").on(table.sessionId, table.viewedAt),
   ],
 );

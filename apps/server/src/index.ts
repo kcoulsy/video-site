@@ -12,6 +12,7 @@ import { commentLikeRoutes } from "./routes/comment-like";
 import { likeRoutes } from "./routes/like";
 import { moderationRoutes } from "./routes/moderation";
 import { playlistRoutes } from "./routes/playlist";
+import { recommendationsRoutes } from "./routes/recommendations";
 import { searchRoutes } from "./routes/search";
 import { streamingRoutes } from "./routes/streaming";
 import { tagRoutes } from "./routes/tags";
@@ -73,6 +74,7 @@ app.route("/api", watchHistoryRoutes);
 app.route("/api", watchLaterRoutes);
 app.route("/api", playlistRoutes);
 app.route("/api", analyticsRoutes);
+app.route("/api", recommendationsRoutes);
 
 app.all("/api/uploads", (c) => handleTusRequest(c.req.raw));
 app.all("/api/uploads/*", (c) => handleTusRequest(c.req.raw));

@@ -4,8 +4,11 @@ import { user } from "@video-site/db/schema/auth";
 import { category, categoryTag, tag, videoTag } from "@video-site/db/schema/tags";
 import { video } from "@video-site/db/schema/video";
 import { viewEvent } from "@video-site/db/schema/view-event";
+import { env } from "@video-site/env/server";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
+import type { Context } from "hono";
 import { z } from "zod";
 
 import { ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
@@ -34,6 +37,23 @@ function hashIpUa(c: {
     "unknown";
   const ua = c.req.header("user-agent") ?? "unknown";
   return new Bun.CryptoHasher("sha256").update(`${ip}|${ua}`).digest("hex").slice(0, 32);
+}
+
+const GUEST_SESSION_COOKIE = "vs_gsid";
+const GUEST_SESSION_MAX_AGE = 60 * 60 * 24 * 90;
+
+function getOrSetGuestSessionId(c: Context): string {
+  const existing = getCookie(c, GUEST_SESSION_COOKIE);
+  if (existing) return existing;
+  const sid = generateId();
+  setCookie(c, GUEST_SESSION_COOKIE, sid, {
+    path: "/",
+    maxAge: GUEST_SESSION_MAX_AGE,
+    sameSite: "Lax",
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+  });
+  return sid;
 }
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
@@ -329,9 +349,10 @@ videoRoutes.post("/:id/view", async (c) => {
     throw new NotFoundError("Video");
   }
 
+  const guestSessionId = session ? null : getOrSetGuestSessionId(c);
   const viewerKey = session
     ? `view:${videoId}:user:${session.user.id}`
-    : `view:${videoId}:anon:${hashIpUa(c)}`;
+    : `view:${videoId}:anon:${guestSessionId ?? hashIpUa(c)}`;
 
   const redis = getRedisClient();
   const wasSet = await redis.set(viewerKey, "1", "EX", 86400, "NX");
@@ -348,6 +369,7 @@ videoRoutes.post("/:id/view", async (c) => {
       id: generateId(),
       videoId,
       userId: session?.user.id ?? null,
+      sessionId: guestSessionId,
     });
   });
 

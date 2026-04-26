@@ -20,3 +20,9 @@ export type TranscodeProgress = {
   stage: "probing" | "thumbnail" | "transcoding" | "complete";
   percent: number;
 };
+
+export type RecsJobType = "build-similarity" | "build-trending" | "build-user-cf" | "guest-cleanup";
+
+export interface RecsJobData {
+  type: RecsJobType;
+}

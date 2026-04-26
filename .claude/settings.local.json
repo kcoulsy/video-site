@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(pnpm install *)",
-      "Bash(bunx tsc *)"
+      "Bash(bunx tsc *)",
+      "Bash(bun run *)",
+      "Bash(pnpm exec *)",
+      "Bash(pnpm run *)"
     ]
   }
 }

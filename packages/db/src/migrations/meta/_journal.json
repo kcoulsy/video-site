@@ -36,6 +36,13 @@
       "when": 1777199142700,
       "tag": "0004_certain_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777208603758,
+      "tag": "0005_wild_spectrum",
+      "breakpoints": true
     }
   ]
 }
