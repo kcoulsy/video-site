@@ -13,10 +13,11 @@ import type { Comment, CommentsPage } from "./types";
 
 interface CommentSectionProps {
   videoId: string;
+  videoOwnerId: string;
   commentCount: number;
 }
 
-export function CommentSection({ videoId, commentCount }: CommentSectionProps) {
+export function CommentSection({ videoId, videoOwnerId, commentCount }: CommentSectionProps) {
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const { data: session } = authClient.useSession();
   const currentUser = session?.user;
@@ -109,7 +110,12 @@ export function CommentSection({ videoId, commentCount }: CommentSectionProps) {
         </div>
       )}
 
-      <CommentList videoId={videoId} sort={sort} currentUserId={currentUser?.id} />
+      <CommentList
+        videoId={videoId}
+        videoOwnerId={videoOwnerId}
+        sort={sort}
+        currentUserId={currentUser?.id}
+      />
     </div>
   );
 }

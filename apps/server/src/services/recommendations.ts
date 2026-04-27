@@ -431,9 +431,7 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
           watchHistory,
           and(eq(watchHistory.userId, userId), eq(watchHistory.videoId, video.id)),
         )
-        .where(
-          and(publicReadyWhere, ne(video.userId, userId), inArray(video.id, missingIds)),
-        );
+        .where(and(publicReadyWhere, ne(video.userId, userId), inArray(video.id, missingIds)));
 
       for (const r of missingRows) {
         if (r.completedAt) continue;
@@ -451,11 +449,13 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
     }
   }
 
-  const cwCards: VideoCard[] = continueWatching.map(({ progressPercent: _p, watchedSeconds: _w, ...rest }) => {
-    void _p;
-    void _w;
-    return rest;
-  });
+  const cwCards: VideoCard[] = continueWatching.map(
+    ({ progressPercent: _p, watchedSeconds: _w, ...rest }) => {
+      void _p;
+      void _w;
+      return rest;
+    },
+  );
 
   let recommended: VideoCard[];
   if (entries.size === 0) {

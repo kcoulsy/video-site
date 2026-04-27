@@ -12,14 +12,23 @@ import Loader from "@/components/loader";
 import { CommentSection } from "@/components/comments/comment-section";
 import { ReportButton } from "@/components/report-button";
 import { SaveToPlaylistMenu } from "@/components/save-to-playlist-menu";
+import { ShareDialog } from "@/components/share-dialog";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { WatchNext } from "@/components/watch-next";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { formatDate, formatViewCount } from "@/lib/format";
 
+interface WatchSearchParams {
+  t?: number;
+}
+
 export const Route = createFileRoute("/watch/$videoId")({
   component: WatchPage,
+  validateSearch: (search: Record<string, unknown>): WatchSearchParams => {
+    const t = Number(search.t);
+    return { t: Number.isFinite(t) && t > 0 ? Math.floor(t) : undefined };
+  },
   loader: async ({ params }) => {
     try {
       const res = await fetch(`${env.VITE_SERVER_URL}/api/videos/${params.videoId}`);
@@ -107,12 +116,15 @@ function absoluteUrl(path: string | null): string | undefined {
 
 function WatchPage() {
   const { videoId } = Route.useParams();
+  const { t: tParam } = Route.useSearch();
   const [cinemaMode, setCinemaMode] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const viewReported = useRef(false);
   const lastReportedTime = useRef(0);
   const videoIdRef = useRef(videoId);
   const durationRef = useRef<number | null>(null);
+  const currentTimeRef = useRef(0);
   const { data: session } = authClient.useSession();
   const isAuthenticated = !!session;
 
@@ -211,6 +223,8 @@ function WatchPage() {
       });
     }
 
+    currentTimeRef.current = time;
+
     if (
       isAuthenticated &&
       Math.abs(time - lastReportedTime.current) >= PROGRESS_REPORT_INTERVAL_SECONDS
@@ -248,7 +262,12 @@ function WatchPage() {
     );
   }
 
-  const initialTime = progress && progress.progressPercent < 0.9 ? progress.watchedSeconds : 0;
+  const initialTime =
+    tParam && tParam > 0
+      ? tParam
+      : progress && progress.progressPercent < 0.9
+        ? progress.watchedSeconds
+        : 0;
 
   return (
     <div className="mx-auto max-w-[1800px] px-4 pt-4">
@@ -302,7 +321,12 @@ function WatchPage() {
 
               <SaveToPlaylistMenu videoId={video.id} isAuthenticated={isAuthenticated} />
 
-              <Button variant="secondary" size="sm" className="gap-1.5 rounded-full">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-1.5 rounded-full"
+                onClick={() => setShareOpen(true)}
+              >
                 <Share2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Share</span>
               </Button>
@@ -372,13 +396,25 @@ function WatchPage() {
             ) : null}
           </div>
 
-          <CommentSection videoId={video.id} commentCount={video.commentCount} />
+          <CommentSection
+            videoId={video.id}
+            videoOwnerId={video.user.id}
+            commentCount={video.commentCount}
+          />
         </div>
 
         <aside className={`lg:col-start-2 ${cinemaMode ? "" : "lg:row-start-1 lg:row-span-2"}`}>
           <WatchNext currentVideoId={video.id} />
         </aside>
       </div>
+
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        videoId={video.id}
+        title={video.title}
+        currentTime={currentTimeRef.current}
+      />
     </div>
   );
 }

@@ -26,3 +26,26 @@ export type RecsJobType = "build-similarity" | "build-trending" | "build-user-cf
 export interface RecsJobData {
   type: RecsJobType;
 }
+
+export type NotificationKind =
+  | "new_upload"
+  | "comment_reply"
+  | "video_like"
+  | "comment_like"
+  | "mention";
+
+export type NotificationJobData =
+  | {
+      type: "fanout-new-upload";
+      videoId: string;
+      channelId: string;
+    }
+  | {
+      type: "single";
+      recipientId: string;
+      kind: NotificationKind;
+      actorId?: string;
+      videoId?: string;
+      commentId?: string;
+      coalesceWindowSec?: number;
+    };

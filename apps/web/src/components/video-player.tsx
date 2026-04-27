@@ -465,28 +465,29 @@ export function VideoPlayer({
               className="pointer-events-none absolute bottom-5 -translate-x-1/2"
               style={{ left: `${(hoverTime / duration) * 100}%` }}
             >
-              {storyboard && (() => {
-                const tileCount = storyboard.cols * storyboard.rows;
-                const idx = Math.min(
-                  tileCount - 1,
-                  Math.max(0, Math.floor(hoverTime / storyboard.interval)),
-                );
-                const col = idx % storyboard.cols;
-                const row = Math.floor(idx / storyboard.cols);
-                return (
-                  <div
-                    className="mb-1 overflow-hidden rounded border border-white/20 bg-black shadow-lg"
-                    style={{
-                      width: storyboard.tileWidth,
-                      height: storyboard.tileHeight,
-                      backgroundImage: `url(${storyboard.url})`,
-                      backgroundPosition: `-${col * storyboard.tileWidth}px -${row * storyboard.tileHeight}px`,
-                      backgroundSize: `${storyboard.cols * storyboard.tileWidth}px ${storyboard.rows * storyboard.tileHeight}px`,
-                      backgroundRepeat: "no-repeat",
-                    }}
-                  />
-                );
-              })()}
+              {storyboard &&
+                (() => {
+                  const tileCount = storyboard.cols * storyboard.rows;
+                  const idx = Math.min(
+                    tileCount - 1,
+                    Math.max(0, Math.floor(hoverTime / storyboard.interval)),
+                  );
+                  const col = idx % storyboard.cols;
+                  const row = Math.floor(idx / storyboard.cols);
+                  return (
+                    <div
+                      className="mb-1 overflow-hidden rounded border border-white/20 bg-black shadow-lg"
+                      style={{
+                        width: storyboard.tileWidth,
+                        height: storyboard.tileHeight,
+                        backgroundImage: `url(${storyboard.url})`,
+                        backgroundPosition: `-${col * storyboard.tileWidth}px -${row * storyboard.tileHeight}px`,
+                        backgroundSize: `${storyboard.cols * storyboard.tileWidth}px ${storyboard.rows * storyboard.tileHeight}px`,
+                        backgroundRepeat: "no-repeat",
+                      }}
+                    />
+                  );
+                })()}
               <div className="mx-auto inline-block rounded bg-black/80 px-1.5 py-0.5 text-xs text-white">
                 {formatDuration(hoverTime)}
               </div>

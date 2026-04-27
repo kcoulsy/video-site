@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WatchLaterRouteImport } from './routes/watch-later'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as PlaylistsRouteImport } from './routes/playlists'
@@ -22,7 +23,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as WatchVideoIdRouteImport } from './routes/watch.$videoId'
 import { Route as UHandleRouteImport } from './routes/u.$handle'
+import { Route as PlaylistsMineRouteImport } from './routes/playlists.mine'
 import { Route as PlaylistPlaylistIdRouteImport } from './routes/playlist.$playlistId'
+import { Route as EmbedVideoIdRouteImport } from './routes/embed.$videoId'
 import { Route as AdminVideosRouteImport } from './routes/admin.videos'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTagsRouteImport } from './routes/admin.tags'
@@ -42,6 +45,11 @@ const WatchLaterRoute = WatchLaterRouteImport.update({
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriptionsRoute = SubscriptionsRouteImport.update({
+  id: '/subscriptions',
+  path: '/subscriptions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -99,9 +107,19 @@ const UHandleRoute = UHandleRouteImport.update({
   path: '/u/$handle',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlaylistsMineRoute = PlaylistsMineRouteImport.update({
+  id: '/mine',
+  path: '/mine',
+  getParentRoute: () => PlaylistsRoute,
+} as any)
 const PlaylistPlaylistIdRoute = PlaylistPlaylistIdRouteImport.update({
   id: '/playlist/$playlistId',
   path: '/playlist/$playlistId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmbedVideoIdRoute = EmbedVideoIdRouteImport.update({
+  id: '/embed/$videoId',
+  path: '/embed/$videoId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminVideosRoute = AdminVideosRouteImport.update({
@@ -161,9 +179,10 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
-  '/playlists': typeof PlaylistsRoute
+  '/playlists': typeof PlaylistsRouteWithChildren
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/subscriptions': typeof SubscriptionsRoute
   '/upload': typeof UploadRoute
   '/watch-later': typeof WatchLaterRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -174,7 +193,9 @@ export interface FileRoutesByFullPath {
   '/admin/tags': typeof AdminTagsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/videos': typeof AdminVideosRoute
+  '/embed/$videoId': typeof EmbedVideoIdRoute
   '/playlist/$playlistId': typeof PlaylistPlaylistIdRoute
+  '/playlists/mine': typeof PlaylistsMineRoute
   '/u/$handle': typeof UHandleRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
   '/admin/': typeof AdminIndexRoute
@@ -186,9 +207,10 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
-  '/playlists': typeof PlaylistsRoute
+  '/playlists': typeof PlaylistsRouteWithChildren
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/subscriptions': typeof SubscriptionsRoute
   '/upload': typeof UploadRoute
   '/watch-later': typeof WatchLaterRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -199,7 +221,9 @@ export interface FileRoutesByTo {
   '/admin/tags': typeof AdminTagsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/videos': typeof AdminVideosRoute
+  '/embed/$videoId': typeof EmbedVideoIdRoute
   '/playlist/$playlistId': typeof PlaylistPlaylistIdRoute
+  '/playlists/mine': typeof PlaylistsMineRoute
   '/u/$handle': typeof UHandleRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
   '/admin': typeof AdminIndexRoute
@@ -213,9 +237,10 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
-  '/playlists': typeof PlaylistsRoute
+  '/playlists': typeof PlaylistsRouteWithChildren
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/subscriptions': typeof SubscriptionsRoute
   '/upload': typeof UploadRoute
   '/watch-later': typeof WatchLaterRoute
   '/admin/audit': typeof AdminAuditRoute
@@ -226,7 +251,9 @@ export interface FileRoutesById {
   '/admin/tags': typeof AdminTagsRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/videos': typeof AdminVideosRoute
+  '/embed/$videoId': typeof EmbedVideoIdRoute
   '/playlist/$playlistId': typeof PlaylistPlaylistIdRoute
+  '/playlists/mine': typeof PlaylistsMineRoute
   '/u/$handle': typeof UHandleRoute
   '/watch/$videoId': typeof WatchVideoIdRoute
   '/admin/': typeof AdminIndexRoute
@@ -244,6 +271,7 @@ export interface FileRouteTypes {
     | '/playlists'
     | '/search'
     | '/settings'
+    | '/subscriptions'
     | '/upload'
     | '/watch-later'
     | '/admin/audit'
@@ -254,7 +282,9 @@ export interface FileRouteTypes {
     | '/admin/tags'
     | '/admin/users'
     | '/admin/videos'
+    | '/embed/$videoId'
     | '/playlist/$playlistId'
+    | '/playlists/mine'
     | '/u/$handle'
     | '/watch/$videoId'
     | '/admin/'
@@ -269,6 +299,7 @@ export interface FileRouteTypes {
     | '/playlists'
     | '/search'
     | '/settings'
+    | '/subscriptions'
     | '/upload'
     | '/watch-later'
     | '/admin/audit'
@@ -279,7 +310,9 @@ export interface FileRouteTypes {
     | '/admin/tags'
     | '/admin/users'
     | '/admin/videos'
+    | '/embed/$videoId'
     | '/playlist/$playlistId'
+    | '/playlists/mine'
     | '/u/$handle'
     | '/watch/$videoId'
     | '/admin'
@@ -295,6 +328,7 @@ export interface FileRouteTypes {
     | '/playlists'
     | '/search'
     | '/settings'
+    | '/subscriptions'
     | '/upload'
     | '/watch-later'
     | '/admin/audit'
@@ -305,7 +339,9 @@ export interface FileRouteTypes {
     | '/admin/tags'
     | '/admin/users'
     | '/admin/videos'
+    | '/embed/$videoId'
     | '/playlist/$playlistId'
+    | '/playlists/mine'
     | '/u/$handle'
     | '/watch/$videoId'
     | '/admin/'
@@ -319,11 +355,13 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   HistoryRoute: typeof HistoryRoute
   LoginRoute: typeof LoginRoute
-  PlaylistsRoute: typeof PlaylistsRoute
+  PlaylistsRoute: typeof PlaylistsRouteWithChildren
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
+  SubscriptionsRoute: typeof SubscriptionsRoute
   UploadRoute: typeof UploadRoute
   WatchLaterRoute: typeof WatchLaterRoute
+  EmbedVideoIdRoute: typeof EmbedVideoIdRoute
   PlaylistPlaylistIdRoute: typeof PlaylistPlaylistIdRoute
   UHandleRoute: typeof UHandleRoute
   WatchVideoIdRoute: typeof WatchVideoIdRoute
@@ -345,6 +383,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriptions': {
+      id: '/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/subscriptions'
+      preLoaderRoute: typeof SubscriptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -424,11 +469,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UHandleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/playlists/mine': {
+      id: '/playlists/mine'
+      path: '/mine'
+      fullPath: '/playlists/mine'
+      preLoaderRoute: typeof PlaylistsMineRouteImport
+      parentRoute: typeof PlaylistsRoute
+    }
     '/playlist/$playlistId': {
       id: '/playlist/$playlistId'
       path: '/playlist/$playlistId'
       fullPath: '/playlist/$playlistId'
       preLoaderRoute: typeof PlaylistPlaylistIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/embed/$videoId': {
+      id: '/embed/$videoId'
+      path: '/embed/$videoId'
+      fullPath: '/embed/$videoId'
+      preLoaderRoute: typeof EmbedVideoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/videos': {
@@ -530,17 +589,31 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface PlaylistsRouteChildren {
+  PlaylistsMineRoute: typeof PlaylistsMineRoute
+}
+
+const PlaylistsRouteChildren: PlaylistsRouteChildren = {
+  PlaylistsMineRoute: PlaylistsMineRoute,
+}
+
+const PlaylistsRouteWithChildren = PlaylistsRoute._addFileChildren(
+  PlaylistsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   DashboardRoute: DashboardRoute,
   HistoryRoute: HistoryRoute,
   LoginRoute: LoginRoute,
-  PlaylistsRoute: PlaylistsRoute,
+  PlaylistsRoute: PlaylistsRouteWithChildren,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
+  SubscriptionsRoute: SubscriptionsRoute,
   UploadRoute: UploadRoute,
   WatchLaterRoute: WatchLaterRoute,
+  EmbedVideoIdRoute: EmbedVideoIdRoute,
   PlaylistPlaylistIdRoute: PlaylistPlaylistIdRoute,
   UHandleRoute: UHandleRoute,
   WatchVideoIdRoute: WatchVideoIdRoute,

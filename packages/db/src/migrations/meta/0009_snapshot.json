@@ -1,6 +1,6 @@
 {
-  "id": "fca72a37-6bb0-49a2-a8b3-ef910f79e0b0",
-  "prevId": "e0453ae9-502b-4cf3-8bc1-721a66904221",
+  "id": "e881e829-4672-4a24-8dbf-92ba0faef397",
+  "prevId": "fca72a37-6bb0-49a2-a8b3-ef910f79e0b0",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -559,6 +559,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "root_id": {
+          "name": "root_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "depth": {
           "name": "depth",
           "type": "integer",
@@ -579,6 +585,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "pinned_at": {
+          "name": "pinned_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creator_hearted_at": {
+          "name": "creator_hearted_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -662,6 +680,21 @@
           "method": "btree",
           "with": {}
         },
+        "comment_root_id_idx": {
+          "name": "comment_root_id_idx",
+          "columns": [
+            {
+              "expression": "root_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "comment_user_id_idx": {
           "name": "comment_user_id_idx",
           "columns": [
@@ -688,6 +721,27 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "comment_video_pinned_idx": {
+          "name": "comment_video_pinned_idx",
+          "columns": [
+            {
+              "expression": "video_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pinned_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -738,6 +792,15 @@
           "tableFrom": "comment",
           "tableTo": "comment",
           "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "comment_root_id_comment_id_fk": {
+          "name": "comment_root_id_comment_id_fk",
+          "tableFrom": "comment",
+          "tableTo": "comment",
+          "columnsFrom": ["root_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"

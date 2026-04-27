@@ -6,6 +6,8 @@ export * from "./like";
 export * from "./watch-history";
 export * from "./watch-later";
 export * from "./playlist";
+export * from "./subscription";
+export * from "./notification";
 export * from "./view-event";
 export * from "./tags";
 export * from "./moderation";

@@ -19,11 +19,17 @@ export const comment = pgTable(
     parentId: text("parent_id").references((): any => comment.id, {
       onDelete: "cascade",
     }),
+    rootId: text("root_id").references((): any => comment.id, {
+      onDelete: "cascade",
+    }),
 
     depth: integer("depth").default(0).notNull(),
 
     replyCount: integer("reply_count").default(0).notNull(),
     likeCount: integer("like_count").default(0).notNull(),
+
+    pinnedAt: timestamp("pinned_at"),
+    creatorHeartedAt: timestamp("creator_hearted_at"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -41,8 +47,10 @@ export const comment = pgTable(
   (table) => [
     index("comment_video_id_idx").on(table.videoId),
     index("comment_parent_id_idx").on(table.parentId),
+    index("comment_root_id_idx").on(table.rootId),
     index("comment_user_id_idx").on(table.userId),
     index("comment_video_id_created_at_idx").on(table.videoId, table.createdAt),
+    index("comment_video_pinned_idx").on(table.videoId, table.pinnedAt),
     index("comment_reviewed_at_idx").on(table.reviewedAt),
   ],
 );

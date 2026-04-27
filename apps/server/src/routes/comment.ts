@@ -10,11 +10,11 @@ import { z } from "zod";
 
 import { AppError, ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
 import { activeAuthorWhere } from "../lib/moderation-filters";
+import { enqueueNotification } from "../lib/queue";
 import { getRedisClient } from "../lib/redis";
 import { requireActiveUser, requireNotMuted } from "../middleware/require-active-user";
 import type { AppVariables } from "../types";
 
-const MAX_DEPTH = 3;
 const RATE_LIMIT_PER_MINUTE = 10;
 
 const contentSchema = z
@@ -30,6 +30,39 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(50).default(20),
   sort: z.enum(["newest", "oldest"]).default("newest"),
 });
+
+const MENTION_RE = /(?:^|[^a-zA-Z0-9_])@([a-zA-Z0-9_]{3,30})/g;
+
+async function notifyMentions(
+  content: string,
+  authorId: string,
+  videoId: string,
+  commentId: string,
+) {
+  const handles = new Set<string>();
+  let match: RegExpExecArray | null;
+  while ((match = MENTION_RE.exec(content)) !== null) {
+    handles.add(match[1]!.toLowerCase());
+  }
+  if (handles.size === 0) return;
+
+  const recipients = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(inArray(user.handle, [...handles]));
+
+  for (const r of recipients) {
+    if (r.id === authorId) continue;
+    await enqueueNotification({
+      type: "single",
+      recipientId: r.id,
+      kind: "mention",
+      actorId: authorId,
+      videoId,
+      commentId,
+    });
+  }
+}
 
 async function checkRateLimit(userId: string) {
   const redis = getRedisClient();
@@ -54,10 +87,13 @@ function serializeComment(
     content: isRemoved ? "[removed]" : isDeleted ? "[deleted]" : row.content,
     user: row.user,
     parentId: row.parentId,
+    rootId: row.rootId,
     depth: row.depth,
     replyCount: row.replyCount,
     likeCount: row.likeCount,
     liked: row.liked ?? false,
+    pinnedAt: row.pinnedAt,
+    creatorHeartedAt: row.creatorHeartedAt,
     createdAt: row.createdAt,
     editedAt: row.editedAt,
     deletedAt: row.deletedAt,
@@ -72,6 +108,7 @@ async function listComments(
   limit: number,
   cursor?: string,
   currentUserId?: string,
+  pinnedFirst = false,
 ) {
   if (cursor) {
     const [cursorRow] = await db
@@ -88,7 +125,8 @@ async function listComments(
     }
   }
 
-  const orderBy = sort === "oldest" ? asc(comment.createdAt) : desc(comment.createdAt);
+  const dateOrder = sort === "oldest" ? asc(comment.createdAt) : desc(comment.createdAt);
+  const orderBy = pinnedFirst ? [sql`${comment.pinnedAt} DESC NULLS LAST`, dateOrder] : [dateOrder];
 
   const rows = await db
     .select({
@@ -101,7 +139,7 @@ async function listComments(
     .from(comment)
     .innerJoin(user, eq(user.id, comment.userId))
     .where(and(...where, activeAuthorWhere()))
-    .orderBy(orderBy)
+    .orderBy(...orderBy)
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
@@ -146,6 +184,7 @@ commentRoutes.get("/videos/:videoId/comments", async (c) => {
     parsed.data.limit,
     parsed.data.cursor,
     session?.user.id,
+    true,
   );
 
   return c.json(result);
@@ -161,7 +200,7 @@ commentRoutes.get("/videos/:videoId/comments/:id/replies", async (c) => {
 
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   const result = await listComments(
-    [eq(comment.videoId, videoId), eq(comment.parentId, parentId)],
+    [eq(comment.videoId, videoId), eq(comment.rootId, parentId)],
     "oldest",
     parsed.data.limit,
     parsed.data.cursor,
@@ -200,6 +239,7 @@ commentRoutes.post("/videos/:videoId/comments", ...requireNotMuted, async (c) =>
       userId: currentUser.id,
       videoId,
       parentId: null,
+      rootId: null,
       depth: 0,
     });
     await tx
@@ -208,6 +248,8 @@ commentRoutes.post("/videos/:videoId/comments", ...requireNotMuted, async (c) =>
       .where(eq(video.id, videoId));
   });
 
+  await notifyMentions(parsed.data.content, currentUser.id, videoId, id);
+
   return c.json(
     serializeComment({
       id,
@@ -215,9 +257,12 @@ commentRoutes.post("/videos/:videoId/comments", ...requireNotMuted, async (c) =>
       userId: currentUser.id,
       videoId,
       parentId: null,
+      rootId: null,
       depth: 0,
       replyCount: 0,
       likeCount: 0,
+      pinnedAt: null,
+      creatorHeartedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       editedAt: null,
@@ -249,7 +294,13 @@ commentRoutes.post("/videos/:videoId/comments/:id/replies", ...requireNotMuted, 
   }
 
   const [parent] = await db
-    .select({ depth: comment.depth, videoId: comment.videoId })
+    .select({
+      id: comment.id,
+      depth: comment.depth,
+      videoId: comment.videoId,
+      rootId: comment.rootId,
+      userId: comment.userId,
+    })
     .from(comment)
     .where(eq(comment.id, parentId))
     .limit(1);
@@ -259,27 +310,51 @@ commentRoutes.post("/videos/:videoId/comments/:id/replies", ...requireNotMuted, 
 
   await checkRateLimit(currentUser.id);
 
-  const depth = Math.min(parent.depth + 1, MAX_DEPTH);
+  const rootId = parent.depth === 0 ? parent.id : (parent.rootId ?? parent.id);
   const id = generateId();
 
+  let rootOwnerId = parent.userId;
   await db.transaction(async (tx) => {
+    if (rootId !== parent.id) {
+      const [rootRow] = await tx
+        .select({ userId: comment.userId })
+        .from(comment)
+        .where(eq(comment.id, rootId))
+        .limit(1);
+      if (rootRow) rootOwnerId = rootRow.userId;
+    }
+
     await tx.insert(comment).values({
       id,
       content: parsed.data.content,
       userId: currentUser.id,
       videoId,
-      parentId,
-      depth,
+      parentId: rootId,
+      rootId,
+      depth: 1,
     });
     await tx
       .update(comment)
       .set({ replyCount: sql`${comment.replyCount} + 1` })
-      .where(eq(comment.id, parentId));
+      .where(eq(comment.id, rootId));
     await tx
       .update(video)
       .set({ commentCount: sql`${video.commentCount} + 1` })
       .where(eq(video.id, videoId));
   });
+
+  if (rootOwnerId !== currentUser.id) {
+    await enqueueNotification({
+      type: "single",
+      recipientId: rootOwnerId,
+      kind: "comment_reply",
+      actorId: currentUser.id,
+      videoId,
+      commentId: id,
+    });
+  }
+
+  await notifyMentions(parsed.data.content, currentUser.id, videoId, id);
 
   return c.json(
     serializeComment({
@@ -287,10 +362,13 @@ commentRoutes.post("/videos/:videoId/comments/:id/replies", ...requireNotMuted, 
       content: parsed.data.content,
       userId: currentUser.id,
       videoId,
-      parentId,
-      depth,
+      parentId: rootId,
+      rootId,
+      depth: 1,
       replyCount: 0,
       likeCount: 0,
+      pinnedAt: null,
+      creatorHeartedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       editedAt: null,
@@ -353,6 +431,7 @@ commentRoutes.delete("/comments/:id", ...requireActiveUser, async (c) => {
       userId: comment.userId,
       videoId: comment.videoId,
       parentId: comment.parentId,
+      rootId: comment.rootId,
       replyCount: comment.replyCount,
       deletedAt: comment.deletedAt,
     })
@@ -381,15 +460,73 @@ commentRoutes.delete("/comments/:id", ...requireActiveUser, async (c) => {
       .set({ commentCount: sql`GREATEST(${video.commentCount} - 1, 0)` })
       .where(eq(video.id, existing.videoId));
 
-    if (existing.parentId) {
+    const rootForCount = existing.rootId ?? existing.parentId;
+    if (rootForCount) {
       await tx
         .update(comment)
         .set({
           replyCount: sql`GREATEST(${comment.replyCount} - 1, 0)`,
         })
-        .where(eq(comment.id, existing.parentId));
+        .where(eq(comment.id, rootForCount));
     }
   });
 
   return c.json({ ok: true });
+});
+
+async function ensureVideoOwner(commentId: string, userId: string) {
+  const [row] = await db
+    .select({
+      id: comment.id,
+      videoId: comment.videoId,
+      ownerId: video.userId,
+    })
+    .from(comment)
+    .innerJoin(video, eq(video.id, comment.videoId))
+    .where(eq(comment.id, commentId))
+    .limit(1);
+  if (!row) throw new NotFoundError("Comment");
+  if (row.ownerId !== userId) throw new ForbiddenError();
+  return row;
+}
+
+commentRoutes.post("/comments/:id/pin", ...requireActiveUser, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+  const { videoId } = await ensureVideoOwner(id, currentUser.id);
+
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(comment)
+      .set({ pinnedAt: null })
+      .where(and(eq(comment.videoId, videoId), sql`${comment.pinnedAt} IS NOT NULL`));
+    await tx.update(comment).set({ pinnedAt: now }).where(eq(comment.id, id));
+  });
+  return c.json({ pinnedAt: now });
+});
+
+commentRoutes.delete("/comments/:id/pin", ...requireActiveUser, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+  await ensureVideoOwner(id, currentUser.id);
+  await db.update(comment).set({ pinnedAt: null }).where(eq(comment.id, id));
+  return c.json({ pinnedAt: null });
+});
+
+commentRoutes.post("/comments/:id/heart", ...requireActiveUser, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+  await ensureVideoOwner(id, currentUser.id);
+  const now = new Date();
+  await db.update(comment).set({ creatorHeartedAt: now }).where(eq(comment.id, id));
+  return c.json({ creatorHeartedAt: now });
+});
+
+commentRoutes.delete("/comments/:id/heart", ...requireActiveUser, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+  await ensureVideoOwner(id, currentUser.id);
+  await db.update(comment).set({ creatorHeartedAt: null }).where(eq(comment.id, id));
+  return c.json({ creatorHeartedAt: null });
 });

@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowDown, ArrowUp, ListVideo, Play, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ListVideo, Play, Share2, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
 
 import Loader from "@/components/loader";
+import { ShareDialog } from "@/components/share-dialog";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { formatDuration, formatViewCount, formatRelativeTime } from "@/lib/format";
 
@@ -56,6 +57,7 @@ function PlaylistDetailPage() {
   const [editVisibility, setEditVisibility] = useState<"public" | "unlisted" | "private">(
     "private",
   );
+  const [shareOpen, setShareOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery<PlaylistResponse>({
     queryKey: ["playlist", playlistId],
@@ -215,27 +217,38 @@ function PlaylistDetailPage() {
                   {data.description}
                 </p>
               )}
-              {data.isOwner && (
-                <div className="mt-4 flex gap-2">
-                  <Button size="sm" variant="outline" onClick={startEdit}>
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5 text-red-500"
-                    disabled={deleteMutation.isPending}
-                    onClick={() => {
-                      if (window.confirm("Delete this playlist?")) {
-                        deleteMutation.mutate();
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
-                </div>
-              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setShareOpen(true)}
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </Button>
+                {data.isOwner && (
+                  <>
+                    <Button size="sm" variant="outline" onClick={startEdit}>
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 text-red-500"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => {
+                        if (window.confirm("Delete this playlist?")) {
+                          deleteMutation.mutate();
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -332,6 +345,15 @@ function PlaylistDetailPage() {
             );
           })}
         </div>
+      )}
+
+      {data && (
+        <ShareDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          playlistId={data.id}
+          title={data.title}
+        />
       )}
     </div>
   );

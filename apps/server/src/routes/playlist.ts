@@ -31,6 +31,103 @@ const updateSchema = z.object({
 const addItemSchema = z.object({ videoId: z.string().min(1) });
 const reorderSchema = z.object({ position: z.number().int().nonnegative() });
 
+playlistRoutes.get("/playlists", async (c) => {
+  const params = Object.fromEntries(new URL(c.req.url).searchParams);
+  const page = Math.max(1, Math.min(500, Number(params.page) || 1));
+  const limit = Math.max(1, Math.min(50, Number(params.limit) || 24));
+  const offset = (page - 1) * limit;
+
+  const rows = await db
+    .select({
+      id: playlist.id,
+      title: playlist.title,
+      description: playlist.description,
+      visibility: playlist.visibility,
+      createdAt: playlist.createdAt,
+      updatedAt: playlist.updatedAt,
+      ownerId: user.id,
+      ownerName: user.name,
+      ownerHandle: user.handle,
+      ownerImage: user.image,
+      itemCount: sql<number>`(SELECT COUNT(*)::int FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id})`,
+      thumbVideoId: sql<
+        string | null
+      >`(SELECT ${playlistItem.videoId} FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id} ORDER BY ${playlistItem.position} ASC LIMIT 1)`,
+      total: sql<number>`COUNT(*) OVER()::int`,
+    })
+    .from(playlist)
+    .innerJoin(user, eq(user.id, playlist.userId))
+    .where(and(eq(playlist.visibility, "public"), activeAuthorWhere()))
+    .orderBy(desc(playlist.updatedAt))
+    .limit(limit)
+    .offset(offset);
+
+  const total = rows[0]?.total ?? 0;
+  return c.json({
+    items: rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      visibility: r.visibility,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      itemCount: r.itemCount,
+      thumbnailUrl: r.thumbVideoId ? `/api/stream/${r.thumbVideoId}/thumbnail` : null,
+      user: {
+        id: r.ownerId,
+        name: r.ownerName,
+        handle: r.ownerHandle,
+        image: r.ownerImage,
+      },
+    })),
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  });
+});
+
+playlistRoutes.get("/users/:handle/playlists", async (c) => {
+  const handle = c.req.param("handle").toLowerCase();
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+
+  const [owner] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.handle, handle))
+    .limit(1);
+  if (!owner) throw new NotFoundError("Profile");
+
+  const isOwner = session?.user.id === owner.id;
+  const visWhere = isOwner
+    ? sql`${playlist.visibility} <> 'private'`
+    : eq(playlist.visibility, "public");
+
+  const rows = await db
+    .select({
+      id: playlist.id,
+      title: playlist.title,
+      description: playlist.description,
+      visibility: playlist.visibility,
+      updatedAt: playlist.updatedAt,
+      itemCount: sql<number>`(SELECT COUNT(*)::int FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id})`,
+      thumbVideoId: sql<
+        string | null
+      >`(SELECT ${playlistItem.videoId} FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id} ORDER BY ${playlistItem.position} ASC LIMIT 1)`,
+    })
+    .from(playlist)
+    .where(and(eq(playlist.userId, owner.id), visWhere))
+    .orderBy(desc(playlist.updatedAt))
+    .limit(48);
+
+  return c.json({
+    items: rows.map((r) => ({
+      ...r,
+      thumbnailUrl: r.thumbVideoId ? `/api/stream/${r.thumbVideoId}/thumbnail` : null,
+    })),
+  });
+});
+
 playlistRoutes.get("/playlists/mine", requireAuth, async (c) => {
   const userId = c.get("user").id;
 

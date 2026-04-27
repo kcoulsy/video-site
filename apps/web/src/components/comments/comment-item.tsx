@@ -1,8 +1,8 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@video-site/ui/components/button";
-import { ChevronDown, ChevronUp, ThumbsUp } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronUp, Heart, Pin, ThumbsUp } from "lucide-react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 
 import { apiClient } from "@/lib/api-client";
@@ -15,13 +15,32 @@ import type { Comment, CommentsPage } from "./types";
 interface CommentItemProps {
   comment: Comment;
   videoId: string;
+  videoOwnerId: string;
   currentUserId?: string;
   isReply?: boolean;
+}
+
+const MENTION_RE = /(@[a-zA-Z0-9_]{3,30})/g;
+
+function renderMentions(content: string) {
+  const parts = content.split(MENTION_RE);
+  return parts.map((part, i) => {
+    if (part.startsWith("@") && part.length >= 4) {
+      const handle = part.slice(1).toLowerCase();
+      return (
+        <Link key={i} to="/u/$handle" params={{ handle }} className="text-primary hover:underline">
+          {part}
+        </Link>
+      );
+    }
+    return <Fragment key={i}>{part}</Fragment>;
+  });
 }
 
 export function CommentItem({
   comment,
   videoId,
+  videoOwnerId,
   currentUserId,
   isReply = false,
 }: CommentItemProps) {
@@ -31,7 +50,10 @@ export function CommentItem({
   const [showReplies, setShowReplies] = useState(false);
 
   const isOwner = currentUserId === comment.user.id;
+  const isVideoOwner = currentUserId === videoOwnerId;
   const isDeleted = comment.deletedAt != null;
+  const isPinned = comment.pinnedAt != null;
+  const isHearted = comment.creatorHeartedAt != null;
 
   const repliesQuery = useInfiniteQuery<CommentsPage>({
     queryKey: ["comments", videoId, "replies", comment.id],
@@ -45,8 +67,10 @@ export function CommentItem({
     },
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.nextCursor,
-    enabled: showReplies,
+    enabled: !isReply && showReplies,
   });
+
+  const threadRootId = comment.rootId ?? comment.id;
 
   const replyMutation = useMutation({
     mutationFn: (content: string) =>
@@ -56,11 +80,11 @@ export function CommentItem({
       }),
     onSuccess: (created) => {
       setReplying(false);
-      setShowReplies(true);
+      if (!isReply) setShowReplies(true);
       queryClient.setQueryData<{
         pages: CommentsPage[];
         pageParams: unknown[];
-      }>(["comments", videoId, "replies", comment.id], (old) => {
+      }>(["comments", videoId, "replies", threadRootId], (old) => {
         if (!old) {
           return {
             pages: [{ comments: [created], nextCursor: null, hasMore: false }],
@@ -89,7 +113,7 @@ export function CommentItem({
           pages: old.pages.map((p) => ({
             ...p,
             comments: p.comments.map((cm) =>
-              cm.id === comment.id ? { ...cm, replyCount: cm.replyCount + 1 } : cm,
+              cm.id === threadRootId ? { ...cm, replyCount: cm.replyCount + 1 } : cm,
             ),
           })),
         };
@@ -123,11 +147,11 @@ export function CommentItem({
           })),
         };
       });
-      if (comment.parentId) {
+      if (isReply) {
         queryClient.setQueryData<{
           pages: CommentsPage[];
           pageParams: unknown[];
-        }>(["comments", videoId, "replies", comment.parentId], (old) => {
+        }>(["comments", videoId, "replies", threadRootId], (old) => {
           if (!old) return old;
           return {
             ...old,
@@ -166,8 +190,8 @@ export function CommentItem({
       };
 
       queryClient.setQueryData(["comments", videoId, "top"], updatePages);
-      if (comment.parentId) {
-        queryClient.setQueryData(["comments", videoId, "replies", comment.parentId], updatePages);
+      if (isReply) {
+        queryClient.setQueryData(["comments", videoId, "replies", threadRootId], updatePages);
         if (!transform) {
           queryClient.setQueryData<{
             pages: CommentsPage[];
@@ -179,7 +203,7 @@ export function CommentItem({
               pages: old.pages.map((p) => ({
                 ...p,
                 comments: p.comments.map((cm) =>
-                  cm.id === comment.parentId
+                  cm.id === threadRootId
                     ? {
                         ...cm,
                         replyCount: Math.max(0, cm.replyCount - 1),
@@ -195,6 +219,42 @@ export function CommentItem({
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Failed to delete");
     },
+  });
+
+  const updateCommentInCache = (patch: Partial<Comment>) => {
+    const apply = (cm: Comment) => (cm.id === comment.id ? { ...cm, ...patch } : cm);
+    const updatePages = (old: { pages: CommentsPage[]; pageParams: unknown[] } | undefined) => {
+      if (!old) return old;
+      return {
+        ...old,
+        pages: old.pages.map((p) => ({ ...p, comments: p.comments.map(apply) })),
+      };
+    };
+    queryClient.setQueriesData({ queryKey: ["comments", videoId, "top"] }, updatePages);
+    queryClient.setQueryData(["comments", videoId, "replies", threadRootId], updatePages);
+  };
+
+  const pinMutation = useMutation({
+    mutationFn: () =>
+      apiClient<{ pinnedAt: string | null }>(`/api/comments/${comment.id}/pin`, {
+        method: isPinned ? "DELETE" : "POST",
+      }),
+    onSuccess: (data) => {
+      updateCommentInCache({ pinnedAt: data.pinnedAt });
+      if (!isPinned) {
+        queryClient.invalidateQueries({ queryKey: ["comments", videoId, "top"] });
+      }
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update pin"),
+  });
+
+  const heartMutation = useMutation({
+    mutationFn: () =>
+      apiClient<{ creatorHeartedAt: string | null }>(`/api/comments/${comment.id}/heart`, {
+        method: isHearted ? "DELETE" : "POST",
+      }),
+    onSuccess: (data) => updateCommentInCache({ creatorHeartedAt: data.creatorHeartedAt }),
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update heart"),
   });
 
   const likeMutation = useMutation({
@@ -220,11 +280,7 @@ export function CommentItem({
         };
       };
       queryClient.setQueriesData({ queryKey: ["comments", videoId, "top"] }, updatePages);
-      if (comment.parentId) {
-        queryClient.setQueryData(["comments", videoId, "replies", comment.parentId], updatePages);
-      } else {
-        queryClient.setQueryData(["comments", videoId, "replies", comment.id], updatePages);
-      }
+      queryClient.setQueryData(["comments", videoId, "replies", threadRootId], updatePages);
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : "Failed to like comment");
@@ -241,11 +297,7 @@ export function CommentItem({
   const allReplies = replyPages.flatMap((p) => p.comments);
 
   const avatarInner = comment.user.image ? (
-    <img
-      src={comment.user.image}
-      alt={comment.user.name}
-      className="h-full w-full object-cover"
-    />
+    <img src={comment.user.image} alt={comment.user.name} className="h-full w-full object-cover" />
   ) : (
     <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
       {comment.user.name.charAt(0).toUpperCase()}
@@ -269,6 +321,12 @@ export function CommentItem({
       )}
 
       <div className="min-w-0 flex-1">
+        {isPinned && !isReply && (
+          <div className="mb-1 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <Pin className="h-3 w-3" />
+            Pinned by creator
+          </div>
+        )}
         <div className="flex items-center gap-2 text-xs">
           {comment.user.handle ? (
             <Link
@@ -303,7 +361,7 @@ export function CommentItem({
               isDeleted ? "italic text-muted-foreground" : ""
             }`}
           >
-            {comment.content}
+            {isDeleted ? comment.content : renderMentions(comment.content)}
           </p>
         )}
 
@@ -327,6 +385,14 @@ export function CommentItem({
               <ThumbsUp className={`h-3.5 w-3.5 ${comment.liked ? "fill-primary" : ""}`} />
               {comment.likeCount > 0 ? comment.likeCount : ""}
             </button>
+            {isHearted && (
+              <span
+                aria-label="Creator hearted this"
+                className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-xs text-red-500"
+              >
+                <Heart className="h-3 w-3 fill-red-500" />
+              </span>
+            )}
             {currentUserId && (
               <Button
                 type="button"
@@ -361,6 +427,34 @@ export function CommentItem({
                 </Button>
               </>
             )}
+            {isVideoOwner && !isReply && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => pinMutation.mutate()}
+                disabled={pinMutation.isPending}
+                className="h-7 rounded-full px-2 text-xs"
+              >
+                <Pin className={`mr-1 h-3.5 w-3.5 ${isPinned ? "fill-primary" : ""}`} />
+                {isPinned ? "Unpin" : "Pin"}
+              </Button>
+            )}
+            {isVideoOwner && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => heartMutation.mutate()}
+                disabled={heartMutation.isPending}
+                className="h-7 rounded-full px-2 text-xs"
+              >
+                <Heart
+                  className={`mr-1 h-3.5 w-3.5 ${isHearted ? "fill-red-500 text-red-500" : ""}`}
+                />
+                {isHearted ? "Unheart" : "Heart"}
+              </Button>
+            )}
             {!isOwner && currentUserId && (
               <ReportButton
                 targetType="comment"
@@ -378,6 +472,7 @@ export function CommentItem({
               autoFocus
               placeholder={`Reply to ${comment.user.name}...`}
               submitLabel="Reply"
+              initialContent={isReply && comment.user.handle ? `@${comment.user.handle} ` : ""}
               onSubmit={(content) => replyMutation.mutateAsync(content)}
               onCancel={() => setReplying(false)}
             />
@@ -406,6 +501,7 @@ export function CommentItem({
                 key={reply.id}
                 comment={reply}
                 videoId={videoId}
+                videoOwnerId={videoOwnerId}
                 currentUserId={currentUserId}
                 isReply
               />

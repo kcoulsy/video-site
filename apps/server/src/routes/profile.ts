@@ -1,5 +1,8 @@
+import { auth } from "@video-site/auth";
 import { db } from "@video-site/db";
 import { user } from "@video-site/db/schema/auth";
+import { playlist } from "@video-site/db/schema/playlist";
+import { subscription } from "@video-site/db/schema/subscription";
 import { video } from "@video-site/db/schema/video";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -32,7 +35,11 @@ const updateSchema = z.object({
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
-function userImageUrl(userId: string, kind: "avatar" | "banner", path: string | null): string | null {
+function userImageUrl(
+  userId: string,
+  kind: "avatar" | "banner",
+  path: string | null,
+): string | null {
   if (!path) return null;
   return `/api/profile/${userId}/image/${kind}`;
 }
@@ -68,37 +75,41 @@ profileRoutes.patch(
   requireAuth,
   rateLimit({ name: "profile:update", limit: 20, windowSeconds: 600 }),
   async (c) => {
-  const currentUser = c.get("user");
-  const body = await c.req.json().catch(() => null);
-  const parsed = updateSchema.safeParse(body);
-  if (!parsed.success) {
-    throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid body");
-  }
-
-  if (parsed.data.handle) {
-    const [taken] = await db
-      .select({ id: user.id })
-      .from(user)
-      .where(and(eq(user.handle, parsed.data.handle), sql`${user.id} <> ${currentUser.id}`))
-      .limit(1);
-    if (taken) {
-      return c.json({ error: "Handle already taken", code: "HANDLE_TAKEN" }, 409);
+    const currentUser = c.get("user");
+    const body = await c.req.json().catch(() => null);
+    const parsed = updateSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid body");
     }
-  }
 
-  const fields: Partial<typeof user.$inferInsert> = {};
-  if (parsed.data.name !== undefined) fields.name = parsed.data.name;
-  if (parsed.data.handle !== undefined) fields.handle = parsed.data.handle;
-  if (parsed.data.bio !== undefined) fields.bio = parsed.data.bio;
+    if (parsed.data.handle) {
+      const [taken] = await db
+        .select({ id: user.id })
+        .from(user)
+        .where(and(eq(user.handle, parsed.data.handle), sql`${user.id} <> ${currentUser.id}`))
+        .limit(1);
+      if (taken) {
+        return c.json({ error: "Handle already taken", code: "HANDLE_TAKEN" }, 409);
+      }
+    }
 
-  if (Object.keys(fields).length > 0) {
-    await db.update(user).set(fields).where(eq(user.id, currentUser.id));
-  }
+    const fields: Partial<typeof user.$inferInsert> = {};
+    if (parsed.data.name !== undefined) fields.name = parsed.data.name;
+    if (parsed.data.handle !== undefined) fields.handle = parsed.data.handle;
+    if (parsed.data.bio !== undefined) fields.bio = parsed.data.bio;
 
-  return c.json({ ok: true });
-});
+    if (Object.keys(fields).length > 0) {
+      await db.update(user).set(fields).where(eq(user.id, currentUser.id));
+    }
 
-async function handleImageUpload(c: Context<{ Variables: AppVariables }>, kind: "avatar" | "banner") {
+    return c.json({ ok: true });
+  },
+);
+
+async function handleImageUpload(
+  c: Context<{ Variables: AppVariables }>,
+  kind: "avatar" | "banner",
+) {
   const currentUser = c.get("user");
   const body = await c.req.parseBody();
   const file = body["image"] ?? body["file"];
@@ -244,6 +255,34 @@ profileRoutes.get("/profile/:handle", async (c) => {
       ),
     );
 
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const viewerId = session?.user.id;
+  const isOwner = viewerId === row.id;
+  const [playlistCounts] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(playlist)
+    .where(
+      and(
+        eq(playlist.userId, row.id),
+        isOwner ? sql`${playlist.visibility} <> 'private'` : eq(playlist.visibility, "public"),
+      ),
+    );
+
+  const [subCounts] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(subscription)
+    .where(eq(subscription.channelId, row.id));
+
+  let viewerIsSubscribed = false;
+  if (viewerId && !isOwner) {
+    const [exists] = await db
+      .select({ x: sql<number>`1` })
+      .from(subscription)
+      .where(and(eq(subscription.subscriberId, viewerId), eq(subscription.channelId, row.id)))
+      .limit(1);
+    viewerIsSubscribed = !!exists;
+  }
+
   return c.json({
     user: {
       id: row.id,
@@ -255,6 +294,12 @@ profileRoutes.get("/profile/:handle", async (c) => {
       createdAt: row.createdAt,
     },
     videos: items,
-    counts: { videos: counts?.videoCount ?? 0 },
+    counts: {
+      videos: counts?.videoCount ?? 0,
+      playlists: playlistCounts?.count ?? 0,
+      subscribers: subCounts?.count ?? 0,
+    },
+    viewerIsSubscribed,
+    isOwner,
   });
 });

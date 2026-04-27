@@ -2,6 +2,7 @@ import { env } from "@video-site/env/worker";
 import { Queue, Worker } from "bullmq";
 
 import { processCleanup } from "./processors/cleanup";
+import { processNotification } from "./processors/notifications";
 import {
   processGuestCleanup,
   processRecsBuildSimilarity,
@@ -10,8 +11,15 @@ import {
 } from "./processors/recommendations";
 import { processThumbnail } from "./processors/thumbnail";
 import { processTranscode } from "./processors/transcode";
-import { CLEANUP_QUEUE, RECS_QUEUE, THUMBNAIL_QUEUE, TRANSCODE_QUEUE, connection } from "./queues";
-import type { RecsJobData } from "./types";
+import {
+  CLEANUP_QUEUE,
+  NOTIFICATIONS_QUEUE,
+  RECS_QUEUE,
+  THUMBNAIL_QUEUE,
+  TRANSCODE_QUEUE,
+  connection,
+} from "./queues";
+import type { NotificationJobData, RecsJobData } from "./types";
 
 const transcodeWorker = new Worker(TRANSCODE_QUEUE, processTranscode, {
   connection,
@@ -49,11 +57,18 @@ const recsWorker = new Worker<RecsJobData>(
   { connection, concurrency: 1 },
 );
 
+const notificationsWorker = new Worker<NotificationJobData>(
+  NOTIFICATIONS_QUEUE,
+  processNotification,
+  { connection, concurrency: 4 },
+);
+
 const workers = {
   transcode: transcodeWorker,
   thumbnail: thumbnailWorker,
   cleanup: cleanupWorker,
   recs: recsWorker,
+  notifications: notificationsWorker,
 };
 
 for (const [name, worker] of Object.entries(workers)) {
@@ -128,6 +143,7 @@ async function shutdown() {
     thumbnailWorker.close(),
     cleanupWorker.close(),
     recsWorker.close(),
+    notificationsWorker.close(),
   ]);
   await cleanupQueue.close();
   await recsQueue.close();

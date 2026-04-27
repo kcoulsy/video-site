@@ -7,7 +7,12 @@
       "Bash(pnpm exec *)",
       "Bash(pnpm run *)",
       "Bash(pnpm add *)",
-      "Bash(grep -E \"\\\\.tsx$\")"
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(pnpm db:generate)",
+      "Bash(npx oxfmt *)",
+      "Bash(npx oxlint *)",
+      "Bash(pnpm check-types *)",
+      "Bash(pnpm build *)"
     ]
   }
 }

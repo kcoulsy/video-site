@@ -4,6 +4,7 @@ export type AppUser = User & {
   role?: string | null;
   mutedAt?: Date | null;
   muteReason?: string | null;
+  handle?: string | null;
 };
 
 export type AppVariables = {

@@ -15,22 +15,17 @@ const toForwardSlashes = (p: string) => p.replaceAll("\\", "/");
 
 export function createLocalStorage(basePath: string): StorageService {
   if (!path.isAbsolute(basePath)) {
-    throw new Error(
-      `STORAGE_PATH must be an absolute path, got: ${basePath}`,
-    );
+    throw new Error(`STORAGE_PATH must be an absolute path, got: ${basePath}`);
   }
 
   const base = toForwardSlashes(path.resolve(basePath));
 
-  const join = (...segments: string[]) =>
-    toForwardSlashes(path.join(base, ...segments));
+  const join = (...segments: string[]) => toForwardSlashes(path.join(base, ...segments));
 
   const getVideoDir = (videoId: string) => join(VIDEOS_DIR, videoId);
   const getRawDir = (videoId: string) => join(VIDEOS_DIR, videoId, RAW_DIR);
-  const getTranscodedDir = (videoId: string) =>
-    join(VIDEOS_DIR, videoId, TRANSCODED_DIR);
-  const getThumbnailDir = (videoId: string) =>
-    join(VIDEOS_DIR, videoId, THUMBNAILS_DIR);
+  const getTranscodedDir = (videoId: string) => join(VIDEOS_DIR, videoId, TRANSCODED_DIR);
+  const getThumbnailDir = (videoId: string) => join(VIDEOS_DIR, videoId, THUMBNAILS_DIR);
   const getUserImageDir = (userId: string) => join(USERS_DIR, userId);
 
   return {

@@ -11,6 +11,7 @@ const searchQuerySchema = z.object({
   page: z.coerce.number().int().positive().max(500).default(1),
   limit: z.coerce.number().int().positive().max(50).default(20),
   sort: z.enum(["relevance", "date", "views"]).default("relevance"),
+  type: z.enum(["videos", "playlists", "all"]).default("all"),
 });
 
 const suggestQuerySchema = z.object({
@@ -42,18 +43,40 @@ interface SuggestRow {
 
 export const searchRoutes = new Hono<{ Variables: AppVariables }>();
 
+interface PlaylistSearchRow {
+  id: string;
+  title: string;
+  description: string | null;
+  updated_at: Date;
+  item_count: number;
+  thumb_video_id: string | null;
+  user_id: string;
+  user_name: string;
+  user_handle: string | null;
+  user_image: string | null;
+  total_count: string | number;
+}
+
 searchRoutes.get("/", async (c) => {
   const params = Object.fromEntries(new URL(c.req.url).searchParams);
   const rawQ = typeof params.q === "string" ? params.q.trim() : "";
   if (!rawQ) {
-    return c.json({ results: [], total: 0, page: 1, totalPages: 0, query: "" });
+    return c.json({
+      results: [],
+      playlists: [],
+      total: 0,
+      playlistTotal: 0,
+      page: 1,
+      totalPages: 0,
+      query: "",
+    });
   }
 
   const parsed = searchQuerySchema.safeParse(params);
   if (!parsed.success) {
     throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid query");
   }
-  const { q, page, limit, sort } = parsed.data;
+  const { q, page, limit, sort, type } = parsed.data;
   const offset = (page - 1) * limit;
 
   const orderBy =
@@ -63,7 +86,37 @@ searchRoutes.get("/", async (c) => {
         ? sql`v.created_at DESC`
         : sql`v.view_count DESC`;
 
-  const results = await db.execute(sql`
+  const wantVideos = type !== "playlists";
+  const wantPlaylists = type !== "videos";
+
+  const playlistPromise = wantPlaylists
+    ? db.execute(sql`
+        SELECT
+          p.id,
+          p.title,
+          p.description,
+          p.updated_at,
+          (SELECT COUNT(*)::int FROM playlist_item pi WHERE pi.playlist_id = p.id) AS item_count,
+          (SELECT pi.video_id FROM playlist_item pi WHERE pi.playlist_id = p.id ORDER BY pi.position ASC LIMIT 1) AS thumb_video_id,
+          u.id AS user_id,
+          u.name AS user_name,
+          u.handle AS user_handle,
+          u.image AS user_image,
+          COUNT(*) OVER() AS total_count
+        FROM playlist p
+        JOIN "user" u ON u.id = p.user_id
+        WHERE
+          p.visibility = 'public'
+          AND u.banned_at IS NULL
+          AND (u.suspended_until IS NULL OR u.suspended_until < NOW())
+          AND (p.title ILIKE ${"%" + q + "%"} OR p.description ILIKE ${"%" + q + "%"})
+        ORDER BY p.updated_at DESC
+        LIMIT 20
+      `)
+    : Promise.resolve({ rows: [] as unknown as PlaylistSearchRow[] });
+
+  const videoPromise = wantVideos
+    ? db.execute(sql`
     SELECT
       v.id,
       v.title,
@@ -101,10 +154,15 @@ searchRoutes.get("/", async (c) => {
     ORDER BY ${orderBy}
     LIMIT ${limit}
     OFFSET ${offset}
-  `);
+  `)
+    : Promise.resolve({ rows: [] as unknown as SearchRow[] });
+
+  const [results, playlistResults] = await Promise.all([videoPromise, playlistPromise]);
 
   const rows = results.rows as unknown as SearchRow[];
   const total = Number(rows[0]?.total_count ?? 0);
+  const pRows = playlistResults.rows as unknown as PlaylistSearchRow[];
+  const playlistTotal = Number(pRows[0]?.total_count ?? 0);
 
   return c.json({
     results: rows.map((row) => ({
@@ -124,7 +182,22 @@ searchRoutes.get("/", async (c) => {
       },
       relevanceScore: Number(row.rank),
     })),
+    playlists: pRows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      updatedAt: row.updated_at,
+      itemCount: row.item_count,
+      thumbnailUrl: row.thumb_video_id ? `/api/stream/${row.thumb_video_id}/thumbnail` : null,
+      user: {
+        id: row.user_id,
+        name: row.user_name,
+        handle: row.user_handle,
+        image: row.user_image,
+      },
+    })),
     total,
+    playlistTotal,
     page,
     limit,
     totalPages: Math.max(1, Math.ceil(total / limit)),

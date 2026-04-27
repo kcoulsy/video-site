@@ -5,30 +5,37 @@ import { useEffect } from "react";
 import { env } from "@video-site/env/web";
 
 import { Pagination } from "@/components/pagination";
+import { PlaylistCard, type PlaylistCardData } from "@/components/playlist-card";
 import { VideoGrid } from "@/components/video-grid";
 import { VideoGridSkeleton } from "@/components/video-card-skeleton";
 import type { VideoCardProps } from "@/components/video-card";
 import { apiClient } from "@/lib/api-client";
 
 type SortMode = "relevance" | "date" | "views";
+type SearchType = "videos" | "playlists";
 
 interface SearchSearchParams {
   q: string;
   sort?: SortMode;
   page?: number;
+  type?: SearchType;
 }
 
 const SORT_VALUES = new Set<SortMode>(["relevance", "date", "views"]);
+const TYPE_VALUES = new Set<SearchType>(["videos", "playlists"]);
 
 export const Route = createFileRoute("/search")({
   component: SearchPage,
   validateSearch: (search: Record<string, unknown>): SearchSearchParams => {
     const sortRaw = typeof search.sort === "string" ? (search.sort as SortMode) : "relevance";
     const sort: SortMode = SORT_VALUES.has(sortRaw) ? sortRaw : "relevance";
+    const typeRaw = typeof search.type === "string" ? (search.type as SearchType) : "videos";
+    const type: SearchType = TYPE_VALUES.has(typeRaw) ? typeRaw : "videos";
     const pageNum = Number(search.page);
     return {
       q: typeof search.q === "string" ? search.q : "",
       sort,
+      type,
       page: Number.isFinite(pageNum) && pageNum > 0 ? Math.floor(pageNum) : 1,
     };
   },
@@ -48,9 +55,15 @@ interface SearchResult {
   relevanceScore: number;
 }
 
+interface PlaylistSearchResult extends PlaylistCardData {
+  description: string | null;
+}
+
 interface SearchResponse {
   results: SearchResult[];
+  playlists: PlaylistSearchResult[];
   total: number;
+  playlistTotal: number;
   page: number;
   limit: number;
   totalPages: number;
@@ -69,9 +82,10 @@ function absoluteUrl(path: string | null): string | null {
 }
 
 function SearchPage() {
-  const { q, sort: sortParam, page: pageParam } = Route.useSearch();
+  const { q, sort: sortParam, page: pageParam, type: typeParam } = Route.useSearch();
   const sort: SortMode = sortParam ?? "relevance";
   const page: number = pageParam ?? 1;
+  const type: SearchType = typeParam ?? "videos";
   const navigate = Route.useNavigate();
 
   const trimmed = q.trim();
@@ -89,6 +103,7 @@ function SearchPage() {
     sort,
     page: String(page),
     limit: "20",
+    type: "all",
   });
 
   const { data, isLoading, error } = useQuery<SearchResponse>({
@@ -130,7 +145,9 @@ function SearchPage() {
   }
 
   const results = data?.results ?? [];
+  const playlists = data?.playlists ?? [];
   const total = data?.total ?? 0;
+  const playlistTotal = data?.playlistTotal ?? 0;
   const totalPages = data?.totalPages ?? 0;
 
   const videos: VideoCardProps[] = results.map((r) => ({
@@ -143,15 +160,17 @@ function SearchPage() {
     user: { name: r.user.name, image: r.user.image },
   }));
 
+  const activeCount = type === "videos" ? total : playlistTotal;
+
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-lg font-medium">
-            {total > 0 ? (
+            {activeCount > 0 ? (
               <>
-                About <span className="font-semibold">{total.toLocaleString()}</span>{" "}
-                {total === 1 ? "result" : "results"} for{" "}
+                About <span className="font-semibold">{activeCount.toLocaleString()}</span>{" "}
+                {activeCount === 1 ? "result" : "results"} for{" "}
                 <span className="text-primary">&ldquo;{trimmed}&rdquo;</span>
               </>
             ) : (
@@ -162,7 +181,7 @@ function SearchPage() {
           </h1>
         </div>
 
-        {total > 0 && (
+        {type === "videos" && total > 0 && (
           <div className="flex items-center gap-1 self-start rounded-lg bg-secondary p-1">
             {SORT_OPTIONS.map((option) => (
               <button
@@ -187,27 +206,68 @@ function SearchPage() {
         )}
       </div>
 
-      {results.length === 0 ? (
+      <div className="mb-6 border-b border-border">
+        <nav className="-mb-px flex gap-6">
+          <button
+            type="button"
+            onClick={() => navigate({ search: (prev) => ({ ...prev, type: "videos", page: 1 }) })}
+            className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
+              type === "videos"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Videos <span className="ml-2 text-xs text-muted-foreground">{total}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              navigate({ search: (prev) => ({ ...prev, type: "playlists", page: 1 }) })
+            }
+            className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
+              type === "playlists"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Playlists <span className="ml-2 text-xs text-muted-foreground">{playlistTotal}</span>
+          </button>
+        </nav>
+      </div>
+
+      {type === "videos" ? (
+        results.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <SearchX className="h-16 w-16 text-muted-foreground/20" />
+            <h2 className="mt-4 text-lg font-medium">No results found</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Try different keywords or check your spelling
+            </p>
+            <Link to="/" className="mt-6 text-sm text-primary hover:underline">
+              Browse all videos
+            </Link>
+          </div>
+        ) : (
+          <>
+            <VideoGrid videos={videos} />
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onChange={(next) => navigate({ search: (prev) => ({ ...prev, page: next }) })}
+            />
+          </>
+        )
+      ) : playlists.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24">
           <SearchX className="h-16 w-16 text-muted-foreground/20" />
-          <h2 className="mt-4 text-lg font-medium">No results found</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Try different keywords or check your spelling
-          </p>
-          <Link to="/" className="mt-6 text-sm text-primary hover:underline">
-            Browse all videos
-          </Link>
+          <h2 className="mt-4 text-lg font-medium">No playlists found</h2>
         </div>
       ) : (
-        <>
-          <VideoGrid videos={videos} />
-
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            onChange={(next) => navigate({ search: (prev) => ({ ...prev, page: next }) })}
-          />
-        </>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {playlists.map((p) => (
+            <PlaylistCard key={p.id} playlist={p} showOwner />
+          ))}
+        </div>
       )}
     </div>
   );

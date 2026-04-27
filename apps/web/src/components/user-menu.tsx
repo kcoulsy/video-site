@@ -41,9 +41,7 @@ export default function UserMenu() {
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {handle && (
-            <DropdownMenuItem
-              onClick={() => navigate({ to: "/u/$handle", params: { handle } })}
-            >
+            <DropdownMenuItem onClick={() => navigate({ to: "/u/$handle", params: { handle } })}>
               My Profile
             </DropdownMenuItem>
           )}
@@ -54,7 +52,10 @@ export default function UserMenu() {
           <DropdownMenuItem onClick={() => navigate({ to: "/watch-later" })}>
             Watch Later
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate({ to: "/playlists" })}>
+          <DropdownMenuItem onClick={() => navigate({ to: "/subscriptions" })}>
+            Subscriptions
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate({ to: "/playlists/mine" })}>
             Playlists
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>

@@ -22,6 +22,20 @@ interface CleanupJobData {
   videoId?: string;
 }
 
+type NotificationKind = "new_upload" | "comment_reply" | "video_like" | "comment_like" | "mention";
+
+type NotificationJobData =
+  | { type: "fanout-new-upload"; videoId: string; channelId: string }
+  | {
+      type: "single";
+      recipientId: string;
+      kind: NotificationKind;
+      actorId?: string;
+      videoId?: string;
+      commentId?: string;
+      coalesceWindowSec?: number;
+    };
+
 export const transcodeQueue = new Queue<TranscodeJobData>("video-transcode", {
   connection,
   defaultJobOptions: {
@@ -45,3 +59,21 @@ export const thumbnailQueue = new Queue<ThumbnailJobData>("video-thumbnail", {
 export const cleanupQueue = new Queue<CleanupJobData>("video-cleanup", {
   connection,
 });
+
+export const notificationsQueue = new Queue<NotificationJobData>("notifications", {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 2000 },
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 50 },
+  },
+});
+
+export async function enqueueNotification(data: NotificationJobData) {
+  try {
+    await notificationsQueue.add("notify", data);
+  } catch (err) {
+    console.error("[notification] enqueue failed:", err);
+  }
+}

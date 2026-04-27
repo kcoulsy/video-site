@@ -64,6 +64,20 @@
       "when": 1777215229760,
       "tag": "0008_cloudy_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777289087624,
+      "tag": "0009_safe_jackpot",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777293945643,
+      "tag": "0010_nice_paladin",
+      "breakpoints": true
     }
   ]
 }

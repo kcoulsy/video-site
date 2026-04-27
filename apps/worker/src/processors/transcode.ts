@@ -8,6 +8,7 @@ import type { Job } from "bullmq";
 import { eq } from "drizzle-orm";
 import ffmpeg from "fluent-ffmpeg";
 
+import { notificationsQueue } from "../queues";
 import type { TranscodeJobData } from "../types";
 
 ffmpeg.setFfmpegPath(env.FFMPEG_PATH);
@@ -349,6 +350,21 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
         processingError: null,
       })
       .where(eq(video.id, videoId));
+
+    const [readyVideo] = await db
+      .select({ visibility: video.visibility, userId: video.userId })
+      .from(video)
+      .where(eq(video.id, videoId))
+      .limit(1);
+    if (readyVideo && readyVideo.visibility === "public") {
+      await notificationsQueue
+        .add("fanout-new-upload", {
+          type: "fanout-new-upload",
+          videoId,
+          channelId: readyVideo.userId,
+        })
+        .catch((err) => console.error(`[transcode ${videoId}] fanout enqueue failed:`, err));
+    }
 
     if (env.DELETE_RAW_AFTER_TRANSCODE) {
       await storage.deleteFile(rawPath).catch(() => {

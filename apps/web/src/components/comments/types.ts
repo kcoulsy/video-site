@@ -10,10 +10,13 @@ export interface Comment {
   content: string;
   user: CommentUser;
   parentId: string | null;
+  rootId: string | null;
   depth: number;
   replyCount: number;
   likeCount: number;
   liked: boolean;
+  pinnedAt: string | null;
+  creatorHeartedAt: string | null;
   createdAt: string;
   editedAt: string | null;
   deletedAt: string | null;

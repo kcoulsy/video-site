@@ -137,41 +137,42 @@ videoRoutes.post(
   ...requireNotMuted,
   rateLimit({ name: "video:create", limit: 10, windowSeconds: 3600 }),
   async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = createVideoSchema.safeParse(body);
-  if (!parsed.success) {
-    throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid body");
-  }
-
-  const currentUser = c.get("user");
-  const id = generateId();
-
-  await assertHashAllowed(parsed.data.fileHash, { uploaderId: currentUser.id });
-
-  const uniqueTagIds = parsed.data.tagIds ? [...new Set(parsed.data.tagIds)] : [];
-  const slugs = await resolveTagSlugs(uniqueTagIds);
-
-  await db.transaction(async (tx) => {
-    await tx.insert(video).values({
-      id,
-      title: parsed.data.title,
-      description: parsed.data.description,
-      visibility: parsed.data.visibility,
-      tags: slugs.length > 0 ? slugs : null,
-      originalFilename: parsed.data.filename,
-      mimeType: parsed.data.mimeType,
-      fileSize: parsed.data.fileSize,
-      fileHash: parsed.data.fileHash,
-      userId: currentUser.id,
-      status: "uploading",
-    });
-    if (uniqueTagIds.length > 0) {
-      await tx.insert(videoTag).values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
+    const body = await c.req.json().catch(() => null);
+    const parsed = createVideoSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ValidationError(parsed.error.issues[0]?.message ?? "Invalid body");
     }
-  });
 
-  return c.json({ id, uploadUrl: "/api/uploads" }, 201);
-});
+    const currentUser = c.get("user");
+    const id = generateId();
+
+    await assertHashAllowed(parsed.data.fileHash, { uploaderId: currentUser.id });
+
+    const uniqueTagIds = parsed.data.tagIds ? [...new Set(parsed.data.tagIds)] : [];
+    const slugs = await resolveTagSlugs(uniqueTagIds);
+
+    await db.transaction(async (tx) => {
+      await tx.insert(video).values({
+        id,
+        title: parsed.data.title,
+        description: parsed.data.description,
+        visibility: parsed.data.visibility,
+        tags: slugs.length > 0 ? slugs : null,
+        originalFilename: parsed.data.filename,
+        mimeType: parsed.data.mimeType,
+        fileSize: parsed.data.fileSize,
+        fileHash: parsed.data.fileHash,
+        userId: currentUser.id,
+        status: "uploading",
+      });
+      if (uniqueTagIds.length > 0) {
+        await tx.insert(videoTag).values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
+      }
+    });
+
+    return c.json({ id, uploadUrl: "/api/uploads" }, 201);
+  },
+);
 
 videoRoutes.get("/my", requireAuth, async (c) => {
   const parsed = myListQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
@@ -364,65 +365,66 @@ videoRoutes.post(
   "/:id/view",
   rateLimit({ name: "video:view", limit: 120, windowSeconds: 60 }),
   async (c) => {
-  const videoId = c.req.param("id");
+    const videoId = c.req.param("id");
 
-  const [row] = await db
-    .select({
-      visibility: video.visibility,
-      status: video.status,
-      userId: video.userId,
-      deletedAt: video.deletedAt,
-      authorBannedAt: user.bannedAt,
-      authorSuspendedUntil: user.suspendedUntil,
-    })
-    .from(video)
-    .innerJoin(user, eq(user.id, video.userId))
-    .where(eq(video.id, videoId))
-    .limit(1);
+    const [row] = await db
+      .select({
+        visibility: video.visibility,
+        status: video.status,
+        userId: video.userId,
+        deletedAt: video.deletedAt,
+        authorBannedAt: user.bannedAt,
+        authorSuspendedUntil: user.suspendedUntil,
+      })
+      .from(video)
+      .innerJoin(user, eq(user.id, video.userId))
+      .where(eq(video.id, videoId))
+      .limit(1);
 
-  if (!row || row.status !== "ready") {
-    throw new NotFoundError("Video");
-  }
+    if (!row || row.status !== "ready") {
+      throw new NotFoundError("Video");
+    }
 
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
-  if (row.visibility === "private" && session?.user.id !== row.userId) {
-    throw new NotFoundError("Video");
-  }
-  if (
-    row.deletedAt ||
-    row.authorBannedAt ||
-    (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date())
-  ) {
-    throw new NotFoundError("Video");
-  }
+    if (row.visibility === "private" && session?.user.id !== row.userId) {
+      throw new NotFoundError("Video");
+    }
+    if (
+      row.deletedAt ||
+      row.authorBannedAt ||
+      (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date())
+    ) {
+      throw new NotFoundError("Video");
+    }
 
-  const guestSessionId = session ? null : getOrSetGuestSessionId(c);
-  const viewerKey = session
-    ? `view:${videoId}:user:${session.user.id}`
-    : `view:${videoId}:anon:${guestSessionId ?? hashIpUa(c)}`;
+    const guestSessionId = session ? null : getOrSetGuestSessionId(c);
+    const viewerKey = session
+      ? `view:${videoId}:user:${session.user.id}`
+      : `view:${videoId}:anon:${guestSessionId ?? hashIpUa(c)}`;
 
-  const redis = getRedisClient();
-  const wasSet = await redis.set(viewerKey, "1", "EX", 86400, "NX");
-  if (!wasSet) {
-    return c.json({ counted: false });
-  }
+    const redis = getRedisClient();
+    const wasSet = await redis.set(viewerKey, "1", "EX", 86400, "NX");
+    if (!wasSet) {
+      return c.json({ counted: false });
+    }
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(video)
-      .set({ viewCount: sql`${video.viewCount} + 1` })
-      .where(eq(video.id, videoId));
-    await tx.insert(viewEvent).values({
-      id: generateId(),
-      videoId,
-      userId: session?.user.id ?? null,
-      sessionId: guestSessionId,
+    await db.transaction(async (tx) => {
+      await tx
+        .update(video)
+        .set({ viewCount: sql`${video.viewCount} + 1` })
+        .where(eq(video.id, videoId));
+      await tx.insert(viewEvent).values({
+        id: generateId(),
+        videoId,
+        userId: session?.user.id ?? null,
+        sessionId: guestSessionId,
+      });
     });
-  });
 
-  return c.json({ counted: true });
-});
+    return c.json({ counted: true });
+  },
+);
 
 videoRoutes.patch("/:id", requireAuth, async (c) => {
   const id = c.req.param("id");
@@ -530,47 +532,48 @@ videoRoutes.post(
   requireAuth,
   rateLimit({ name: "video:thumbnail", limit: 20, windowSeconds: 600 }),
   async (c) => {
-  const id = c.req.param("id");
-  const currentUser = c.get("user");
+    const id = c.req.param("id");
+    const currentUser = c.get("user");
 
-  const [existing] = await db
-    .select({ userId: video.userId })
-    .from(video)
-    .where(eq(video.id, id))
-    .limit(1);
-  if (!existing) {
-    throw new NotFoundError("Video");
-  }
-  if (existing.userId !== currentUser.id) {
-    throw new ForbiddenError();
-  }
+    const [existing] = await db
+      .select({ userId: video.userId })
+      .from(video)
+      .where(eq(video.id, id))
+      .limit(1);
+    if (!existing) {
+      throw new NotFoundError("Video");
+    }
+    if (existing.userId !== currentUser.id) {
+      throw new ForbiddenError();
+    }
 
-  const body = await c.req.parseBody();
-  const file = body["thumbnail"];
-  if (!(file instanceof File)) {
-    throw new ValidationError("No thumbnail file provided");
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    throw new ValidationError("Thumbnail must be under 5MB");
-  }
+    const body = await c.req.parseBody();
+    const file = body["thumbnail"];
+    if (!(file instanceof File)) {
+      throw new ValidationError("No thumbnail file provided");
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new ValidationError("Thumbnail must be under 5MB");
+    }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  try {
-    await detectThumbnailBuffer(bytes);
-  } catch (err) {
-    throw new ValidationError(err instanceof Error ? err.message : "Invalid image");
-  }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    try {
+      await detectThumbnailBuffer(bytes);
+    } catch (err) {
+      throw new ValidationError(err instanceof Error ? err.message : "Invalid image");
+    }
 
-  const tempPath = storage.resolve("temp", `thumb-${id}-${Date.now()}`);
-  await Bun.write(tempPath, bytes);
+    const tempPath = storage.resolve("temp", `thumb-${id}-${Date.now()}`);
+    await Bun.write(tempPath, bytes);
 
-  await thumbnailQueue.add("thumbnail", {
-    videoId: id,
-    thumbnailSourcePath: tempPath,
-  });
+    await thumbnailQueue.add("thumbnail", {
+      videoId: id,
+      thumbnailSourcePath: tempPath,
+    });
 
-  return c.json({ ok: true });
-});
+    return c.json({ ok: true });
+  },
+);
 
 const selectThumbnailSchema = z.object({
   index: z.number().int().min(0).max(99),

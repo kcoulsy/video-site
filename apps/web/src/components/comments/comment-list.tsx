@@ -7,11 +7,12 @@ import type { CommentsPage } from "./types";
 
 interface CommentListProps {
   videoId: string;
+  videoOwnerId: string;
   sort: "newest" | "oldest";
   currentUserId?: string;
 }
 
-export function CommentList({ videoId, sort, currentUserId }: CommentListProps) {
+export function CommentList({ videoId, videoOwnerId, sort, currentUserId }: CommentListProps) {
   const query = useInfiniteQuery<CommentsPage>({
     queryKey: ["comments", videoId, "top", sort],
     queryFn: ({ pageParam }) => {
@@ -60,6 +61,7 @@ export function CommentList({ videoId, sort, currentUserId }: CommentListProps) 
           key={comment.id}
           comment={comment}
           videoId={videoId}
+          videoOwnerId={videoOwnerId}
           currentUserId={currentUserId}
         />
       ))}

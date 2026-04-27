@@ -1,11 +1,14 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Film, Upload } from "lucide-react";
 import { Button } from "@video-site/ui/components/button";
 
+import { NotificationBell } from "./notification-bell";
 import { SearchBar } from "./search-bar";
 import UserMenu from "./user-menu";
 
 export default function Header() {
+  const { pathname } = useLocation();
+  if (pathname.startsWith("/embed/")) return null;
   return (
     <header
       data-header
@@ -31,6 +34,7 @@ export default function Header() {
             <Upload className="h-4 w-4" />
             <span className="hidden sm:inline">Upload</span>
           </Button>
+          <NotificationBell />
           <UserMenu />
         </div>
       </div>
