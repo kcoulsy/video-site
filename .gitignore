@@ -53,3 +53,4 @@ temp
 # Video storage (local dev)
 storage/
 .claude/
+!packages/storage
