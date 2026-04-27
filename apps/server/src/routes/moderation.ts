@@ -11,6 +11,7 @@ import { AppError, NotFoundError, ValidationError } from "../lib/errors";
 import { logModerationAction } from "../lib/moderation-log";
 import { cleanupQueue } from "../lib/queue";
 import { getRedisClient } from "../lib/redis";
+import { invalidateStreamableVideoMeta } from "../lib/streaming-meta";
 import { requireActiveUser } from "../middleware/require-active-user";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireModerator } from "../middleware/require-moderator";
@@ -454,6 +455,7 @@ modOnly.post("/videos/:id/remove", async (c) => {
       reason: parsed.data.reason,
     });
   });
+  await invalidateStreamableVideoMeta(id);
   return c.json({ ok: true });
 });
 
@@ -482,6 +484,7 @@ modOnly.post("/videos/:id/restore", async (c) => {
       targetId: id,
     });
   });
+  await invalidateStreamableVideoMeta(id);
   return c.json({ ok: true });
 });
 

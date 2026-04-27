@@ -236,6 +236,30 @@ export function VideoPlayer({
     v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + delta));
   }, []);
 
+  const seekToPercent = useCallback((pct: number) => {
+    const v = videoRef.current;
+    if (!v || !v.duration) return;
+    v.currentTime = Math.max(0, Math.min(v.duration, v.duration * pct));
+  }, []);
+
+  const adjustVolume = useCallback((delta: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const next = Math.max(0, Math.min(1, v.volume + delta));
+    v.volume = next;
+    if (next > 0) v.muted = false;
+  }, []);
+
+  const PLAYBACK_RATES = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+  const stepPlaybackRate = useCallback((dir: 1 | -1) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const idx = PLAYBACK_RATES.indexOf(v.playbackRate);
+    const cur = idx === -1 ? PLAYBACK_RATES.indexOf(1) : idx;
+    const next = Math.max(0, Math.min(PLAYBACK_RATES.length - 1, cur + dir));
+    v.playbackRate = PLAYBACK_RATES[next]!;
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
@@ -281,19 +305,37 @@ export function VideoPlayer({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!containerRef.current) return;
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Only when player or its descendant is focused, OR fullscreen
       const focused =
         containerRef.current.contains(document.activeElement) ||
         document.fullscreenElement === containerRef.current;
       if (!focused) return;
 
-      switch (e.key.toLowerCase()) {
+      const key = e.key.toLowerCase();
+
+      if (key >= "0" && key <= "9" && !e.shiftKey) {
+        e.preventDefault();
+        seekToPercent(Number(key) / 10);
+        return;
+      }
+
+      switch (key) {
         case " ":
         case "k":
           e.preventDefault();
           togglePlay();
+          break;
+        case "j":
+          e.preventDefault();
+          seekBy(-10);
+          break;
+        case "l":
+          e.preventDefault();
+          seekBy(10);
           break;
         case "arrowleft":
           e.preventDefault();
@@ -303,6 +345,14 @@ export function VideoPlayer({
           e.preventDefault();
           seekBy(5);
           break;
+        case "arrowup":
+          e.preventDefault();
+          adjustVolume(0.1);
+          break;
+        case "arrowdown":
+          e.preventDefault();
+          adjustVolume(-0.1);
+          break;
         case "f":
           e.preventDefault();
           toggleFullscreen();
@@ -310,6 +360,18 @@ export function VideoPlayer({
         case "m":
           e.preventDefault();
           toggleMute();
+          break;
+        case ",":
+          if (e.shiftKey) {
+            e.preventDefault();
+            stepPlaybackRate(-1);
+          }
+          break;
+        case ".":
+          if (e.shiftKey) {
+            e.preventDefault();
+            stepPlaybackRate(1);
+          }
           break;
         case "t":
           if (onToggleCinema) {
@@ -321,7 +383,7 @@ export function VideoPlayer({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [togglePlay, seekBy, toggleFullscreen, toggleMute, onToggleCinema]);
+  }, [togglePlay, seekBy, seekToPercent, adjustVolume, stepPlaybackRate, toggleFullscreen, toggleMute, onToggleCinema]);
 
   // Auto-hide controls
   const showControls = useCallback(() => {

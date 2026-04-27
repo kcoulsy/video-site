@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { bigint, index, integer, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
@@ -80,6 +81,12 @@ export const video = pgTable(
     index("video_deleted_at_idx").on(table.deletedAt),
     index("video_reviewed_at_idx").on(table.reviewedAt),
     index("video_file_hash_idx").on(table.fileHash),
+    index("video_public_feed_idx")
+      .on(table.visibility, table.status, table.createdAt.desc())
+      .where(sql`${table.deletedAt} IS NULL`),
+    index("video_user_status_created_idx")
+      .on(table.userId, table.status, table.createdAt.desc())
+      .where(sql`${table.deletedAt} IS NULL`),
   ],
 );
 

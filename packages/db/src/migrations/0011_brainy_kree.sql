@@ -1,0 +1,3 @@
+CREATE INDEX "comment_video_visible_created_idx" ON "comment" USING btree ("video_id","created_at" DESC NULLS LAST) WHERE "comment"."removed_by" IS NULL;--> statement-breakpoint
+CREATE INDEX "video_public_feed_idx" ON "video" USING btree ("visibility","status","created_at" DESC NULLS LAST) WHERE "video"."deleted_at" IS NULL;--> statement-breakpoint
+CREATE INDEX "video_user_status_created_idx" ON "video" USING btree ("user_id","status","created_at" DESC NULLS LAST) WHERE "video"."deleted_at" IS NULL;

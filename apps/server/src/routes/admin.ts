@@ -10,6 +10,7 @@ import { z } from "zod";
 import { ForbiddenError, NotFoundError, ValidationError } from "../lib/errors";
 import { logModerationAction } from "../lib/moderation-log";
 import { cleanupQueue } from "../lib/queue";
+import { invalidateStreamableVideoMeta } from "../lib/streaming-meta";
 import { requireAdmin } from "../middleware/require-admin";
 import type { AppVariables } from "../types";
 
@@ -293,6 +294,7 @@ adminRoutes.patch("/videos/:id", async (c) => {
     }
   });
 
+  await invalidateStreamableVideoMeta(id);
   return c.json({ ok: true });
 });
 
@@ -313,6 +315,7 @@ adminRoutes.delete("/videos/:id", async (c) => {
     });
   });
   await cleanupQueue.add("delete-video", { type: "delete-video", videoId: id });
+  await invalidateStreamableVideoMeta(id);
 
   return c.json({ ok: true });
 });

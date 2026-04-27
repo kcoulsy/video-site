@@ -12,7 +12,10 @@
       "Bash(npx oxfmt *)",
       "Bash(npx oxlint *)",
       "Bash(pnpm check-types *)",
-      "Bash(pnpm build *)"
+      "Bash(pnpm build *)",
+      "Bash(grep \"\\\\.tsx$\")",
+      "Bash(xargs wc *)",
+      "Bash(xargs grep *)"
     ]
   }
 }

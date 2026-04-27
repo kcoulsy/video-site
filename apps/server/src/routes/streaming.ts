@@ -1,12 +1,9 @@
 import { auth } from "@video-site/auth";
-import { db } from "@video-site/db";
-import { user } from "@video-site/db/schema/auth";
-import { video } from "@video-site/db/schema/video";
-import { and, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import type { BunFile } from "bun";
 
 import { storage } from "../lib/storage";
+import { getStreamableVideoMeta, type StreamableVideoMeta } from "../lib/streaming-meta";
 import type { AppVariables } from "../types";
 
 const SEGMENT_FILENAME_RE = /^(init-stream\d+|chunk-stream\d+-\d{5,})\.m4s$/;
@@ -66,40 +63,26 @@ function handleRangeRequest(file: BunFile, rangeHeader: string, contentType: str
   });
 }
 
+async function authorizePrivate(meta: StreamableVideoMeta, headers: Headers): Promise<boolean> {
+  if (meta.visibility !== "private") return true;
+  const session = await auth.api.getSession({ headers });
+  return Boolean(session && session.user.id === meta.userId);
+}
+
 export const streamingRoutes = new Hono<{ Variables: AppVariables }>();
 
 streamingRoutes.get("/:videoId/manifest.mpd", async (c) => {
   const videoId = c.req.param("videoId");
   if (!VIDEO_ID_RE.test(videoId)) return c.notFound();
 
-  const [row] = await db
-    .select({
-      manifestPath: video.manifestPath,
-      visibility: video.visibility,
-      userId: video.userId,
-      deletedAt: video.deletedAt,
-      authorBannedAt: user.bannedAt,
-      authorSuspendedUntil: user.suspendedUntil,
-    })
-    .from(video)
-    .innerJoin(user, eq(user.id, video.userId))
-    .where(and(eq(video.id, videoId), eq(video.status, "ready"), isNull(video.deletedAt)))
-    .limit(1);
-
-  if (!row || !row.manifestPath) return c.notFound();
-  if (row.authorBannedAt) return c.notFound();
-  if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) return c.notFound();
-
-  if (row.visibility === "private") {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session || session.user.id !== row.userId) {
-      return c.notFound();
-    }
+  const meta = await getStreamableVideoMeta(videoId);
+  if (!meta || meta.blocked || meta.status !== "ready" || !meta.manifestPath) {
+    return c.notFound();
   }
+  if (!(await authorizePrivate(meta, c.req.raw.headers))) return c.notFound();
+  if (!(await storage.fileExists(meta.manifestPath))) return c.notFound();
 
-  if (!(await storage.fileExists(row.manifestPath))) return c.notFound();
-
-  const file = Bun.file(row.manifestPath);
+  const file = Bun.file(meta.manifestPath);
   return new Response(file.stream(), {
     headers: {
       "Content-Type": "application/dash+xml",
@@ -113,35 +96,12 @@ streamingRoutes.get("/:videoId/thumbnail", async (c) => {
   const videoId = c.req.param("videoId");
   if (!VIDEO_ID_RE.test(videoId)) return c.notFound();
 
-  const [row] = await db
-    .select({
-      thumbnailPath: video.thumbnailPath,
-      visibility: video.visibility,
-      userId: video.userId,
-      deletedAt: video.deletedAt,
-      authorBannedAt: user.bannedAt,
-      authorSuspendedUntil: user.suspendedUntil,
-    })
-    .from(video)
-    .innerJoin(user, eq(user.id, video.userId))
-    .where(eq(video.id, videoId))
-    .limit(1);
+  const meta = await getStreamableVideoMeta(videoId);
+  if (!meta || meta.blocked || !meta.thumbnailPath) return c.notFound();
+  if (!(await authorizePrivate(meta, c.req.raw.headers))) return c.notFound();
+  if (!(await storage.fileExists(meta.thumbnailPath))) return c.notFound();
 
-  if (!row || !row.thumbnailPath) return c.notFound();
-  if (row.deletedAt) return c.notFound();
-  if (row.authorBannedAt) return c.notFound();
-  if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) return c.notFound();
-
-  if (row.visibility === "private") {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session || session.user.id !== row.userId) {
-      return c.notFound();
-    }
-  }
-
-  if (!(await storage.fileExists(row.thumbnailPath))) return c.notFound();
-
-  const file = Bun.file(row.thumbnailPath);
+  const file = Bun.file(meta.thumbnailPath);
   return new Response(file.stream(), {
     headers: {
       "Content-Type": file.type || "image/jpeg",
@@ -155,35 +115,12 @@ streamingRoutes.get("/:videoId/storyboard", async (c) => {
   const videoId = c.req.param("videoId");
   if (!VIDEO_ID_RE.test(videoId)) return c.notFound();
 
-  const [row] = await db
-    .select({
-      storyboardPath: video.storyboardPath,
-      visibility: video.visibility,
-      userId: video.userId,
-      deletedAt: video.deletedAt,
-      authorBannedAt: user.bannedAt,
-      authorSuspendedUntil: user.suspendedUntil,
-    })
-    .from(video)
-    .innerJoin(user, eq(user.id, video.userId))
-    .where(eq(video.id, videoId))
-    .limit(1);
+  const meta = await getStreamableVideoMeta(videoId);
+  if (!meta || meta.blocked || !meta.storyboardPath) return c.notFound();
+  if (!(await authorizePrivate(meta, c.req.raw.headers))) return c.notFound();
+  if (!(await storage.fileExists(meta.storyboardPath))) return c.notFound();
 
-  if (!row || !row.storyboardPath) return c.notFound();
-  if (row.deletedAt) return c.notFound();
-  if (row.authorBannedAt) return c.notFound();
-  if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) return c.notFound();
-
-  if (row.visibility === "private") {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session || session.user.id !== row.userId) {
-      return c.notFound();
-    }
-  }
-
-  if (!(await storage.fileExists(row.storyboardPath))) return c.notFound();
-
-  const file = Bun.file(row.storyboardPath);
+  const file = Bun.file(meta.storyboardPath);
   return new Response(file.stream(), {
     headers: {
       "Content-Type": file.type || "image/jpeg",
@@ -202,32 +139,10 @@ streamingRoutes.get("/:videoId/thumbnail/still/:index", async (c) => {
     return c.json({ error: "Invalid index" }, 400);
   }
 
-  const [row] = await db
-    .select({
-      stillsCount: video.thumbnailStillsCount,
-      visibility: video.visibility,
-      userId: video.userId,
-      deletedAt: video.deletedAt,
-      authorBannedAt: user.bannedAt,
-      authorSuspendedUntil: user.suspendedUntil,
-    })
-    .from(video)
-    .innerJoin(user, eq(user.id, video.userId))
-    .where(eq(video.id, videoId))
-    .limit(1);
-
-  if (!row) return c.notFound();
-  if (index >= row.stillsCount) return c.notFound();
-  if (row.deletedAt) return c.notFound();
-  if (row.authorBannedAt) return c.notFound();
-  if (row.authorSuspendedUntil && row.authorSuspendedUntil > new Date()) return c.notFound();
-
-  if (row.visibility === "private") {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session || session.user.id !== row.userId) {
-      return c.notFound();
-    }
-  }
+  const meta = await getStreamableVideoMeta(videoId);
+  if (!meta || meta.blocked) return c.notFound();
+  if (index >= meta.thumbnailStillsCount) return c.notFound();
+  if (!(await authorizePrivate(meta, c.req.raw.headers))) return c.notFound();
 
   const filePath = storage.resolve("videos", videoId, "thumbnails", `still-${index}.jpg`);
   if (!(await storage.fileExists(filePath))) return c.notFound();

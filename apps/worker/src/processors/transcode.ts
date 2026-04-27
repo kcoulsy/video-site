@@ -8,8 +8,10 @@ import type { Job } from "bullmq";
 import { eq } from "drizzle-orm";
 import ffmpeg from "fluent-ffmpeg";
 
-import { notificationsQueue } from "../queues";
+import { connection, notificationsQueue } from "../queues";
 import type { TranscodeJobData } from "../types";
+
+const STREAM_META_CACHE_KEY = (videoId: string) => `stream:meta:${videoId}`;
 
 ffmpeg.setFfmpegPath(env.FFMPEG_PATH);
 ffmpeg.setFfprobePath(env.FFPROBE_PATH);
@@ -351,6 +353,8 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
       })
       .where(eq(video.id, videoId));
 
+    await connection.del(STREAM_META_CACHE_KEY(videoId));
+
     const [readyVideo] = await db
       .select({ visibility: video.visibility, userId: video.userId })
       .from(video)
@@ -379,6 +383,7 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
       .update(video)
       .set({ status: "failed", processingError: message })
       .where(eq(video.id, videoId));
+    await connection.del(STREAM_META_CACHE_KEY(videoId));
     throw err;
   }
 }

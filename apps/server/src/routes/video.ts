@@ -18,6 +18,7 @@ import { activeAuthorWhere, visibleVideoWhere } from "../lib/moderation-filters"
 import { cleanupQueue, thumbnailQueue, transcodeQueue } from "../lib/queue";
 import { getRedisClient } from "../lib/redis";
 import { storage } from "../lib/storage";
+import { invalidateStreamableVideoMeta } from "../lib/streaming-meta";
 import { requireAuth } from "../middleware/auth";
 import { rateLimit } from "../middleware/rate-limit";
 import { requireNotMuted } from "../middleware/require-active-user";
@@ -468,6 +469,7 @@ videoRoutes.patch("/:id", requireAuth, async (c) => {
     }
   });
 
+  await invalidateStreamableVideoMeta(id);
   return c.json({ ok: true });
 });
 
@@ -489,6 +491,7 @@ videoRoutes.delete("/:id", requireAuth, async (c) => {
 
   await db.delete(video).where(eq(video.id, id));
   await cleanupQueue.add("delete-video", { type: "delete-video", videoId: id });
+  await invalidateStreamableVideoMeta(id);
 
   return c.json({ ok: true });
 });

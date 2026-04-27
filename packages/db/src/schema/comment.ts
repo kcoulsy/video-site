@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
@@ -52,5 +53,8 @@ export const comment = pgTable(
     index("comment_video_id_created_at_idx").on(table.videoId, table.createdAt),
     index("comment_video_pinned_idx").on(table.videoId, table.pinnedAt),
     index("comment_reviewed_at_idx").on(table.reviewedAt),
+    index("comment_video_visible_created_idx")
+      .on(table.videoId, table.createdAt.desc())
+      .where(sql`${table.removedBy} IS NULL`),
   ],
 );
