@@ -13,7 +13,7 @@ export interface VideoCardProps {
   duration: number | null;
   viewCount: number;
   createdAt: string;
-  user: { name: string; image?: string | null };
+  user: { name: string };
   progressPercent?: number;
 }
 
@@ -49,26 +49,14 @@ export function VideoCard({
       </div>
 
       {/* Info */}
-      <div className="mt-3 flex gap-3">
-        <div className="mt-0.5 h-8 w-8 shrink-0 overflow-hidden rounded-full bg-secondary">
-          {user.image ? (
-            <img src={user.image} alt={user.name} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-2 text-sm font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
-            {title}
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">{user.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {formatViewCount(viewCount)} views &middot; {formatRelativeTime(createdAt)}
-          </p>
-        </div>
+      <div className="mt-3 min-w-0">
+        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
+          {title}
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">{user.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {formatViewCount(viewCount)} views &middot; {formatRelativeTime(createdAt)}
+        </p>
       </div>
     </Link>
   );

@@ -2,6 +2,7 @@ export interface CommentUser {
   id: string;
   name: string;
   image: string | null;
+  handle: string | null;
 }
 
 export interface Comment {

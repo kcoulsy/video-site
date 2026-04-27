@@ -159,6 +159,7 @@ export function SaveToPlaylistMenu({ videoId, isAuthenticated }: SaveToPlaylistM
                   autoFocus
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
                   placeholder="Playlist title"
                   maxLength={120}
                   className="rounded-md border border-border bg-transparent px-2 py-1 text-sm"

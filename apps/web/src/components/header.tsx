@@ -11,7 +11,7 @@ export default function Header() {
       data-header
       className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl"
     >
-      <div className="flex h-14 items-center gap-4 px-4">
+      <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-4 px-4">
         {/* Brand */}
         <Link to="/" className="flex shrink-0 items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
@@ -26,7 +26,7 @@ export default function Header() {
         <SearchBar />
 
         {/* Actions */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <Button variant="ghost" size="sm" render={<Link to="/upload" />} className="gap-2">
             <Upload className="h-4 w-4" />
             <span className="hidden sm:inline">Upload</span>

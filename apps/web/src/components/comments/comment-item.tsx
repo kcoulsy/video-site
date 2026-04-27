@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@video-site/ui/components/button";
 import { ChevronDown, ChevronUp, ThumbsUp } from "lucide-react";
 import { useState } from "react";
@@ -239,25 +240,47 @@ export function CommentItem({
   const replyPages = repliesQuery.data?.pages ?? [];
   const allReplies = replyPages.flatMap((p) => p.comments);
 
+  const avatarInner = comment.user.image ? (
+    <img
+      src={comment.user.image}
+      alt={comment.user.name}
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
+      {comment.user.name.charAt(0).toUpperCase()}
+    </div>
+  );
+
   return (
     <div className="flex gap-3">
-      <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-secondary">
-        {comment.user.image ? (
-          <img
-            src={comment.user.image}
-            alt={comment.user.name}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
-            {comment.user.name.charAt(0).toUpperCase()}
-          </div>
-        )}
-      </div>
+      {comment.user.handle ? (
+        <Link
+          to="/u/$handle"
+          params={{ handle: comment.user.handle }}
+          className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-secondary"
+        >
+          {avatarInner}
+        </Link>
+      ) : (
+        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-secondary">
+          {avatarInner}
+        </div>
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 text-xs">
-          <span className="font-semibold">{comment.user.name}</span>
+          {comment.user.handle ? (
+            <Link
+              to="/u/$handle"
+              params={{ handle: comment.user.handle }}
+              className="font-semibold transition-colors hover:text-primary"
+            >
+              {comment.user.name}
+            </Link>
+          ) : (
+            <span className="font-semibold">{comment.user.name}</span>
+          )}
           <span className="text-muted-foreground">
             {formatRelativeTime(comment.createdAt)}
             {comment.editedAt && !isDeleted && " (edited)"}

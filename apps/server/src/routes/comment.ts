@@ -43,7 +43,7 @@ async function checkRateLimit(userId: string) {
 
 function serializeComment(
   row: typeof comment.$inferSelect & {
-    user: { id: string; name: string; image: string | null };
+    user: { id: string; name: string; image: string | null; handle: string | null };
     liked?: boolean;
   },
 ) {
@@ -96,6 +96,7 @@ async function listComments(
       userId: user.id,
       userName: user.name,
       userImage: user.image,
+      userHandle: user.handle,
     })
     .from(comment)
     .innerJoin(user, eq(user.id, comment.userId))
@@ -119,7 +120,7 @@ async function listComments(
   const items = slice.map((r) =>
     serializeComment({
       ...r.c,
-      user: { id: r.userId, name: r.userName, image: r.userImage },
+      user: { id: r.userId, name: r.userName, image: r.userImage, handle: r.userHandle },
       liked: likedSet.has(r.c.id),
     }),
   );
@@ -229,6 +230,7 @@ commentRoutes.post("/videos/:videoId/comments", ...requireNotMuted, async (c) =>
         id: currentUser.id,
         name: currentUser.name,
         image: currentUser.image ?? null,
+        handle: currentUser.handle ?? null,
       },
     }),
     201,
@@ -301,6 +303,7 @@ commentRoutes.post("/videos/:videoId/comments/:id/replies", ...requireNotMuted, 
         id: currentUser.id,
         name: currentUser.name,
         image: currentUser.image ?? null,
+        handle: currentUser.handle ?? null,
       },
     }),
     201,

@@ -8,6 +8,8 @@ import { APIError } from "better-auth/api";
 
 export type UserRole = "user" | "moderator" | "admin";
 
+const HANDLE_RE = /^[a-z0-9_]{3,30}$/;
+
 export function createAuth() {
   const db = createDb();
 
@@ -31,8 +33,8 @@ export function createAuth() {
         },
         handle: {
           type: "string",
-          required: false,
-          input: false,
+          required: true,
+          input: true,
         },
         bio: {
           type: "string",
@@ -47,6 +49,28 @@ export function createAuth() {
       },
     },
     databaseHooks: {
+      user: {
+        create: {
+          before: async (userData) => {
+            const u = userData as typeof userData & { handle?: string | null };
+            const handle = (u.handle ?? "").toLowerCase();
+            if (!HANDLE_RE.test(handle)) {
+              throw new APIError("BAD_REQUEST", {
+                message: "Handle must be 3-30 chars: lowercase letters, numbers, underscore",
+              });
+            }
+            const [existing] = await db
+              .select({ id: schema.user.id })
+              .from(schema.user)
+              .where(eq(schema.user.handle, handle))
+              .limit(1);
+            if (existing) {
+              throw new APIError("BAD_REQUEST", { message: "Handle already taken" });
+            }
+            return { data: { ...userData, handle } };
+          },
+        },
+      },
       session: {
         create: {
           before: async (sessionData) => {

@@ -4,13 +4,10 @@ export function VideoCardSkeleton() {
   return (
     <div className="block">
       <Skeleton className="aspect-video w-full" />
-      <div className="mt-3 flex gap-3">
-        <Skeleton className="mt-0.5 h-8 w-8 shrink-0 rounded-full" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <Skeleton className="h-4 w-[90%]" />
-          <Skeleton className="h-3 w-[60%]" />
-          <Skeleton className="h-3 w-[40%]" />
-        </div>
+      <div className="mt-3 min-w-0 space-y-2">
+        <Skeleton className="h-4 w-[90%]" />
+        <Skeleton className="h-3 w-[60%]" />
+        <Skeleton className="h-3 w-[40%]" />
       </div>
     </div>
   );

@@ -29,6 +29,8 @@ export default function UserMenu() {
     );
   }
 
+  const handle = (session.user as { handle?: string | null }).handle ?? null;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="outline" />}>
@@ -38,6 +40,13 @@ export default function UserMenu() {
         <DropdownMenuGroup>
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {handle && (
+            <DropdownMenuItem
+              onClick={() => navigate({ to: "/u/$handle", params: { handle } })}
+            >
+              My Profile
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => navigate({ to: "/dashboard" })}>
             Dashboard
           </DropdownMenuItem>

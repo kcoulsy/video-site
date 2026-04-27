@@ -1,6 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
-import { ListVideo, Play } from "lucide-react";
+import { ListVideo, Play, Plus } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
 
 import Loader from "@/components/loader";
@@ -39,9 +42,30 @@ function absoluteUrl(path: string | null): string | undefined {
 }
 
 function PlaylistsPage() {
+  const queryClient = useQueryClient();
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+
   const { data, isLoading } = useQuery<{ items: PlaylistRow[] }>({
     queryKey: ["playlists", "mine"],
     queryFn: () => apiClient<{ items: PlaylistRow[] }>("/api/playlists/mine"),
+  });
+
+  const createPlaylist = useMutation({
+    mutationFn: async () =>
+      apiClient<{ id: string }>("/api/playlists", {
+        method: "POST",
+        body: JSON.stringify({ title: newTitle.trim(), visibility: "private" }),
+      }),
+    onSuccess: () => {
+      setCreating(false);
+      setNewTitle("");
+      queryClient.invalidateQueries({ queryKey: ["playlists", "mine"] });
+      toast.success("Playlist created");
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Failed to create playlist");
+    },
   });
 
   if (isLoading) {
@@ -56,10 +80,57 @@ function PlaylistsPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6">
-      <div className="mb-8 flex items-center gap-3">
-        <ListVideo className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-semibold">Your Playlists</h1>
+      <div className="mb-8 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <ListVideo className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold">Your Playlists</h1>
+        </div>
+        {!creating && (
+          <Button size="sm" onClick={() => setCreating(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            New playlist
+          </Button>
+        )}
       </div>
+
+      {creating && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newTitle.trim()) createPlaylist.mutate();
+          }}
+          className="mb-6 flex flex-col gap-2 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center"
+        >
+          <input
+            autoFocus
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Playlist title"
+            maxLength={120}
+            className="flex-1 rounded-md border border-border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setCreating(false);
+                setNewTitle("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!newTitle.trim() || createPlaylist.isPending}
+            >
+              Create
+            </Button>
+          </div>
+        </form>
+      )}
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
@@ -68,7 +139,7 @@ function PlaylistsPage() {
             You haven't created any playlists yet.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Save a video to a new playlist from any watch page.
+            Create one above, or save a video from any watch page.
           </p>
         </div>
       ) : (
