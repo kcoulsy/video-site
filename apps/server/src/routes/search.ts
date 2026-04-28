@@ -37,8 +37,12 @@ interface SearchRow {
   total_count: string | number;
 }
 
-interface SuggestRow {
+interface VideoSuggestRow {
   title: string;
+}
+
+interface NamedSuggestRow {
+  name: string;
 }
 
 export const searchRoutes = new Hono<{ Variables: AppVariables }>();
@@ -150,6 +154,17 @@ searchRoutes.get("/", async (c) => {
       AND (
         v.search_vector @@ websearch_to_tsquery('english', ${q})
         OR similarity(v.title, ${q}) > 0.1
+        OR EXISTS (
+          SELECT 1 FROM video_tag vt
+          JOIN tag t ON t.id = vt.tag_id
+          WHERE vt.video_id = v.id AND lower(t.name) = lower(${q})
+        )
+        OR EXISTS (
+          SELECT 1 FROM video_tag vt
+          JOIN category_tag ct ON ct.tag_id = vt.tag_id
+          JOIN category c ON c.id = ct.category_id
+          WHERE vt.video_id = v.id AND lower(c.name) = lower(${q})
+        )
       )
     ORDER BY ${orderBy}
     LIMIT ${limit}
@@ -219,24 +234,50 @@ searchRoutes.get("/suggest", async (c) => {
   const { q } = parsed.data;
   const prefix = `${q}%`;
 
-  const results = await db.execute(sql`
-    SELECT DISTINCT v.title AS title
-    FROM video v
-    JOIN "user" u ON v.user_id = u.id
-    WHERE
-      v.status = 'ready'
-      AND v.visibility = 'public'
-      AND v.deleted_at IS NULL
-      AND u.banned_at IS NULL
-      AND (u.suspended_until IS NULL OR u.suspended_until < NOW())
-      AND (
-        v.title % ${q}
-        OR v.title ILIKE ${prefix}
-      )
-    ORDER BY similarity(v.title, ${q}) DESC
-    LIMIT 10
-  `);
+  const [videoResults, tagResults, categoryResults] = await Promise.all([
+    db.execute(sql`
+      SELECT v.title AS title
+      FROM video v
+      JOIN "user" u ON v.user_id = u.id
+      WHERE
+        v.status = 'ready'
+        AND v.visibility = 'public'
+        AND v.deleted_at IS NULL
+        AND u.banned_at IS NULL
+        AND (u.suspended_until IS NULL OR u.suspended_until < NOW())
+        AND (
+          v.title % ${q}
+          OR v.title ILIKE ${prefix}
+        )
+      GROUP BY v.title
+      ORDER BY MAX(similarity(v.title, ${q})) DESC
+      LIMIT 6
+    `),
+    db.execute(sql`
+      SELECT t.name AS name
+      FROM tag t
+      WHERE t.name % ${q} OR t.name ILIKE ${prefix}
+      ORDER BY similarity(t.name, ${q}) DESC
+      LIMIT 4
+    `),
+    db.execute(sql`
+      SELECT c.name AS name
+      FROM category c
+      WHERE c.name % ${q} OR c.name ILIKE ${prefix}
+      ORDER BY similarity(c.name, ${q}) DESC
+      LIMIT 3
+    `),
+  ]);
 
-  const rows = results.rows as unknown as SuggestRow[];
-  return c.json({ suggestions: rows.map((row) => row.title) });
+  const videoRows = videoResults.rows as unknown as VideoSuggestRow[];
+  const tagRows = tagResults.rows as unknown as NamedSuggestRow[];
+  const categoryRows = categoryResults.rows as unknown as NamedSuggestRow[];
+
+  const suggestions = [
+    ...categoryRows.map((row) => ({ type: "category" as const, label: row.name })),
+    ...tagRows.map((row) => ({ type: "tag" as const, label: row.name })),
+    ...videoRows.map((row) => ({ type: "video" as const, label: row.title })),
+  ];
+
+  return c.json({ suggestions });
 });

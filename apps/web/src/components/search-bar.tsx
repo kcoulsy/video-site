@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Search, X } from "lucide-react";
+import { Folder, Hash, Search, X } from "lucide-react";
 
 import { apiClient } from "@/lib/api-client";
 
+interface Suggestion {
+  type: "video" | "tag" | "category";
+  label: string;
+}
+
 interface SuggestResponse {
-  suggestions: string[];
+  suggestions: Suggestion[];
 }
 
 export function SearchBar() {
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,7 +40,7 @@ export function SearchBar() {
     (e: React.FormEvent) => {
       e.preventDefault();
       if (activeIndex >= 0 && suggestions[activeIndex]) {
-        const picked = suggestions[activeIndex];
+        const picked = suggestions[activeIndex].label;
         setQuery(picked);
         submitSearch(picked);
       } else {
@@ -170,21 +175,32 @@ export function SearchBar() {
         >
           {suggestions.map((suggestion, i) => (
             <li
-              key={suggestion}
+              key={`${suggestion.type}:${suggestion.label}`}
               role="option"
               aria-selected={i === activeIndex}
               onMouseDown={(e) => {
                 e.preventDefault();
-                setQuery(suggestion);
-                submitSearch(suggestion);
+                setQuery(suggestion.label);
+                submitSearch(suggestion.label);
               }}
               onMouseEnter={() => setActiveIndex(i)}
               className={`flex cursor-pointer items-center gap-2 px-4 py-2 text-sm transition-colors ${
                 i === activeIndex ? "bg-accent text-foreground" : "text-muted-foreground"
               }`}
             >
-              <Search className="h-3.5 w-3.5 shrink-0 opacity-60" />
-              <span className="truncate">{suggestion}</span>
+              {suggestion.type === "tag" ? (
+                <Hash className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              ) : suggestion.type === "category" ? (
+                <Folder className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              ) : (
+                <Search className="h-3.5 w-3.5 shrink-0 opacity-60" />
+              )}
+              <span className="truncate">{suggestion.label}</span>
+              {suggestion.type !== "video" && (
+                <span className="ml-auto text-xs uppercase tracking-wide opacity-50">
+                  {suggestion.type}
+                </span>
+              )}
             </li>
           ))}
         </ul>
