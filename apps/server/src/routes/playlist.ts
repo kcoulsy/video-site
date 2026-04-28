@@ -49,14 +49,23 @@ playlistRoutes.get("/playlists", async (c) => {
       ownerName: user.name,
       ownerHandle: user.handle,
       ownerImage: user.image,
-      itemCount: sql<number>`(SELECT COUNT(*)::int FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id})`,
-      thumbVideoId: sql<
-        string | null
-      >`(SELECT ${playlistItem.videoId} FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id} ORDER BY ${playlistItem.position} ASC LIMIT 1)`,
+      itemCount: sql<number>`COALESCE(pl_summary.count, 0)::int`,
+      thumbVideoId: sql<string | null>`pl_summary.first_video_id`,
       total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(playlist)
     .innerJoin(user, eq(user.id, playlist.userId))
+    .leftJoin(
+      sql`LATERAL (
+        SELECT COUNT(*) AS count,
+               (SELECT ${playlistItem.videoId} FROM ${playlistItem}
+                WHERE ${playlistItem.playlistId} = ${playlist.id}
+                ORDER BY ${playlistItem.position} ASC LIMIT 1) AS first_video_id
+        FROM ${playlistItem}
+        WHERE ${playlistItem.playlistId} = ${playlist.id}
+      ) AS pl_summary`,
+      sql`true`,
+    )
     .where(and(eq(playlist.visibility, "public"), activeAuthorWhere()))
     .orderBy(desc(playlist.updatedAt))
     .limit(limit)
@@ -89,13 +98,16 @@ playlistRoutes.get("/playlists", async (c) => {
 
 playlistRoutes.get("/users/:handle/playlists", async (c) => {
   const handle = c.req.param("handle").toLowerCase();
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const params = Object.fromEntries(new URL(c.req.url).searchParams);
+  const page = Math.max(1, Math.min(500, Number(params.page) || 1));
+  const limit = Math.max(1, Math.min(50, Number(params.limit) || 48));
+  const offset = (page - 1) * limit;
 
-  const [owner] = await db
-    .select({ id: user.id })
-    .from(user)
-    .where(eq(user.handle, handle))
-    .limit(1);
+  const [ownerRows, session] = await Promise.all([
+    db.select({ id: user.id }).from(user).where(eq(user.handle, handle)).limit(1),
+    auth.api.getSession({ headers: c.req.raw.headers }),
+  ]);
+  const owner = ownerRows[0];
   if (!owner) throw new NotFoundError("Profile");
 
   const isOwner = session?.user.id === owner.id;
@@ -110,26 +122,49 @@ playlistRoutes.get("/users/:handle/playlists", async (c) => {
       description: playlist.description,
       visibility: playlist.visibility,
       updatedAt: playlist.updatedAt,
-      itemCount: sql<number>`(SELECT COUNT(*)::int FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id})`,
-      thumbVideoId: sql<
-        string | null
-      >`(SELECT ${playlistItem.videoId} FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id} ORDER BY ${playlistItem.position} ASC LIMIT 1)`,
+      itemCount: sql<number>`COALESCE(pl_summary.count, 0)::int`,
+      thumbVideoId: sql<string | null>`pl_summary.first_video_id`,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(playlist)
+    .leftJoin(
+      sql`LATERAL (
+        SELECT COUNT(*) AS count,
+               (SELECT ${playlistItem.videoId} FROM ${playlistItem}
+                WHERE ${playlistItem.playlistId} = ${playlist.id}
+                ORDER BY ${playlistItem.position} ASC LIMIT 1) AS first_video_id
+        FROM ${playlistItem}
+        WHERE ${playlistItem.playlistId} = ${playlist.id}
+      ) AS pl_summary`,
+      sql`true`,
+    )
     .where(and(eq(playlist.userId, owner.id), visWhere))
     .orderBy(desc(playlist.updatedAt))
-    .limit(48);
+    .limit(limit)
+    .offset(offset);
 
+  const total = rows[0]?.total ?? 0;
   return c.json({
-    items: rows.map((r) => ({
-      ...r,
-      thumbnailUrl: r.thumbVideoId ? `/api/stream/${r.thumbVideoId}/thumbnail` : null,
-    })),
+    items: rows.map(({ total: _t, ...r }) => {
+      void _t;
+      return {
+        ...r,
+        thumbnailUrl: r.thumbVideoId ? `/api/stream/${r.thumbVideoId}/thumbnail` : null,
+      };
+    }),
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
   });
 });
 
 playlistRoutes.get("/playlists/mine", requireAuth, async (c) => {
   const userId = c.get("user").id;
+  const params = Object.fromEntries(new URL(c.req.url).searchParams);
+  const page = Math.max(1, Math.min(500, Number(params.page) || 1));
+  const limit = Math.max(1, Math.min(100, Number(params.limit) || 48));
+  const offset = (page - 1) * limit;
 
   const rows = await db
     .select({
@@ -139,20 +174,40 @@ playlistRoutes.get("/playlists/mine", requireAuth, async (c) => {
       visibility: playlist.visibility,
       createdAt: playlist.createdAt,
       updatedAt: playlist.updatedAt,
-      itemCount: sql<number>`(SELECT COUNT(*)::int FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id})`,
-      thumbVideoId: sql<
-        string | null
-      >`(SELECT ${playlistItem.videoId} FROM ${playlistItem} WHERE ${playlistItem.playlistId} = ${playlist.id} ORDER BY ${playlistItem.position} ASC LIMIT 1)`,
+      itemCount: sql<number>`COALESCE(pl_summary.count, 0)::int`,
+      thumbVideoId: sql<string | null>`pl_summary.first_video_id`,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(playlist)
+    .leftJoin(
+      sql`LATERAL (
+        SELECT COUNT(*) AS count,
+               (SELECT ${playlistItem.videoId} FROM ${playlistItem}
+                WHERE ${playlistItem.playlistId} = ${playlist.id}
+                ORDER BY ${playlistItem.position} ASC LIMIT 1) AS first_video_id
+        FROM ${playlistItem}
+        WHERE ${playlistItem.playlistId} = ${playlist.id}
+      ) AS pl_summary`,
+      sql`true`,
+    )
     .where(eq(playlist.userId, userId))
-    .orderBy(desc(playlist.updatedAt));
+    .orderBy(desc(playlist.updatedAt))
+    .limit(limit)
+    .offset(offset);
 
+  const total = rows[0]?.total ?? 0;
   return c.json({
-    items: rows.map((r) => ({
-      ...r,
-      thumbnailUrl: r.thumbVideoId ? `/api/stream/${r.thumbVideoId}/thumbnail` : null,
-    })),
+    items: rows.map(({ total: _t, ...r }) => {
+      void _t;
+      return {
+        ...r,
+        thumbnailUrl: r.thumbVideoId ? `/api/stream/${r.thumbVideoId}/thumbnail` : null,
+      };
+    }),
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
   });
 });
 
@@ -169,7 +224,8 @@ playlistRoutes.get("/playlists/contains/:videoId", requireAuth, async (c) => {
     })
     .from(playlist)
     .where(eq(playlist.userId, userId))
-    .orderBy(desc(playlist.updatedAt));
+    .orderBy(desc(playlist.updatedAt))
+    .limit(100);
 
   return c.json({ items: rows });
 });

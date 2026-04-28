@@ -293,32 +293,32 @@ export async function getRelated(
   limit = 15,
   userId: string | null = null,
 ): Promise<VideoCard[]> {
-  const currentRows = await db
-    .select({
-      id: video.id,
-      title: video.title,
-      tags: video.tags,
-      userId: video.userId,
-    })
-    .from(video)
-    .where(eq(video.id, videoId))
-    .limit(1);
+  const [currentRows, sims] = await Promise.all([
+    db
+      .select({
+        id: video.id,
+        title: video.title,
+        tags: video.tags,
+        userId: video.userId,
+      })
+      .from(video)
+      .where(eq(video.id, videoId))
+      .limit(1),
+    db
+      .select({
+        otherVideoId: videoSimilarity.otherVideoId,
+        score: videoSimilarity.score,
+      })
+      .from(videoSimilarity)
+      .where(eq(videoSimilarity.videoId, videoId))
+      .orderBy(desc(videoSimilarity.score))
+      .limit(limit * RELATED_SIM_OVERFETCH),
+  ]);
   const current = currentRows[0];
   if (!current) return getTrending(limit, [videoId]);
 
   const currentTitleTokens = titleTokens(current.title);
   const currentTags = current.tags ?? [];
-
-  // Co-watch (item-CF) similarity rows.
-  const sims = await db
-    .select({
-      otherVideoId: videoSimilarity.otherVideoId,
-      score: videoSimilarity.score,
-    })
-    .from(videoSimilarity)
-    .where(eq(videoSimilarity.videoId, videoId))
-    .orderBy(desc(videoSimilarity.score))
-    .limit(limit * RELATED_SIM_OVERFETCH);
 
   const cfScoreById = new Map(sims.map((s) => [s.otherVideoId, s.score]));
   const maxCfScore = sims.reduce((m, s) => (s.score > m ? s.score : m), 0);
@@ -362,7 +362,13 @@ export async function getRelated(
   let viewerTags = new Set<string>();
   let viewerCompletedIds = new Set<string>();
   if (userId) {
-    const seeds = await getUserSeedVideos(userId);
+    const [seeds, completed] = await Promise.all([
+      getUserSeedVideos(userId),
+      db
+        .select({ videoId: watchHistory.videoId })
+        .from(watchHistory)
+        .where(and(eq(watchHistory.userId, userId), sql`${watchHistory.completedAt} IS NOT NULL`)),
+    ]);
     if (seeds.length > 0) {
       const seedRows = await db
         .select({ tags: video.tags, userId: video.userId })
@@ -373,11 +379,6 @@ export async function getRelated(
         for (const t of s.tags ?? []) viewerTags.add(t);
       }
     }
-
-    const completed = await db
-      .select({ videoId: watchHistory.videoId })
-      .from(watchHistory)
-      .where(and(eq(watchHistory.userId, userId), sql`${watchHistory.completedAt} IS NOT NULL`));
     viewerCompletedIds = new Set(completed.map((r) => r.videoId));
   }
 
@@ -529,27 +530,27 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
 
   const targetCount = limit * HOME_CANDIDATE_OVERFETCH;
 
-  const continueWatching = await getContinueWatching(userId, HOME_CONTINUE_WATCHING_LIMIT);
+  const [continueWatching, userCfRows, itemCfScores] = await Promise.all([
+    getContinueWatching(userId, HOME_CONTINUE_WATCHING_LIMIT),
+    db
+      .select({
+        ...baseVideoSelect,
+        cfScore: userRecs.score,
+        completedAt: watchHistory.completedAt,
+      })
+      .from(userRecs)
+      .innerJoin(video, eq(video.id, userRecs.videoId))
+      .innerJoin(user, eq(user.id, video.userId))
+      .leftJoin(
+        watchHistory,
+        and(eq(watchHistory.userId, userId), eq(watchHistory.videoId, video.id)),
+      )
+      .where(and(eq(userRecs.userId, userId), publicReadyWhere))
+      .orderBy(desc(userRecs.score))
+      .limit(targetCount),
+    getItemCfCandidates(userId),
+  ]);
   const cwIds = new Set(continueWatching.map((c) => c.id));
-
-  const userCfRows = await db
-    .select({
-      ...baseVideoSelect,
-      cfScore: userRecs.score,
-      completedAt: watchHistory.completedAt,
-    })
-    .from(userRecs)
-    .innerJoin(video, eq(video.id, userRecs.videoId))
-    .innerJoin(user, eq(user.id, video.userId))
-    .leftJoin(
-      watchHistory,
-      and(eq(watchHistory.userId, userId), eq(watchHistory.videoId, video.id)),
-    )
-    .where(and(eq(userRecs.userId, userId), publicReadyWhere))
-    .orderBy(desc(userRecs.score))
-    .limit(targetCount);
-
-  const itemCfScores = await getItemCfCandidates(userId);
 
   const entries = new Map<string, HomeEntry>();
 

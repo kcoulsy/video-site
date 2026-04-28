@@ -13,6 +13,15 @@ const USERS_DIR = "users";
 
 const toForwardSlashes = (p: string) => p.replaceAll("\\", "/");
 
+// Defensive: this package's caller-supplied filenames must be a single safe segment.
+// Rejects path separators, traversal sequences, NULs, and leading dots.
+const SAFE_FILENAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$/;
+function assertSafeFilename(filename: string): void {
+  if (!SAFE_FILENAME_RE.test(filename) || filename.includes("..")) {
+    throw new Error(`Unsafe filename: ${filename}`);
+  }
+}
+
 export function createLocalStorage(basePath: string): StorageService {
   if (!path.isAbsolute(basePath)) {
     throw new Error(`STORAGE_PATH must be an absolute path, got: ${basePath}`);
@@ -30,6 +39,7 @@ export function createLocalStorage(basePath: string): StorageService {
 
   return {
     async saveRawUpload(videoId, sourceFile, filename) {
+      assertSafeFilename(filename);
       const dir = getRawDir(videoId);
       await mkdir(dir, { recursive: true });
       const dest = toForwardSlashes(path.join(dir, filename));
@@ -55,6 +65,7 @@ export function createLocalStorage(basePath: string): StorageService {
     },
 
     async saveThumbnail(videoId, data, filename = "thumbnail.jpg") {
+      assertSafeFilename(filename);
       const dir = getThumbnailDir(videoId);
       await mkdir(dir, { recursive: true });
       const dest = toForwardSlashes(path.join(dir, filename));
@@ -67,9 +78,11 @@ export function createLocalStorage(basePath: string): StorageService {
     },
 
     async saveUserImage(userId, kind, data, extension = "jpg") {
+      const filename = `${kind}.${extension}`;
+      assertSafeFilename(filename);
       const dir = getUserImageDir(userId);
       await mkdir(dir, { recursive: true });
-      const dest = toForwardSlashes(path.join(dir, `${kind}.${extension}`));
+      const dest = toForwardSlashes(path.join(dir, filename));
       await Bun.write(dest, data);
       return dest;
     },

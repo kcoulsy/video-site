@@ -1,4 +1,6 @@
+import { env } from "@video-site/env/server";
 import type { Context } from "hono";
+import { getConnInfo } from "hono/adapter/bun/conninfo";
 import { createMiddleware } from "hono/factory";
 
 import { AppError } from "../lib/errors";
@@ -21,9 +23,20 @@ interface RateLimitOptions {
 function clientIdent(c: Context): string {
   const user = c.get("user") as AppUser | undefined;
   if (user?.id) return `u:${user.id}`;
-  const fwd = c.req.header("x-forwarded-for");
-  const ip = fwd?.split(",")[0]?.trim() || c.req.header("x-real-ip") || "anon";
-  return `ip:${ip}`;
+  // Only honor proxy headers when the deployment explicitly opts in via TRUST_PROXY.
+  // Otherwise an unauthenticated caller could rotate X-Forwarded-For to bypass per-IP buckets.
+  if (env.TRUST_PROXY) {
+    const fwd = c.req.header("x-forwarded-for");
+    const ip = fwd?.split(",")[0]?.trim() || c.req.header("x-real-ip");
+    if (ip) return `ip:${ip}`;
+  }
+  try {
+    const info = getConnInfo(c);
+    if (info.remote.address) return `ip:${info.remote.address}`;
+  } catch {
+    // adapter not available (e.g. tests) — fall through
+  }
+  return "ip:anon";
 }
 
 export function rateLimit(opts: RateLimitOptions) {

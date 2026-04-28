@@ -184,7 +184,10 @@ videoRoutes.get("/my", requireAuth, async (c) => {
   const currentUser = c.get("user");
 
   const rows = await db
-    .select()
+    .select({
+      v: video,
+      total: sql<number>`COUNT(*) OVER()::int`,
+    })
     .from(video)
     .where(eq(video.userId, currentUser.id))
     .orderBy(desc(video.createdAt))
@@ -192,18 +195,13 @@ videoRoutes.get("/my", requireAuth, async (c) => {
     .offset((page - 1) * limit);
 
   const items = rows.map((r) => ({
-    ...r,
-    thumbnailUrl: thumbnailUrlFor(r.id, r.thumbnailPath, r.thumbnailStillIndex),
-    isRemoved: r.deletedAt != null,
+    ...r.v,
+    thumbnailUrl: thumbnailUrlFor(r.v.id, r.v.thumbnailPath, r.v.thumbnailStillIndex),
+    isRemoved: r.v.deletedAt != null,
   }));
+  const total = rows[0]?.total ?? 0;
 
-  const countResult = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(video)
-    .where(eq(video.userId, currentUser.id));
-  const count = countResult[0]?.count ?? 0;
-
-  return c.json({ items, page, limit, total: count });
+  return c.json({ items, page, limit, total });
 });
 
 videoRoutes.get("/", async (c) => {
@@ -339,6 +337,7 @@ videoRoutes.get("/:id", async (c) => {
     }
   }
 
+  c.header("Cache-Control", "private, max-age=60");
   return c.json({
     ...row.v,
     streamUrl: streamUrlFor(row.v.id, row.v.status),

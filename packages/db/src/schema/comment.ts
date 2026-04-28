@@ -56,5 +56,9 @@ export const comment = pgTable(
     index("comment_video_visible_created_idx")
       .on(table.videoId, table.createdAt.desc())
       .where(sql`${table.removedBy} IS NULL`),
+    index("comment_video_toplevel_created_idx")
+      .on(table.videoId, table.createdAt.desc())
+      .where(sql`${table.parentId} IS NULL`),
+    index("comment_video_root_created_idx").on(table.videoId, table.rootId, table.createdAt),
   ],
 );

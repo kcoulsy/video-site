@@ -91,11 +91,23 @@ function extractThumbnail(
 }
 
 export const THUMBNAIL_WIDTHS = [320, 640, 1280] as const;
+// Defensive caps for sharp inputs to prevent image-bomb DoS in the worker.
+export const MAX_INPUT_DIMENSION = 8000;
+export const MAX_INPUT_PIXELS = MAX_INPUT_DIMENSION * MAX_INPUT_DIMENSION;
 
 async function writeWebpVariants(jpegPath: string): Promise<void> {
   const dir = path.posix.dirname(jpegPath);
   const base = path.posix.basename(jpegPath, path.posix.extname(jpegPath));
-  const input = sharp(jpegPath);
+  const input = sharp(jpegPath, { limitInputPixels: MAX_INPUT_PIXELS }).timeout({ seconds: 30 });
+  const meta = await input.metadata();
+  if (
+    (meta.width ?? 0) > MAX_INPUT_DIMENSION ||
+    (meta.height ?? 0) > MAX_INPUT_DIMENSION
+  ) {
+    throw new Error(
+      `still ${meta.width}x${meta.height} exceeds ${MAX_INPUT_DIMENSION}px cap`,
+    );
+  }
   await Promise.all(
     THUMBNAIL_WIDTHS.map(async (w) => {
       const out = path.posix.join(dir, `${base}-${w}.webp`);
@@ -320,12 +332,9 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
     for (let i = 0; i < STILL_FRACTIONS.length; i++) {
       await extractThumbnail(rawPath, stillFiles[i]!, duration * STILL_FRACTIONS[i]!);
       // Pre-render WebP variants so the streaming route can serve them with no per-request cost.
-      // Best-effort: a sharp failure shouldn't fail the whole job (we still have the JPEG).
-      try {
-        await writeWebpVariants(stillFiles[i]!);
-      } catch (err) {
-        console.error(`[transcode ${videoId}] webp variant generation failed for still-${i}:`, err);
-      }
+      // Failures propagate so BullMQ retries the job — JPEG-only thumbnails are a degraded result
+      // we don't want shipping silently.
+      await writeWebpVariants(stillFiles[i]!);
     }
 
     const defaultStillIndex = 1;

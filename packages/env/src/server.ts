@@ -11,6 +11,12 @@ export const env = createEnv({
     REDIS_URL: z.string().default("redis://localhost:6379"),
     STORAGE_PATH: z.string().min(1),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+    // When true, trust X-Forwarded-For / X-Real-IP for the client IP. Only enable
+    // when the server is behind a proxy you control (Nginx, Caddy, Cloudflare).
+    TRUST_PROXY: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true,

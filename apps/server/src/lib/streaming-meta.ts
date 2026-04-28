@@ -6,7 +6,10 @@ import { eq } from "drizzle-orm";
 import { getRedisClient } from "./redis";
 
 const CACHE_TTL_SECONDS = 60;
-const NEGATIVE_CACHE_TTL_SECONDS = 30;
+// Short negative TTL: a moderator un-deleting a video should be visible quickly.
+// Positive cache is invalidated explicitly via invalidateStreamableVideoMeta on writes;
+// the not-found path has no such hook so we rely on a tight TTL instead.
+const NEGATIVE_CACHE_TTL_SECONDS = 5;
 const cacheKey = (videoId: string) => `stream:meta:${videoId}`;
 
 export interface StreamableVideoMeta {

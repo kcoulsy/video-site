@@ -187,46 +187,88 @@ profileRoutes.get("/profile/:handle", async (c) => {
   const handle = c.req.param("handle").toLowerCase();
   if (!HANDLE_RE.test(handle)) throw new NotFoundError("Profile");
 
-  const [row] = await db
-    .select({
-      id: user.id,
-      name: user.name,
-      handle: user.handle,
-      bio: user.bio,
-      image: user.image,
-      bannerPath: user.bannerPath,
-      createdAt: user.createdAt,
-      bannedAt: user.bannedAt,
-      suspendedUntil: user.suspendedUntil,
-    })
-    .from(user)
-    .where(eq(user.handle, handle))
-    .limit(1);
+  const [profileRows, session] = await Promise.all([
+    db
+      .select({
+        id: user.id,
+        name: user.name,
+        handle: user.handle,
+        bio: user.bio,
+        image: user.image,
+        bannerPath: user.bannerPath,
+        createdAt: user.createdAt,
+        bannedAt: user.bannedAt,
+        suspendedUntil: user.suspendedUntil,
+      })
+      .from(user)
+      .where(eq(user.handle, handle))
+      .limit(1),
+    auth.api.getSession({ headers: c.req.raw.headers }),
+  ]);
+  const row = profileRows[0];
   if (!row) throw new NotFoundError("Profile");
   if (row.bannedAt) throw new NotFoundError("Profile");
   if (row.suspendedUntil && row.suspendedUntil > new Date()) throw new NotFoundError("Profile");
 
-  const videos = await db
-    .select({
-      id: video.id,
-      title: video.title,
-      thumbnailPath: video.thumbnailPath,
-      thumbnailStillIndex: video.thumbnailStillIndex,
-      duration: video.duration,
-      viewCount: video.viewCount,
-      createdAt: video.createdAt,
-    })
-    .from(video)
-    .where(
-      and(
-        eq(video.userId, row.id),
-        eq(video.status, "ready"),
-        eq(video.visibility, "public"),
-        visibleVideoWhere(),
+  const viewerId = session?.user.id;
+  const isOwner = viewerId === row.id;
+
+  const [videos, counts, playlistCounts, subCounts, subExists] = await Promise.all([
+    db
+      .select({
+        id: video.id,
+        title: video.title,
+        thumbnailPath: video.thumbnailPath,
+        thumbnailStillIndex: video.thumbnailStillIndex,
+        duration: video.duration,
+        viewCount: video.viewCount,
+        createdAt: video.createdAt,
+      })
+      .from(video)
+      .where(
+        and(
+          eq(video.userId, row.id),
+          eq(video.status, "ready"),
+          eq(video.visibility, "public"),
+          visibleVideoWhere(),
+        ),
+      )
+      .orderBy(desc(video.createdAt))
+      .limit(48),
+    db
+      .select({ videoCount: sql<number>`count(*)::int` })
+      .from(video)
+      .innerJoin(user, eq(user.id, video.userId))
+      .where(
+        and(
+          eq(video.userId, row.id),
+          eq(video.status, "ready"),
+          eq(video.visibility, "public"),
+          visibleVideoWhere(),
+          activeAuthorWhere(),
+        ),
       ),
-    )
-    .orderBy(desc(video.createdAt))
-    .limit(48);
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(playlist)
+      .where(
+        and(
+          eq(playlist.userId, row.id),
+          isOwner ? sql`${playlist.visibility} <> 'private'` : eq(playlist.visibility, "public"),
+        ),
+      ),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(subscription)
+      .where(eq(subscription.channelId, row.id)),
+    viewerId && !isOwner
+      ? db
+          .select({ x: sql<number>`1` })
+          .from(subscription)
+          .where(and(eq(subscription.subscriberId, viewerId), eq(subscription.channelId, row.id)))
+          .limit(1)
+      : Promise.resolve([] as { x: number }[]),
+  ]);
 
   const avatarUrl = userImageUrl(row.id, "avatar", row.image);
   const items = videos.map((v) => ({
@@ -241,47 +283,7 @@ profileRoutes.get("/profile/:handle", async (c) => {
     user: { id: row.id, name: row.name, image: avatarUrl },
   }));
 
-  const [counts] = await db
-    .select({ videoCount: sql<number>`count(*)::int` })
-    .from(video)
-    .innerJoin(user, eq(user.id, video.userId))
-    .where(
-      and(
-        eq(video.userId, row.id),
-        eq(video.status, "ready"),
-        eq(video.visibility, "public"),
-        visibleVideoWhere(),
-        activeAuthorWhere(),
-      ),
-    );
-
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  const viewerId = session?.user.id;
-  const isOwner = viewerId === row.id;
-  const [playlistCounts] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(playlist)
-    .where(
-      and(
-        eq(playlist.userId, row.id),
-        isOwner ? sql`${playlist.visibility} <> 'private'` : eq(playlist.visibility, "public"),
-      ),
-    );
-
-  const [subCounts] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(subscription)
-    .where(eq(subscription.channelId, row.id));
-
-  let viewerIsSubscribed = false;
-  if (viewerId && !isOwner) {
-    const [exists] = await db
-      .select({ x: sql<number>`1` })
-      .from(subscription)
-      .where(and(eq(subscription.subscriberId, viewerId), eq(subscription.channelId, row.id)))
-      .limit(1);
-    viewerIsSubscribed = !!exists;
-  }
+  const viewerIsSubscribed = subExists.length > 0;
 
   c.header("Cache-Control", "private, max-age=30");
   return c.json({
@@ -296,9 +298,9 @@ profileRoutes.get("/profile/:handle", async (c) => {
     },
     videos: items,
     counts: {
-      videos: counts?.videoCount ?? 0,
-      playlists: playlistCounts?.count ?? 0,
-      subscribers: subCounts?.count ?? 0,
+      videos: counts[0]?.videoCount ?? 0,
+      playlists: playlistCounts[0]?.count ?? 0,
+      subscribers: subCounts[0]?.count ?? 0,
     },
     viewerIsSubscribed,
     isOwner,

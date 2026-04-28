@@ -561,7 +561,7 @@ modOnly.get("/reports", async (c) => {
 
   const where = status ? eq(report.status, status) : undefined;
 
-  const items = await db
+  const rows = await db
     .select({
       id: report.id,
       reporterId: report.reporterId,
@@ -576,6 +576,7 @@ modOnly.get("/reports", async (c) => {
       createdAt: report.createdAt,
       reporterName: user.name,
       reporterEmail: user.email,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(report)
     .leftJoin(user, eq(user.id, report.reporterId))
@@ -584,12 +585,13 @@ modOnly.get("/reports", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  const [total] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(report)
-    .where(where);
+  const total = rows[0]?.total ?? 0;
+  const items = rows.map(({ total: _t, ...rest }) => {
+    void _t;
+    return rest;
+  });
 
-  return c.json({ items, page, limit, total: total?.count ?? 0 });
+  return c.json({ items, page, limit, total });
 });
 
 modOnly.post("/reports/:id/resolve", async (c) => {
@@ -680,7 +682,7 @@ modOnly.get("/actions", async (c) => {
   ].filter((c): c is NonNullable<typeof c> => c !== undefined);
   const where = conditions.length ? and(...conditions) : undefined;
 
-  const items = await db
+  const rows = await db
     .select({
       id: moderationAction.id,
       actorId: moderationAction.actorId,
@@ -692,6 +694,7 @@ modOnly.get("/actions", async (c) => {
       createdAt: moderationAction.createdAt,
       actorName: user.name,
       actorEmail: user.email,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(moderationAction)
     .leftJoin(user, eq(user.id, moderationAction.actorId))
@@ -700,12 +703,13 @@ modOnly.get("/actions", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  const [total] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(moderationAction)
-    .where(where);
+  const total = rows[0]?.total ?? 0;
+  const items = rows.map(({ total: _t, ...rest }) => {
+    void _t;
+    return rest;
+  });
 
-  return c.json({ items, page, limit, total: total?.count ?? 0 });
+  return c.json({ items, page, limit, total });
 });
 
 // Hard delete (admin only)

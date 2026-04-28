@@ -1,5 +1,5 @@
 import { db, generateId } from "@video-site/db";
-import { user } from "@video-site/db/schema/auth";
+import { account, session, user } from "@video-site/db/schema/auth";
 import { comment } from "@video-site/db/schema/comment";
 import { category, categoryTag, tag, videoTag } from "@video-site/db/schema/tags";
 import { video } from "@video-site/db/schema/video";
@@ -70,7 +70,10 @@ adminRoutes.get("/stats", async (c) => {
 adminRoutes.get("/users", async (c) => {
   const parsed = listQuerySchema.safeParse(Object.fromEntries(new URL(c.req.url).searchParams));
   if (!parsed.success) throw new ValidationError("Invalid query");
-  const { page, limit, q } = parsed.data;
+  const { page, q } = parsed.data;
+  // Cap search limit to 25: ILIKE %q% on email+name is a seq scan without a trigram
+  // index, and the listQuerySchema otherwise allows up to 100.
+  const limit = q ? Math.min(parsed.data.limit, 25) : parsed.data.limit;
 
   const where = q ? or(ilike(user.email, `%${q}%`), ilike(user.name, `%${q}%`)) : undefined;
 
@@ -88,21 +91,31 @@ adminRoutes.get("/users", async (c) => {
       suspendReason: user.suspendReason,
       mutedAt: user.mutedAt,
       muteReason: user.muteReason,
-      videoCount: sql<number>`(SELECT count(*)::int FROM ${video} WHERE ${video.userId} = ${user.id})`,
-      commentCount: sql<number>`(SELECT count(*)::int FROM ${comment} WHERE ${comment.userId} = ${user.id})`,
+      videoCount: sql<number>`COALESCE(vc.count, 0)::int`,
+      commentCount: sql<number>`COALESCE(cc.count, 0)::int`,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(user)
+    .leftJoin(
+      sql`(SELECT user_id, count(*)::int AS count FROM ${video} GROUP BY user_id) AS vc`,
+      sql`vc.user_id = ${user.id}`,
+    )
+    .leftJoin(
+      sql`(SELECT user_id, count(*)::int AS count FROM ${comment} GROUP BY user_id) AS cc`,
+      sql`cc.user_id = ${user.id}`,
+    )
     .where(where)
     .orderBy(desc(user.createdAt))
     .limit(limit)
     .offset((page - 1) * limit);
 
-  const [total] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(user)
-    .where(where);
+  const total = rows[0]?.total ?? 0;
+  const items = rows.map(({ total: _t, ...rest }) => {
+    void _t;
+    return rest;
+  });
 
-  return c.json({ items: rows, page, limit, total: total?.count ?? 0 });
+  return c.json({ items, page, limit, total });
 });
 
 const updateUserSchema = z.object({ role: roleSchema });
@@ -160,6 +173,11 @@ adminRoutes.delete("/users/:id", async (c) => {
       targetId: id,
       metadata: { videoCount: userVideos.length },
     });
+    // Explicitly invalidate sessions and credentials in the same tx so the deleted
+    // user can't ride a live session even briefly. The FKs are ON DELETE CASCADE,
+    // but being explicit survives schema drift and makes the security guarantee local.
+    await tx.delete(session).where(eq(session.userId, id));
+    await tx.delete(account).where(eq(account.userId, id));
     await tx.delete(user).where(eq(user.id, id));
   });
 
@@ -210,6 +228,7 @@ adminRoutes.get("/videos", async (c) => {
       ownerId: user.id,
       ownerName: user.name,
       ownerEmail: user.email,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(video)
     .innerJoin(user, eq(user.id, video.userId))
@@ -218,10 +237,7 @@ adminRoutes.get("/videos", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  const [total] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(video)
-    .where(where);
+  const total = rows[0]?.total ?? 0;
 
   const items = rows.map((r) => ({
     id: r.id,
@@ -240,7 +256,7 @@ adminRoutes.get("/videos", async (c) => {
     owner: { id: r.ownerId, name: r.ownerName, email: r.ownerEmail },
   }));
 
-  return c.json({ items, page, limit, total: total?.count ?? 0 });
+  return c.json({ items, page, limit, total });
 });
 
 const updateVideoSchema = z.object({
@@ -352,6 +368,7 @@ adminRoutes.get("/comments", async (c) => {
       authorId: user.id,
       authorName: user.name,
       authorEmail: user.email,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(comment)
     .innerJoin(user, eq(user.id, comment.userId))
@@ -361,12 +378,13 @@ adminRoutes.get("/comments", async (c) => {
     .limit(limit)
     .offset((page - 1) * limit);
 
-  const [total] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(comment)
-    .where(where);
+  const total = rows[0]?.total ?? 0;
+  const items = rows.map(({ total: _t, ...rest }) => {
+    void _t;
+    return rest;
+  });
 
-  return c.json({ items: rows, page, limit, total: total?.count ?? 0 });
+  return c.json({ items, page, limit, total });
 });
 
 // ---------- Tags ----------

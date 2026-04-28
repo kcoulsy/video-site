@@ -48,6 +48,11 @@ subscriptionRoutes.delete("/channels/:handle/subscribe", requireAuth, async (c) 
 
 subscriptionRoutes.get("/me/subscriptions", requireAuth, async (c) => {
   const me = c.get("user").id;
+  const params = Object.fromEntries(new URL(c.req.url).searchParams);
+  const page = Math.max(1, Math.min(500, Number(params.page) || 1));
+  const limit = Math.max(1, Math.min(100, Number(params.limit) || 50));
+  const offset = (page - 1) * limit;
+
   const rows = await db
     .select({
       id: user.id,
@@ -55,13 +60,28 @@ subscriptionRoutes.get("/me/subscriptions", requireAuth, async (c) => {
       handle: user.handle,
       image: user.image,
       since: subscription.createdAt,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(subscription)
     .innerJoin(user, eq(user.id, subscription.channelId))
     .where(eq(subscription.subscriberId, me))
-    .orderBy(desc(subscription.createdAt));
+    .orderBy(desc(subscription.createdAt))
+    .limit(limit)
+    .offset(offset);
 
-  return c.json({ items: rows });
+  const total = rows[0]?.total ?? 0;
+  const items = rows.map(({ total: _t, ...rest }) => {
+    void _t;
+    return rest;
+  });
+
+  return c.json({
+    items,
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  });
 });
 
 subscriptionRoutes.get("/me/subscriptions/feed", requireAuth, async (c) => {

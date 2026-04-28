@@ -37,6 +37,7 @@ watchLaterRoutes.get("/watch-later", requireAuth, async (c) => {
       ownerId: user.id,
       ownerName: user.name,
       ownerImage: user.image,
+      total: sql<number>`COUNT(*) OVER()::int`,
     })
     .from(watchLater)
     .innerJoin(video, eq(video.id, watchLater.videoId))
@@ -53,14 +54,9 @@ watchLaterRoutes.get("/watch-later", requireAuth, async (c) => {
     .limit(limit + 1)
     .offset((page - 1) * limit);
 
-  const countResult = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(watchLater)
-    .where(eq(watchLater.userId, userId));
-  const total = countResult[0]?.count ?? 0;
-
   const hasMore = rows.length > limit;
   const slice = hasMore ? rows.slice(0, limit) : rows;
+  const total = rows[0]?.total ?? 0;
 
   const items = slice.map((r) => ({
     videoId: r.videoId,

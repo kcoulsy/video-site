@@ -92,6 +92,13 @@
       "when": 1777376263257,
       "tag": "0012_tag_category_trgm",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1777465000000,
+      "tag": "0013_comment_composite_indexes",
+      "breakpoints": true
     }
   ]
 }

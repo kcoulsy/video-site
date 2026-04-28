@@ -129,32 +129,35 @@ async function listComments(
   const dateOrder = sort === "oldest" ? asc(comment.createdAt) : desc(comment.createdAt);
   const orderBy = pinnedFirst ? [sql`${comment.pinnedAt} DESC NULLS LAST`, dateOrder] : [dateOrder];
 
-  const rows = await db
+  const baseQuery = db
     .select({
       c: comment,
       userId: user.id,
       userName: user.name,
       userImage: user.image,
       userHandle: user.handle,
+      liked: currentUserId
+        ? sql<boolean>`${commentLike.commentId} IS NOT NULL`
+        : sql<boolean>`false`,
     })
     .from(comment)
     .innerJoin(user, eq(user.id, comment.userId))
+    .$dynamic();
+
+  const rows = await (
+    currentUserId
+      ? baseQuery.leftJoin(
+          commentLike,
+          and(eq(commentLike.commentId, comment.id), eq(commentLike.userId, currentUserId)),
+        )
+      : baseQuery
+  )
     .where(and(...where, activeAuthorWhere()))
     .orderBy(...orderBy)
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
   const slice = hasMore ? rows.slice(0, limit) : rows;
-
-  let likedSet: Set<string> = new Set();
-  if (currentUserId && slice.length > 0) {
-    const ids = slice.map((r) => r.c.id);
-    const likedRows = await db
-      .select({ commentId: commentLike.commentId })
-      .from(commentLike)
-      .where(and(eq(commentLike.userId, currentUserId), inArray(commentLike.commentId, ids)));
-    likedSet = new Set(likedRows.map((r) => r.commentId));
-  }
 
   const items = slice.map((r) =>
     serializeComment({
@@ -165,7 +168,7 @@ async function listComments(
         image: userAvatarUrlFor(r.userId, r.userImage),
         handle: r.userHandle,
       },
-      liked: likedSet.has(r.c.id),
+      liked: r.liked,
     }),
   );
 
