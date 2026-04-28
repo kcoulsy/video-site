@@ -20,7 +20,7 @@ interface CategorySidebarProps {
   selected?: string;
 }
 
-export function CategorySidebar({ selected }: CategorySidebarProps) {
+function CategoryNav({ selected, onNavigate }: { selected?: string; onNavigate?: () => void }) {
   const { data, isLoading } = useQuery<CategoriesResponse>({
     queryKey: ["categories"],
     queryFn: () => apiClient<CategoriesResponse>("/api/categories"),
@@ -31,51 +31,67 @@ export function CategorySidebar({ selected }: CategorySidebarProps) {
   const allActive = !selected;
 
   return (
+    <>
+      <div className="mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        Categories
+      </div>
+
+      <nav className="flex flex-col">
+        <ChapterLink
+          label="All Videos"
+          active={allActive}
+          onNavigate={onNavigate}
+          search={(prev: Record<string, unknown>) => ({
+            ...prev,
+            category: undefined,
+            page: undefined,
+          })}
+        />
+
+        {isLoading && items.length === 0 ? (
+          <div className="mt-2 px-4 py-1.5 text-xs text-muted-foreground/60">Loading…</div>
+        ) : null}
+
+        {items.map((cat) => {
+          const active = selected === cat.slug;
+          return (
+            <ChapterLink
+              key={cat.id}
+              label={cat.name}
+              active={active}
+              title={cat.tags.map((t) => t.name).join(cat.mode === "all" ? " AND " : " OR ")}
+              onNavigate={onNavigate}
+              search={(prev: Record<string, unknown>) => ({
+                ...prev,
+                category: active ? undefined : cat.slug,
+                page: undefined,
+              })}
+            />
+          );
+        })}
+      </nav>
+    </>
+  );
+}
+
+export function CategorySidebar({ selected }: CategorySidebarProps) {
+  return (
     <aside className="hidden w-60 shrink-0 md:block">
       <div className="sticky top-20">
-        <div className="mb-3 px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          Categories
-        </div>
-
-        <nav className="flex flex-col">
-          <ChapterLink
-            label="All Videos"
-            active={allActive}
-            search={(prev: Record<string, unknown>) => ({
-              ...prev,
-              category: undefined,
-              page: undefined,
-            })}
-          />
-
-          {isLoading && items.length === 0 ? (
-            <div className="mt-2 px-4 py-1.5 text-xs text-muted-foreground/60">
-              Loading…
-            </div>
-          ) : null}
-
-          {items.map((cat) => {
-            const active = selected === cat.slug;
-            return (
-              <ChapterLink
-                key={cat.id}
-                label={cat.name}
-                active={active}
-                title={cat.tags
-                  .map((t) => t.name)
-                  .join(cat.mode === "all" ? " AND " : " OR ")}
-                search={(prev: Record<string, unknown>) => ({
-                  ...prev,
-                  category: active ? undefined : cat.slug,
-                  page: undefined,
-                })}
-              />
-            );
-          })}
-        </nav>
+        <CategoryNav selected={selected} />
       </div>
     </aside>
   );
+}
+
+export function CategoryDrawerContent({
+  selected,
+  onNavigate,
+}: {
+  selected?: string;
+  onNavigate?: () => void;
+}) {
+  return <CategoryNav selected={selected} onNavigate={onNavigate} />;
 }
 
 interface ChapterLinkProps {
@@ -83,14 +99,16 @@ interface ChapterLinkProps {
   active: boolean;
   title?: string;
   search: (prev: Record<string, unknown>) => Record<string, unknown>;
+  onNavigate?: () => void;
 }
 
-function ChapterLink({ label, active, title, search }: ChapterLinkProps) {
+function ChapterLink({ label, active, title, search, onNavigate }: ChapterLinkProps) {
   return (
     <Link
       to="/"
       search={search}
       title={title}
+      onClick={onNavigate}
       className={`group relative flex items-center gap-3 py-2 pl-4 pr-2 transition-all duration-200 ${
         active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
       }`}

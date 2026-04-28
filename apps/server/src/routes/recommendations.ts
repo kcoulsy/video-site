@@ -37,6 +37,7 @@ recommendationsRoutes.get("/recommendations/feed", async (c) => {
   const limit = parseLimit(c);
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   const items = await getHomeFeed(session?.user.id ?? null, limit);
+  c.header("Cache-Control", "private, max-age=30");
   return c.json({ items });
 });
 
@@ -48,16 +49,19 @@ recommendationsRoutes.get("/recommendations/trending", async (c) => {
     countTrendingCandidates(),
   ]);
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+  c.header("Cache-Control", "public, max-age=60");
   return c.json({ items, page, limit, total, totalPages });
 });
 
 recommendationsRoutes.get("/recommendations/continue-watching", requireAuth, async (c) => {
   const items = await getContinueWatching(c.get("user").id, parseLimit(c));
+  c.header("Cache-Control", "private, no-store");
   return c.json({ items });
 });
 
 recommendationsRoutes.get("/videos/:id/related", async (c) => {
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   const items = await getRelated(c.req.param("id"), parseLimit(c), session?.user.id ?? null);
+  c.header("Cache-Control", "public, max-age=60");
   return c.json({ items });
 });

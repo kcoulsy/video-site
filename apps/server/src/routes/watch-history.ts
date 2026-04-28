@@ -49,36 +49,35 @@ watchHistoryRoutes.post("/videos/:videoId/progress", ...requireActiveUser, async
   const completed = progressPercent >= 0.9;
   const now = new Date();
 
-  const [videoRow] = await db
-    .select({ id: video.id })
-    .from(video)
-    .where(eq(video.id, videoId))
-    .limit(1);
-  if (!videoRow) {
-    throw new NotFoundError("Video");
-  }
-
-  await db
-    .insert(watchHistory)
-    .values({
-      userId,
-      videoId,
-      watchedSeconds,
-      totalDuration,
-      progressPercent,
-      completedAt: completed ? now : null,
-      lastWatchedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [watchHistory.userId, watchHistory.videoId],
-      set: {
+  try {
+    await db
+      .insert(watchHistory)
+      .values({
+        userId,
+        videoId,
         watchedSeconds,
         totalDuration,
         progressPercent,
-        completedAt: completed ? now : sql`${watchHistory.completedAt}`,
+        completedAt: completed ? now : null,
         lastWatchedAt: now,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [watchHistory.userId, watchHistory.videoId],
+        set: {
+          watchedSeconds,
+          totalDuration,
+          progressPercent,
+          completedAt: completed ? now : sql`${watchHistory.completedAt}`,
+          lastWatchedAt: now,
+        },
+      });
+  } catch (err) {
+    // Foreign key violation on videoId — surface as 404 like the prior pre-flight SELECT did.
+    if (err instanceof Error && "code" in err && (err as { code?: string }).code === "23503") {
+      throw new NotFoundError("Video");
+    }
+    throw err;
+  }
 
   return c.json({ ok: true });
 });

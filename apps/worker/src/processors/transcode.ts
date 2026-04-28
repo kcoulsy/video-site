@@ -7,6 +7,7 @@ import { createLocalStorage } from "@video-site/storage";
 import type { Job } from "bullmq";
 import { eq } from "drizzle-orm";
 import ffmpeg from "fluent-ffmpeg";
+import sharp from "sharp";
 
 import { connection, notificationsQueue } from "../queues";
 import type { TranscodeJobData } from "../types";
@@ -77,7 +78,8 @@ function extractThumbnail(
     const cmd = ffmpeg(inputPath)
       .seekInput(timestampSeconds)
       .frames(1)
-      .videoFilter("scale=640:-2")
+      // 1280 lets us produce a sharp 1280-wide WebP variant; sharp downscales to 640/320.
+      .videoFilter("scale=1280:-2")
       .outputOptions("-q:v", "2")
       .output(outputPath);
     const { stderrLines } = attachDiagnostics(cmd, "thumbnail");
@@ -86,6 +88,24 @@ function extractThumbnail(
       .on("error", (err: Error) => reject(ffmpegError(err, stderrLines)))
       .run();
   });
+}
+
+export const THUMBNAIL_WIDTHS = [320, 640, 1280] as const;
+
+async function writeWebpVariants(jpegPath: string): Promise<void> {
+  const dir = path.posix.dirname(jpegPath);
+  const base = path.posix.basename(jpegPath, path.posix.extname(jpegPath));
+  const input = sharp(jpegPath);
+  await Promise.all(
+    THUMBNAIL_WIDTHS.map(async (w) => {
+      const out = path.posix.join(dir, `${base}-${w}.webp`);
+      await input
+        .clone()
+        .resize({ width: w, withoutEnlargement: true })
+        .webp({ quality: 78, effort: 4 })
+        .toFile(out);
+    }),
+  );
 }
 
 const STORYBOARD_TILE_WIDTH = 160;
@@ -299,6 +319,13 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
     );
     for (let i = 0; i < STILL_FRACTIONS.length; i++) {
       await extractThumbnail(rawPath, stillFiles[i]!, duration * STILL_FRACTIONS[i]!);
+      // Pre-render WebP variants so the streaming route can serve them with no per-request cost.
+      // Best-effort: a sharp failure shouldn't fail the whole job (we still have the JPEG).
+      try {
+        await writeWebpVariants(stillFiles[i]!);
+      } catch (err) {
+        console.error(`[transcode ${videoId}] webp variant generation failed for still-${i}:`, err);
+      }
     }
 
     const defaultStillIndex = 1;

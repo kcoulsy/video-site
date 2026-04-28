@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { env } from "@video-site/env/web";
 
+import { Thumbnail } from "./thumbnail";
+
 interface DashPlayer {
   initialize: (el: HTMLVideoElement, url: string, autoPlay: boolean) => void;
   updateSettings: (settings: unknown) => void;
@@ -17,7 +19,7 @@ interface HoverPreviewProps {
   duration: number | null;
 }
 
-const HOVER_DELAY_MS = 600;
+const HOVER_DELAY_MS = 900;
 
 let activeStop: (() => void) | null = null;
 
@@ -127,11 +129,10 @@ export function HoverPreview({ videoId, title, thumbnailUrl, duration }: HoverPr
   return (
     <div className="absolute inset-0" onMouseEnter={start} onMouseLeave={stop}>
       {thumbnailUrl ? (
-        <img
+        <Thumbnail
           src={thumbnailUrl}
           alt={title}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">

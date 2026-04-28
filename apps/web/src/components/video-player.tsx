@@ -73,6 +73,9 @@ export function VideoPlayer({
   const playerRef = useRef<DashPlayer | null>(null);
   const initialTimeRef = useRef<number | undefined>(initialTime);
   const hideTimerRef = useRef<number | null>(null);
+  const progressFillRef = useRef<HTMLDivElement>(null);
+  const progressThumbRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -218,6 +221,26 @@ export function VideoPlayer({
       v.removeEventListener("leavepictureinpicture", onLeavePip);
     };
   }, [onTimeUpdate, onEnded]);
+
+  // Smooth progress bar via rAF — driven directly by video.currentTime to avoid
+  // the choppiness of React state updates that only fire on `timeupdate` (~4Hz).
+  useEffect(() => {
+    const tick = () => {
+      const v = videoRef.current;
+      const fill = progressFillRef.current;
+      const thumb = progressThumbRef.current;
+      if (v && v.duration > 0 && fill) {
+        const pct = (v.currentTime / v.duration) * 100;
+        fill.style.width = `${pct}%`;
+        if (thumb) thumb.style.left = `${pct}%`;
+      }
+      rafRef.current = window.requestAnimationFrame(tick);
+    };
+    rafRef.current = window.requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   // Fullscreen state
   useEffect(() => {
@@ -533,10 +556,12 @@ export function VideoPlayer({
               style={{ width: `${bufferedPct}%` }}
             />
             <div
+              ref={progressFillRef}
               className="absolute inset-y-0 left-0 rounded bg-red-600"
               style={{ width: `${progressPct}%` }}
             />
             <div
+              ref={progressThumbRef}
               className="absolute top-1/2 h-3 w-3 -translate-y-1/2 -translate-x-1/2 rounded-full bg-red-600 opacity-0 transition-opacity group-hover/scrub:opacity-100"
               style={{ left: `${progressPct}%` }}
             />
@@ -584,7 +609,11 @@ export function VideoPlayer({
             className="rounded p-1.5 hover:bg-white/10"
             aria-label={playing ? "Pause" : "Play"}
           >
-            {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
+            {playing ? (
+              <Pause className="h-5 w-5 fill-current" />
+            ) : (
+              <Play className="h-5 w-5 fill-current" />
+            )}
           </button>
 
           <div className="group/vol flex items-center">

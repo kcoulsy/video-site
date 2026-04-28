@@ -3,6 +3,7 @@ import { ListVideo, Play } from "lucide-react";
 import { env } from "@video-site/env/web";
 
 import { formatRelativeTime } from "@/lib/format";
+import { Thumbnail } from "./thumbnail";
 
 export interface PlaylistCardData {
   id: string;
@@ -36,12 +37,7 @@ export function PlaylistCard({ playlist, showOwner = false, showVisibility = fal
     <Link to="/playlist/$playlistId" params={{ playlistId: playlist.id }} className="group block">
       <div className="relative aspect-video overflow-hidden bg-secondary">
         {thumbnail ? (
-          <img
-            src={thumbnail}
-            alt={playlist.title}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
+          <Thumbnail src={thumbnail} alt={playlist.title} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
             <ListVideo className="h-10 w-10 text-muted-foreground/30" />

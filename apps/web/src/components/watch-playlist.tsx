@@ -72,15 +72,13 @@ export function WatchPlaylist({ playlistId, currentVideoId }: WatchPlaylistProps
             {isLoading ? (
               <span className="inline-block h-3 w-32 animate-pulse rounded bg-secondary align-middle" />
             ) : (
-              data?.title ?? "Playlist"
+              (data?.title ?? "Playlist")
             )}
           </Link>
           {data && (
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
               {data.user.name}
-              {position != null && items.length > 0
-                ? ` · ${position} / ${items.length}`
-                : ""}
+              {position != null && items.length > 0 ? ` · ${position} / ${items.length}` : ""}
             </p>
           )}
         </div>
@@ -96,7 +94,9 @@ export function WatchPlaylist({ playlistId, currentVideoId }: WatchPlaylistProps
           <span
             className={
               "flex h-4 w-8 shrink-0 items-center rounded-full p-0.5 transition-colors " +
-              (autoplay ? "justify-end bg-primary" : "justify-start bg-secondary border border-border")
+              (autoplay
+                ? "justify-end bg-primary"
+                : "justify-start bg-secondary border border-border")
             }
           >
             <span className="block h-3 w-3 rounded-full bg-white shadow" />
@@ -140,19 +140,16 @@ export function WatchPlaylist({ playlistId, currentVideoId }: WatchPlaylistProps
                     }
                   >
                     <div className="flex w-5 shrink-0 items-center justify-center text-[11px] text-muted-foreground">
-                      {isCurrent ? (
-                        <Play className="h-3 w-3 fill-primary text-primary" />
-                      ) : (
-                        idx + 1
-                      )}
+                      {isCurrent ? <Play className="h-3 w-3 fill-primary text-primary" /> : idx + 1}
                     </div>
                     <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded bg-secondary">
                       {thumb ? (
                         <img
-                          src={thumb}
+                          src={`${thumb}?w=320`}
                           alt={it.video.title}
                           className="h-full w-full object-cover"
                           loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center">

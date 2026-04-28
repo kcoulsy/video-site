@@ -40,10 +40,7 @@ export default function UserMenu() {
         <DropdownMenuGroup>
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="sm:hidden"
-            onClick={() => navigate({ to: "/upload" })}
-          >
+          <DropdownMenuItem className="sm:hidden" onClick={() => navigate({ to: "/upload" })}>
             Upload
           </DropdownMenuItem>
           {handle && (

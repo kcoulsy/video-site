@@ -178,7 +178,7 @@ profileRoutes.get("/profile/:userId/image/:kind", async (c) => {
     headers: {
       "Content-Type": file.type || "image/jpeg",
       "Content-Length": String(file.size),
-      "Cache-Control": "public, max-age=300",
+      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
     },
   });
 });
@@ -283,6 +283,7 @@ profileRoutes.get("/profile/:handle", async (c) => {
     viewerIsSubscribed = !!exists;
   }
 
+  c.header("Cache-Control", "private, max-age=30");
   return c.json({
     user: {
       id: row.id,

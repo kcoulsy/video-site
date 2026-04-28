@@ -87,10 +87,47 @@ streamingRoutes.get("/:videoId/manifest.mpd", async (c) => {
     headers: {
       "Content-Type": "application/dash+xml",
       "Content-Length": String(file.size),
-      "Cache-Control": "public, max-age=5",
+      "Cache-Control": "public, max-age=3600",
     },
   });
 });
+
+const THUMBNAIL_VARIANT_WIDTHS = new Set([320, 640, 1280]);
+
+function parseVariantWidth(raw: string | undefined): number | null {
+  if (!raw) return null;
+  const n = Number.parseInt(raw, 10);
+  return THUMBNAIL_VARIANT_WIDTHS.has(n) ? n : null;
+}
+
+function preferWebp(acceptHeader: string | undefined): boolean {
+  return Boolean(acceptHeader && acceptHeader.includes("image/webp"));
+}
+
+// Try a WebP variant next to a JPEG; fall back to the JPEG if the variant is missing.
+// Returns the file path to serve plus its content-type, or null on miss.
+async function resolveThumbnailVariant(
+  jpegPath: string,
+  width: number | null,
+  wantWebp: boolean,
+): Promise<{ filePath: string; contentType: string } | null> {
+  if (wantWebp) {
+    const dir = jpegPath.replace(/[/\\][^/\\]+$/, "");
+    const baseName = jpegPath
+      .split(/[\\/]/)
+      .pop()!
+      .replace(/\.[^.]+$/, "");
+    const variantWidth = width ?? 640;
+    const webpPath = `${dir}/${baseName}-${variantWidth}.webp`;
+    if (await storage.fileExists(webpPath)) {
+      return { filePath: webpPath, contentType: "image/webp" };
+    }
+  }
+  if (await storage.fileExists(jpegPath)) {
+    return { filePath: jpegPath, contentType: "image/jpeg" };
+  }
+  return null;
+}
 
 streamingRoutes.get("/:videoId/thumbnail", async (c) => {
   const videoId = c.req.param("videoId");
@@ -99,14 +136,19 @@ streamingRoutes.get("/:videoId/thumbnail", async (c) => {
   const meta = await getStreamableVideoMeta(videoId);
   if (!meta || meta.blocked || !meta.thumbnailPath) return c.notFound();
   if (!(await authorizePrivate(meta, c.req.raw.headers))) return c.notFound();
-  if (!(await storage.fileExists(meta.thumbnailPath))) return c.notFound();
 
-  const file = Bun.file(meta.thumbnailPath);
+  const width = parseVariantWidth(c.req.query("w"));
+  const wantWebp = preferWebp(c.req.header("accept"));
+  const resolved = await resolveThumbnailVariant(meta.thumbnailPath, width, wantWebp);
+  if (!resolved) return c.notFound();
+
+  const file = Bun.file(resolved.filePath);
   return new Response(file.stream(), {
     headers: {
-      "Content-Type": file.type || "image/jpeg",
+      "Content-Type": resolved.contentType,
       "Content-Length": String(file.size),
       "Cache-Control": "public, max-age=3600",
+      Vary: "Accept",
     },
   });
 });
@@ -144,15 +186,19 @@ streamingRoutes.get("/:videoId/thumbnail/still/:index", async (c) => {
   if (index >= meta.thumbnailStillsCount) return c.notFound();
   if (!(await authorizePrivate(meta, c.req.raw.headers))) return c.notFound();
 
-  const filePath = storage.resolve("videos", videoId, "thumbnails", `still-${index}.jpg`);
-  if (!(await storage.fileExists(filePath))) return c.notFound();
+  const jpegPath = storage.resolve("videos", videoId, "thumbnails", `still-${index}.jpg`);
+  const width = parseVariantWidth(c.req.query("w"));
+  const wantWebp = preferWebp(c.req.header("accept"));
+  const resolved = await resolveThumbnailVariant(jpegPath, width, wantWebp);
+  if (!resolved) return c.notFound();
 
-  const file = Bun.file(filePath);
+  const file = Bun.file(resolved.filePath);
   return new Response(file.stream(), {
     headers: {
-      "Content-Type": file.type || "image/jpeg",
+      "Content-Type": resolved.contentType,
       "Content-Length": String(file.size),
       "Cache-Control": "public, max-age=3600",
+      Vary: "Accept",
     },
   });
 });

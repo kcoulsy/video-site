@@ -179,6 +179,7 @@ searchRoutes.get("/", async (c) => {
   const pRows = playlistResults.rows as unknown as PlaylistSearchRow[];
   const playlistTotal = Number(pRows[0]?.total_count ?? 0);
 
+  c.header("Cache-Control", "public, max-age=30");
   return c.json({
     results: rows.map((row) => ({
       id: row.id,
@@ -279,5 +280,6 @@ searchRoutes.get("/suggest", async (c) => {
     ...videoRows.map((row) => ({ type: "video" as const, label: row.title })),
   ];
 
+  c.header("Cache-Control", "public, max-age=120");
   return c.json({ suggestions });
 });

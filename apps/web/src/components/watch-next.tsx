@@ -62,10 +62,11 @@ export function WatchNext({ currentVideoId }: WatchNextProps) {
                 <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-secondary">
                   {v.thumbnailUrl ? (
                     <img
-                      src={`${env.VITE_SERVER_URL}${v.thumbnailUrl}`}
+                      src={`${env.VITE_SERVER_URL}${v.thumbnailUrl}?w=320`}
                       alt={v.title}
                       className="h-full w-full object-cover"
                       loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">

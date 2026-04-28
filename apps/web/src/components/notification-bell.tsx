@@ -67,8 +67,8 @@ export function NotificationBell() {
     queryKey: ["notifications", "unread-count"],
     queryFn: () => apiClient<CountResponse>("/api/notifications/unread-count"),
     enabled: !!session,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const listQuery = useQuery<ListResponse>({

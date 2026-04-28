@@ -30,7 +30,8 @@ export const Route = createFileRoute("/watch/$videoId")({
   component: WatchPage,
   validateSearch: (search: Record<string, unknown>): WatchSearchParams => {
     const t = Number(search.t);
-    const list = typeof search.list === "string" && search.list.length > 0 ? search.list : undefined;
+    const list =
+      typeof search.list === "string" && search.list.length > 0 ? search.list : undefined;
     return {
       t: Number.isFinite(t) && t > 0 ? Math.floor(t) : undefined,
       list,
@@ -78,7 +79,16 @@ export const Route = createFileRoute("/watch/$videoId")({
       );
     }
 
-    return { meta };
+    const links: Array<Record<string, string>> = [];
+    if (video.storyboardUrl) {
+      links.push({
+        rel: "prefetch",
+        href: `${env.VITE_SERVER_URL}${video.storyboardUrl}`,
+        as: "image",
+      });
+    }
+
+    return { meta, links };
   },
 });
 
@@ -114,7 +124,7 @@ interface ProgressResponse {
   completedAt: string | null;
 }
 
-const PROGRESS_REPORT_INTERVAL_SECONDS = 10;
+const PROGRESS_REPORT_INTERVAL_SECONDS = 30;
 
 function absoluteUrl(path: string | null): string | undefined {
   if (!path) return undefined;
@@ -141,6 +151,7 @@ function WatchPage() {
   const { data: session } = authClient.useSession();
   const isAuthenticated = !!session;
 
+  const { video: loaderVideo } = Route.useLoaderData();
   const {
     data: video,
     isLoading,
@@ -148,6 +159,8 @@ function WatchPage() {
   } = useQuery<VideoResponse>({
     queryKey: ["video", videoId],
     queryFn: () => apiClient<VideoResponse>(`/api/videos/${videoId}`),
+    initialData: loaderVideo ?? undefined,
+    staleTime: 60_000,
   });
 
   const { data: progress } = useQuery<ProgressResponse>({
@@ -304,7 +317,7 @@ function WatchPage() {
         : 0;
 
   return (
-    <div className="mx-auto max-w-[1800px] px-4 pt-4">
+    <div className="mx-auto max-w-[1800px] px-2 pt-2 sm:px-4 sm:pt-4">
       <div
         className={
           cinemaMode
@@ -441,17 +454,13 @@ function WatchPage() {
 
         {!cinemaMode && (
           <aside className="lg:col-start-2 lg:row-start-1">
-            {playlistId && (
-              <WatchPlaylist playlistId={playlistId} currentVideoId={video.id} />
-            )}
+            {playlistId && <WatchPlaylist playlistId={playlistId} currentVideoId={video.id} />}
             <WatchNext currentVideoId={video.id} />
           </aside>
         )}
         {cinemaMode && (
           <aside>
-            {playlistId && (
-              <WatchPlaylist playlistId={playlistId} currentVideoId={video.id} />
-            )}
+            {playlistId && <WatchPlaylist playlistId={playlistId} currentVideoId={video.id} />}
             <WatchNext currentVideoId={video.id} />
           </aside>
         )}

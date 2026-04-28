@@ -188,7 +188,7 @@ function HomePage() {
   const visibleSortOptions = sortOptions;
 
   return (
-    <div className="mx-auto flex max-w-[1400px] gap-6 px-4 py-6">
+    <div className="mx-auto flex max-w-[1400px] gap-6 px-3 py-4 sm:px-4 sm:py-6">
       <CategorySidebar selected={category} />
 
       <div className="min-w-0 flex-1">

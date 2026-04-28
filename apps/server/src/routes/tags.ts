@@ -12,6 +12,7 @@ tagRoutes.get("/tags", async (c) => {
     .select({ id: tag.id, slug: tag.slug, name: tag.name })
     .from(tag)
     .orderBy(asc(tag.name));
+  c.header("Cache-Control", "public, max-age=300");
   return c.json({ items });
 });
 
@@ -28,6 +29,7 @@ tagRoutes.get("/categories", async (c) => {
     .orderBy(asc(category.sortOrder), asc(category.name));
 
   if (categories.length === 0) {
+    c.header("Cache-Control", "public, max-age=300");
     return c.json({ items: [] });
   }
 
@@ -53,5 +55,6 @@ tagRoutes.get("/categories", async (c) => {
     tags: tagsByCategory.get(cat.id) ?? [],
   }));
 
+  c.header("Cache-Control", "public, max-age=300");
   return c.json({ items });
 });

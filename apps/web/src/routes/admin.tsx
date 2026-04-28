@@ -74,7 +74,12 @@ function AdminLayout() {
         </nav>
       </aside>
       <section className="min-w-0">
-        <Outlet />
+        <p className="mb-4 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/80 md:hidden">
+          Admin tools are designed for desktop. Tables may overflow horizontally on small screens.
+        </p>
+        <div className="overflow-x-auto">
+          <Outlet />
+        </div>
       </section>
     </div>
   );

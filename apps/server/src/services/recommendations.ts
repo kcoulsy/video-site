@@ -396,9 +396,7 @@ export async function getRelated(
       RELATED_SAME_AUTHOR_BONUS * authorMatch;
 
     let base =
-      (cfNorm > 0
-        ? RELATED_CF_WEIGHT * cfNorm + RELATED_CONTENT_WEIGHT * contentSim
-        : contentSim) *
+      (cfNorm > 0 ? RELATED_CF_WEIGHT * cfNorm + RELATED_CONTENT_WEIGHT * contentSim : contentSim) *
       qualityMultiplier(r.likeCount, r.dislikeCount) *
       freshnessBoost(r.createdAt);
 

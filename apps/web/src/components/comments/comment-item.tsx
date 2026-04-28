@@ -312,18 +312,21 @@ export function CommentItem({
     </div>
   );
 
+  // On mobile, replies use a smaller avatar so nested threads don't crush the content column.
+  const avatarSize = isReply ? "h-7 w-7 sm:h-9 sm:w-9" : "h-9 w-9";
+
   return (
-    <div className="flex gap-3">
+    <div className={`flex ${isReply ? "gap-2 sm:gap-3" : "gap-3"}`}>
       {comment.user.handle ? (
         <Link
           to="/u/$handle"
           params={{ handle: comment.user.handle }}
-          className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-secondary"
+          className={`${avatarSize} shrink-0 overflow-hidden rounded-full bg-secondary`}
         >
           {avatarInner}
         </Link>
       ) : (
-        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-secondary">
+        <div className={`${avatarSize} shrink-0 overflow-hidden rounded-full bg-secondary`}>
           {avatarInner}
         </div>
       )}
