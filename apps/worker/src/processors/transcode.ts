@@ -50,10 +50,7 @@ function probe(filePath: string): Promise<ffmpeg.FfprobeData> {
 
 // Attach uniform diagnostics: log start command and capture stderr tail so the
 // rejection includes the actual reason ffmpeg gave us.
-function attachDiagnostics(
-  cmd: ffmpeg.FfmpegCommand,
-  label: string,
-): { stderrLines: string[] } {
+function attachDiagnostics(cmd: ffmpeg.FfmpegCommand, label: string): { stderrLines: string[] } {
   const stderrLines: string[] = [];
   cmd
     .on("start", (cmdline: string) => {
@@ -84,7 +81,10 @@ function extractThumbnail(
       .outputOptions("-q:v", "2")
       .output(outputPath);
     const { stderrLines } = attachDiagnostics(cmd, "thumbnail");
-    cmd.on("end", () => resolve()).on("error", (err: Error) => reject(ffmpegError(err, stderrLines))).run();
+    cmd
+      .on("end", () => resolve())
+      .on("error", (err: Error) => reject(ffmpegError(err, stderrLines)))
+      .run();
   });
 }
 
@@ -131,7 +131,10 @@ function generateStoryboard(
       )
       .output(outputPath);
     const { stderrLines } = attachDiagnostics(cmd, "storyboard");
-    cmd.on("end", () => resolve()).on("error", (err: Error) => reject(ffmpegError(err, stderrLines))).run();
+    cmd
+      .on("end", () => resolve())
+      .on("error", (err: Error) => reject(ffmpegError(err, stderrLines)))
+      .run();
   });
 }
 

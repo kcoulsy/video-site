@@ -9,8 +9,6 @@ import { Input } from "@video-site/ui/components/input";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { formatRelativeTime } from "@/lib/format";
 
-
-
 export const Route = createLazyFileRoute("/admin/comments")({
   component: AdminComments,
 });

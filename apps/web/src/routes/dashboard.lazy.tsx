@@ -65,8 +65,7 @@ function DashboardPage() {
 
   const { data, isLoading } = useQuery<MyVideosResponse>({
     queryKey: ["videos", "my", page],
-    queryFn: () =>
-      apiClient<MyVideosResponse>(`/api/videos/my?page=${page}&limit=${PAGE_SIZE}`),
+    queryFn: () => apiClient<MyVideosResponse>(`/api/videos/my?page=${page}&limit=${PAGE_SIZE}`),
     placeholderData: (prev) => prev,
   });
 

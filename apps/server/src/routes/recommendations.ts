@@ -57,6 +57,7 @@ recommendationsRoutes.get("/recommendations/continue-watching", requireAuth, asy
 });
 
 recommendationsRoutes.get("/videos/:id/related", async (c) => {
-  const items = await getRelated(c.req.param("id"), parseLimit(c));
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const items = await getRelated(c.req.param("id"), parseLimit(c), session?.user.id ?? null);
   return c.json({ items });
 });

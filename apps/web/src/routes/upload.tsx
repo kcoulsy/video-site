@@ -103,7 +103,8 @@ function UploadPage() {
     (dropped: File | undefined) => {
       if (!dropped) return;
       const looksLikeVideo =
-        dropped.type.startsWith("video/") || /\.(mp4|mov|mkv|webm|avi|m4v|flv|3gp|mpg|mpeg|ts)$/i.test(dropped.name);
+        dropped.type.startsWith("video/") ||
+        /\.(mp4|mov|mkv|webm|avi|m4v|flv|3gp|mpg|mpeg|ts)$/i.test(dropped.name);
       if (!looksLikeVideo) {
         toast.error("That doesn't look like a video file.");
         return;

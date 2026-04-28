@@ -9,8 +9,6 @@ import { ViewsBarChart } from "@/components/views-bar-chart";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { formatViewCount } from "@/lib/format";
 
-
-
 export const Route = createLazyFileRoute("/videos/$videoId/analytics")({
   component: VideoAnalyticsPage,
 });

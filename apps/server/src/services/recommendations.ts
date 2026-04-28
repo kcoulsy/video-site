@@ -36,6 +36,23 @@ const HOME_USER_CF_OVERLAP_BONUS = 0.3; // bonus added when a user-CF candidate 
 // getRelated overfetches similarity rows in case moderation filters drop some.
 const RELATED_SIM_OVERFETCH = 6;
 
+// Related-video content scoring weights. CF (co-watch) is the strongest signal
+// when present; content (tags/title/author) keeps new videos from falling
+// through to trending and shapes the list when CF is thin.
+const RELATED_CF_WEIGHT = 0.7;
+const RELATED_CONTENT_WEIGHT = 0.3;
+const RELATED_SAME_AUTHOR_BONUS = 0.15;
+const RELATED_TITLE_WEIGHT = 0.4; // relative to tag jaccard inside the content score
+
+// How many tag-matched content candidates to pull when CF is sparse or to
+// blend with CF results.
+const RELATED_CONTENT_CANDIDATES = 80;
+
+// Personalization (viewer-aware): small bonuses so the up-next list still
+// feels like it belongs to the *current* video, not the home feed.
+const RELATED_VIEWER_AUTHOR_BONUS = 0.1;
+const RELATED_VIEWER_TAG_BONUS = 0.15;
+
 // Trending fetch overfetch — pull extra in case excluded ids cluster at the top.
 const TRENDING_OVERFETCH_BUFFER = 20;
 
@@ -150,6 +167,23 @@ function tagJaccard(a: string[] | null, b: string[] | null): number {
   return union === 0 ? 0 : intersect / union;
 }
 
+function titleTokens(title: string): Set<string> {
+  const tokens = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length >= 3);
+  return new Set(tokens);
+}
+
+function tokenJaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersect = 0;
+  for (const t of b) if (a.has(t)) intersect++;
+  const union = a.size + b.size - intersect;
+  return union === 0 ? 0 : intersect / union;
+}
+
 function mmrSimilarity(a: CandidateRow, b: CandidateRow): number {
   if (a.userId === b.userId) return 1;
   return tagJaccard(a.tags, b.tags);
@@ -254,7 +288,28 @@ async function getItemCfCandidates(userId: string): Promise<Map<string, number>>
 
 // ---------- public API ----------
 
-export async function getRelated(videoId: string, limit = 15): Promise<VideoCard[]> {
+export async function getRelated(
+  videoId: string,
+  limit = 15,
+  userId: string | null = null,
+): Promise<VideoCard[]> {
+  const currentRows = await db
+    .select({
+      id: video.id,
+      title: video.title,
+      tags: video.tags,
+      userId: video.userId,
+    })
+    .from(video)
+    .where(eq(video.id, videoId))
+    .limit(1);
+  const current = currentRows[0];
+  if (!current) return getTrending(limit, [videoId]);
+
+  const currentTitleTokens = titleTokens(current.title);
+  const currentTags = current.tags ?? [];
+
+  // Co-watch (item-CF) similarity rows.
   const sims = await db
     .select({
       otherVideoId: videoSimilarity.otherVideoId,
@@ -265,34 +320,107 @@ export async function getRelated(videoId: string, limit = 15): Promise<VideoCard
     .orderBy(desc(videoSimilarity.score))
     .limit(limit * RELATED_SIM_OVERFETCH);
 
-  if (sims.length > 0) {
-    const ids = sims.map((s) => s.otherVideoId);
-    const scoreById = new Map(sims.map((s) => [s.otherVideoId, s.score]));
-    const rows = await db
-      .select(baseVideoSelect)
-      .from(video)
-      .innerJoin(user, eq(user.id, video.userId))
-      .where(and(publicReadyWhere, inArray(video.id, ids), ne(video.id, videoId)));
+  const cfScoreById = new Map(sims.map((s) => [s.otherVideoId, s.score]));
+  const maxCfScore = sims.reduce((m, s) => (s.score > m ? s.score : m), 0);
 
-    const scored: ScoredCandidate[] = rows.map((r) => ({
-      row: r,
-      baseScore:
-        (scoreById.get(r.id) ?? 0) *
-        qualityMultiplier(r.likeCount, r.dislikeCount) *
-        freshnessBoost(r.createdAt),
-    }));
-    scored.sort((a, b) => b.baseScore - a.baseScore);
-    const diversified = mmrRerank(scored, limit);
+  // Content candidates: videos that share at least one tag with the current
+  // video. Cheap when `tags` has a GIN index; degrades gracefully without one.
+  const contentRows =
+    currentTags.length > 0
+      ? await db
+          .select(baseVideoSelect)
+          .from(video)
+          .innerJoin(user, eq(user.id, video.userId))
+          .where(
+            and(
+              publicReadyWhere,
+              ne(video.id, videoId),
+              sql`${video.tags} && ${currentTags}::text[]`,
+            ),
+          )
+          .orderBy(desc(video.viewCount))
+          .limit(RELATED_CONTENT_CANDIDATES)
+      : [];
 
-    if (diversified.length >= limit) return diversified.map(rowToCard);
-    const fallback = await getTrending(limit - diversified.length, [
-      videoId,
-      ...diversified.map((r) => r.id),
-    ]);
-    return [...diversified.map(rowToCard), ...fallback];
+  // Pull rows for any CF candidate not already covered by content fetch.
+  const haveIds = new Set(contentRows.map((r) => r.id));
+  const cfMissingIds = [...cfScoreById.keys()].filter((id) => !haveIds.has(id));
+  const cfRows =
+    cfMissingIds.length > 0
+      ? await db
+          .select(baseVideoSelect)
+          .from(video)
+          .innerJoin(user, eq(user.id, video.userId))
+          .where(and(publicReadyWhere, inArray(video.id, cfMissingIds), ne(video.id, videoId)))
+      : [];
+
+  const allRows: CandidateRow[] = [...contentRows, ...cfRows];
+  if (allRows.length === 0) return getTrending(limit, [videoId]);
+
+  // Viewer personalization signals.
+  let viewerAuthorIds = new Set<string>();
+  let viewerTags = new Set<string>();
+  let viewerCompletedIds = new Set<string>();
+  if (userId) {
+    const seeds = await getUserSeedVideos(userId);
+    if (seeds.length > 0) {
+      const seedRows = await db
+        .select({ tags: video.tags, userId: video.userId })
+        .from(video)
+        .where(inArray(video.id, seeds));
+      for (const s of seedRows) {
+        viewerAuthorIds.add(s.userId);
+        for (const t of s.tags ?? []) viewerTags.add(t);
+      }
+    }
+
+    const completed = await db
+      .select({ videoId: watchHistory.videoId })
+      .from(watchHistory)
+      .where(and(eq(watchHistory.userId, userId), sql`${watchHistory.completedAt} IS NOT NULL`));
+    viewerCompletedIds = new Set(completed.map((r) => r.videoId));
   }
 
-  return getTrending(limit, [videoId]);
+  const scored: ScoredCandidate[] = [];
+  for (const r of allRows) {
+    if (viewerCompletedIds.has(r.id)) continue;
+
+    const cfScore = cfScoreById.get(r.id) ?? 0;
+    const cfNorm = maxCfScore > 0 ? cfScore / maxCfScore : 0;
+
+    const tagSim = tagJaccard(currentTags, r.tags);
+    const titleSim = tokenJaccard(currentTitleTokens, titleTokens(r.title));
+    const authorMatch = r.userId === current.userId ? 1 : 0;
+    const contentSim =
+      (tagSim + RELATED_TITLE_WEIGHT * titleSim) / (1 + RELATED_TITLE_WEIGHT) +
+      RELATED_SAME_AUTHOR_BONUS * authorMatch;
+
+    let base =
+      (cfNorm > 0
+        ? RELATED_CF_WEIGHT * cfNorm + RELATED_CONTENT_WEIGHT * contentSim
+        : contentSim) *
+      qualityMultiplier(r.likeCount, r.dislikeCount) *
+      freshnessBoost(r.createdAt);
+
+    if (userId) {
+      if (viewerAuthorIds.has(r.userId)) base += RELATED_VIEWER_AUTHOR_BONUS;
+      if (r.tags && r.tags.some((t) => viewerTags.has(t))) base += RELATED_VIEWER_TAG_BONUS;
+    }
+
+    if (base > 0) scored.push({ row: r, baseScore: base });
+  }
+
+  if (scored.length === 0) return getTrending(limit, [videoId]);
+
+  scored.sort((a, b) => b.baseScore - a.baseScore);
+  const diversified = mmrRerank(scored, limit);
+
+  if (diversified.length >= limit) return diversified.map(rowToCard);
+  const fallback = await getTrending(limit - diversified.length, [
+    videoId,
+    ...diversified.map((r) => r.id),
+  ]);
+  return [...diversified.map(rowToCard), ...fallback];
 }
 
 export async function getTrending(limit: number, exclude: string[] = []): Promise<VideoCard[]> {

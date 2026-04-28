@@ -383,7 +383,16 @@ export function VideoPlayer({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [togglePlay, seekBy, seekToPercent, adjustVolume, stepPlaybackRate, toggleFullscreen, toggleMute, onToggleCinema]);
+  }, [
+    togglePlay,
+    seekBy,
+    seekToPercent,
+    adjustVolume,
+    stepPlaybackRate,
+    toggleFullscreen,
+    toggleMute,
+    onToggleCinema,
+  ]);
 
   // Auto-hide controls
   const showControls = useCallback(() => {

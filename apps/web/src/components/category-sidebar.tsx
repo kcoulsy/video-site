@@ -31,7 +31,7 @@ export function CategorySidebar({ selected }: CategorySidebarProps) {
   const items = data?.items ?? [];
 
   return (
-    <aside className="w-56 shrink-0">
+    <aside className="hidden w-56 shrink-0 md:block">
       <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         <Layers className="h-3.5 w-3.5" />
         Categories

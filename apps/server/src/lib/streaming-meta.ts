@@ -21,9 +21,7 @@ export interface StreamableVideoMeta {
   blocked: boolean;
 }
 
-export async function getStreamableVideoMeta(
-  videoId: string,
-): Promise<StreamableVideoMeta | null> {
+export async function getStreamableVideoMeta(videoId: string): Promise<StreamableVideoMeta | null> {
   const redis = getRedisClient();
   const key = cacheKey(videoId);
 

@@ -8,8 +8,6 @@ import { Button } from "@video-site/ui/components/button";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { formatRelativeTime } from "@/lib/format";
 
-
-
 export const Route = createLazyFileRoute("/admin/reports")({
   component: AdminReports,
 });

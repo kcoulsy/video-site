@@ -35,11 +35,7 @@ export async function assertHashAllowed(
         inArray(video.status, liveStatuses),
         ne(video.id, excludeVideoId),
       )
-    : and(
-        eq(video.fileHash, hash),
-        isNull(video.deletedAt),
-        inArray(video.status, liveStatuses),
-      );
+    : and(eq(video.fileHash, hash), isNull(video.deletedAt), inArray(video.status, liveStatuses));
 
   const [existing] = await db
     .select({

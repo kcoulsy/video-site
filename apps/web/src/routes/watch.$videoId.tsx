@@ -278,11 +278,7 @@ function WatchPage() {
             : "flex flex-col gap-x-6 gap-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_402px] lg:items-start"
         }
       >
-        <div
-          className={
-            cinemaMode ? "mx-auto w-full max-w-[calc((100vh-6rem)*16/9)]" : "min-w-0"
-          }
-        >
+        <div className={cinemaMode ? "mx-auto w-full max-w-[calc((100vh-6rem)*16/9)]" : "min-w-0"}>
           <VideoPlayer
             manifestUrl={absoluteUrl(video.streamUrl)}
             thumbnailUrl={absoluteUrl(video.thumbnailUrl) ?? null}
@@ -305,105 +301,105 @@ function WatchPage() {
           />
 
           <div className="mt-4 min-w-0">
-          <h1 className="text-xl font-semibold leading-snug">{video.title}</h1>
+            <h1 className="text-xl font-semibold leading-snug">{video.title}</h1>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">
-              {formatViewCount(video.viewCount)} views &middot; {formatDate(video.createdAt)}
-            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                {formatViewCount(video.viewCount)} views &middot; {formatDate(video.createdAt)}
+              </p>
 
-            <div className="flex items-center gap-1.5">
-              <LikeButton
-                videoId={video.id}
-                likeCount={video.likeCount}
-                dislikeCount={video.dislikeCount}
-                isAuthenticated={isAuthenticated}
-              />
+              <div className="flex items-center gap-1.5">
+                <LikeButton
+                  videoId={video.id}
+                  likeCount={video.likeCount}
+                  dislikeCount={video.dislikeCount}
+                  isAuthenticated={isAuthenticated}
+                />
 
-              <WatchLaterButton videoId={video.id} isAuthenticated={isAuthenticated} />
+                <WatchLaterButton videoId={video.id} isAuthenticated={isAuthenticated} />
 
-              <SaveToPlaylistMenu videoId={video.id} isAuthenticated={isAuthenticated} />
+                <SaveToPlaylistMenu videoId={video.id} isAuthenticated={isAuthenticated} />
 
-              <Button
-                variant="secondary"
-                size="sm"
-                className="gap-1.5 rounded-full"
-                onClick={() => setShareOpen(true)}
-              >
-                <Share2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Share</span>
-              </Button>
-
-              <ReportButton
-                targetType="video"
-                targetId={video.id}
-                isAuthenticated={isAuthenticated}
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl bg-secondary/50 p-4">
-            <div className="flex items-center gap-3">
-              {video.user.handle ? (
-                <Link
-                  to="/u/$handle"
-                  params={{ handle: video.user.handle }}
-                  className="flex flex-1 items-center gap-3 group/author"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="gap-1.5 rounded-full"
+                  onClick={() => setShareOpen(true)}
                 >
-                  <AuthorAvatar
-                    user={{ ...video.user, image: absoluteUrl(video.user.image) ?? null }}
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold transition-colors group-hover/author:text-primary">
-                      {video.user.name}
+                  <Share2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Share</span>
+                </Button>
+
+                <ReportButton
+                  targetType="video"
+                  targetId={video.id}
+                  isAuthenticated={isAuthenticated}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl bg-secondary/50 p-4">
+              <div className="flex items-center gap-3">
+                {video.user.handle ? (
+                  <Link
+                    to="/u/$handle"
+                    params={{ handle: video.user.handle }}
+                    className="flex flex-1 items-center gap-3 group/author"
+                  >
+                    <AuthorAvatar
+                      user={{ ...video.user, image: absoluteUrl(video.user.image) ?? null }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold transition-colors group-hover/author:text-primary">
+                        {video.user.name}
+                      </p>
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="flex flex-1 items-center gap-3">
+                    <AuthorAvatar
+                      user={{ ...video.user, image: absoluteUrl(video.user.image) ?? null }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{video.user.name}</p>
+                    </div>
+                  </div>
+                )}
+                <Button size="sm" className="rounded-full">
+                  Subscribe
+                </Button>
+              </div>
+
+              {video.description ? (
+                <div className="mt-3">
+                  <div className={descExpanded ? "" : "line-clamp-3"}>
+                    <p className="whitespace-pre-line text-sm text-foreground/80">
+                      {video.description}
                     </p>
                   </div>
-                </Link>
-              ) : (
-                <div className="flex flex-1 items-center gap-3">
-                  <AuthorAvatar
-                    user={{ ...video.user, image: absoluteUrl(video.user.image) ?? null }}
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold">{video.user.name}</p>
-                  </div>
+                  <button
+                    onClick={() => setDescExpanded(!descExpanded)}
+                    className="mt-2 flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {descExpanded ? (
+                      <>
+                        Show less <ChevronUp className="h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        Show more <ChevronDown className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
-              <Button size="sm" className="rounded-full">
-                Subscribe
-              </Button>
+              ) : null}
             </div>
 
-            {video.description ? (
-              <div className="mt-3">
-                <div className={descExpanded ? "" : "line-clamp-3"}>
-                  <p className="whitespace-pre-line text-sm text-foreground/80">
-                    {video.description}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setDescExpanded(!descExpanded)}
-                  className="mt-2 flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {descExpanded ? (
-                    <>
-                      Show less <ChevronUp className="h-4 w-4" />
-                    </>
-                  ) : (
-                    <>
-                      Show more <ChevronDown className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : null}
-          </div>
-
-          <CommentSection
-            videoId={video.id}
-            videoOwnerId={video.user.id}
-            commentCount={video.commentCount}
-          />
+            <CommentSection
+              videoId={video.id}
+              videoOwnerId={video.user.id}
+              commentCount={video.commentCount}
+            />
           </div>
         </div>
 

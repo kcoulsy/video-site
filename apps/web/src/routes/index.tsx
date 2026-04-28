@@ -119,8 +119,7 @@ function HomePage() {
 
   const { data: forYouData, isLoading: forYouLoading } = useQuery<SimpleFeedResponse>({
     queryKey: ["recommendations", "for-you", isAuthed],
-    queryFn: () =>
-      apiClient<SimpleFeedResponse>(`/api/recommendations/feed?limit=${PAGE_SIZE}`),
+    queryFn: () => apiClient<SimpleFeedResponse>(`/api/recommendations/feed?limit=${PAGE_SIZE}`),
     enabled: useForYouPersonalized,
   });
 

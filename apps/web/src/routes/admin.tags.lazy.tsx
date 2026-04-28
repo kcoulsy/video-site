@@ -9,8 +9,6 @@ import { Label } from "@video-site/ui/components/label";
 
 import { ApiError, apiClient } from "@/lib/api-client";
 
-
-
 export const Route = createLazyFileRoute("/admin/tags")({
   component: AdminTags,
 });

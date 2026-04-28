@@ -25,8 +25,6 @@ import { VideoStatusBadge, type VideoStatus } from "@/components/video-status-ba
 import { ApiError, apiClient } from "@/lib/api-client";
 import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/format";
 
-
-
 export const Route = createLazyFileRoute("/admin/videos")({
   component: AdminVideos,
 });

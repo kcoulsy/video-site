@@ -30,9 +30,14 @@ export default function Header() {
 
         {/* Actions */}
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <Button variant="ghost" size="sm" render={<Link to="/upload" />} className="gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            render={<Link to="/upload" />}
+            className="hidden gap-2 sm:flex"
+          >
             <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Upload</span>
+            <span>Upload</span>
           </Button>
           <NotificationBell />
           <UserMenu />

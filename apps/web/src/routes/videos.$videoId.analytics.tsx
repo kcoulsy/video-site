@@ -12,5 +12,4 @@ export const Route = createFileRoute("/videos/$videoId/analytics")({
       throw redirect({ to: "/login" });
     }
   },
-  
 });
