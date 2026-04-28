@@ -43,7 +43,7 @@ function storyboardUrlFor(videoId: string, storyboardPath: string | null): strin
   return `/api/stream/${videoId}/storyboard`;
 }
 
-function userAvatarUrlFor(userId: string, image: string | null): string | null {
+export function userAvatarUrlFor(userId: string, image: string | null): string | null {
   if (!image) return null;
   if (/^https?:\/\//.test(image)) return image;
   return `/api/profile/${userId}/image/avatar`;

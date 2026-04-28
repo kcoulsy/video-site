@@ -1,11 +1,18 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { env } from "@video-site/env/web";
 import { MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { authClient } from "@/lib/auth-client";
 import { apiClient } from "@/lib/api-client";
+
+function userAvatarUrl(userId: string, image: string | null | undefined): string | undefined {
+  if (!image) return undefined;
+  if (/^https?:\/\//.test(image)) return image;
+  return `${env.VITE_SERVER_URL}/api/profile/${userId}/image/avatar`;
+}
 
 import { CommentForm } from "./comment-form";
 import { CommentList } from "./comment-list";
@@ -87,7 +94,7 @@ export function CommentSection({ videoId, videoOwnerId, commentCount }: CommentS
           <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-secondary">
             {currentUser.image ? (
               <img
-                src={currentUser.image}
+                src={userAvatarUrl(currentUser.id, currentUser.image)}
                 alt={currentUser.name}
                 className="h-full w-full object-cover"
               />

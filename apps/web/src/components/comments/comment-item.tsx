@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@video-site/ui/components/button";
+import { env } from "@video-site/env/web";
 import { ChevronDown, ChevronUp, Heart, Pin, ThumbsUp } from "lucide-react";
 import { Fragment, useState } from "react";
 import { toast } from "sonner";
@@ -11,6 +12,12 @@ import { formatRelativeTime } from "@/lib/format";
 import { ReportButton } from "../report-button";
 import { CommentForm } from "./comment-form";
 import type { Comment, CommentsPage } from "./types";
+
+function absoluteAvatarUrl(path: string | null): string | undefined {
+  if (!path) return undefined;
+  if (/^https?:\/\//.test(path)) return path;
+  return `${env.VITE_SERVER_URL}${path}`;
+}
 
 interface CommentItemProps {
   comment: Comment;
@@ -296,8 +303,9 @@ export function CommentItem({
   const replyPages = repliesQuery.data?.pages ?? [];
   const allReplies = replyPages.flatMap((p) => p.comments);
 
-  const avatarInner = comment.user.image ? (
-    <img src={comment.user.image} alt={comment.user.name} className="h-full w-full object-cover" />
+  const avatarSrc = absoluteAvatarUrl(comment.user.image);
+  const avatarInner = avatarSrc ? (
+    <img src={avatarSrc} alt={comment.user.name} className="h-full w-full object-cover" />
   ) : (
     <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
       {comment.user.name.charAt(0).toUpperCase()}

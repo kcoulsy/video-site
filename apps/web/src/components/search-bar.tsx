@@ -53,8 +53,9 @@ export function SearchBar() {
       );
       if (seq !== requestSeq.current) return;
       setSuggestions(data.suggestions);
-    } catch {
+    } catch (err) {
       if (seq !== requestSeq.current) return;
+      if (import.meta.env.DEV) console.error("search suggest failed", err);
       setSuggestions([]);
     }
   }, []);

@@ -14,6 +14,7 @@ import { enqueueNotification } from "../lib/queue";
 import { getRedisClient } from "../lib/redis";
 import { requireActiveUser, requireNotMuted } from "../middleware/require-active-user";
 import type { AppVariables } from "../types";
+import { userAvatarUrlFor } from "./video";
 
 const RATE_LIMIT_PER_MINUTE = 10;
 
@@ -158,7 +159,12 @@ async function listComments(
   const items = slice.map((r) =>
     serializeComment({
       ...r.c,
-      user: { id: r.userId, name: r.userName, image: r.userImage, handle: r.userHandle },
+      user: {
+        id: r.userId,
+        name: r.userName,
+        image: userAvatarUrlFor(r.userId, r.userImage),
+        handle: r.userHandle,
+      },
       liked: likedSet.has(r.c.id),
     }),
   );
@@ -274,7 +280,7 @@ commentRoutes.post("/videos/:videoId/comments", ...requireNotMuted, async (c) =>
       user: {
         id: currentUser.id,
         name: currentUser.name,
-        image: currentUser.image ?? null,
+        image: userAvatarUrlFor(currentUser.id, currentUser.image ?? null),
         handle: currentUser.handle ?? null,
       },
     }),
@@ -380,7 +386,7 @@ commentRoutes.post("/videos/:videoId/comments/:id/replies", ...requireNotMuted, 
       user: {
         id: currentUser.id,
         name: currentUser.name,
-        image: currentUser.image ?? null,
+        image: userAvatarUrlFor(currentUser.id, currentUser.image ?? null),
         handle: currentUser.handle ?? null,
       },
     }),
