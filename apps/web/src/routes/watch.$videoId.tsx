@@ -271,12 +271,16 @@ function WatchPage() {
 
   return (
     <div className="mx-auto max-w-[1800px] px-4 pt-4">
-      <div className="grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_402px]">
+      <div
+        className={
+          cinemaMode
+            ? "flex flex-col gap-4"
+            : "flex flex-col gap-x-6 gap-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_402px] lg:items-start"
+        }
+      >
         <div
           className={
-            cinemaMode
-              ? "mx-auto w-full max-w-[calc((100vh-6rem)*16/9)] lg:col-span-2"
-              : "lg:col-start-1"
+            cinemaMode ? "mx-auto w-full max-w-[calc((100vh-6rem)*16/9)]" : "min-w-0"
           }
         >
           <VideoPlayer
@@ -299,9 +303,8 @@ function WatchPage() {
             cinemaMode={cinemaMode}
             onToggleCinema={() => setCinemaMode((c) => !c)}
           />
-        </div>
 
-        <div className="min-w-0 lg:col-start-1">
+          <div className="mt-4 min-w-0">
           <h1 className="text-xl font-semibold leading-snug">{video.title}</h1>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
@@ -401,11 +404,19 @@ function WatchPage() {
             videoOwnerId={video.user.id}
             commentCount={video.commentCount}
           />
+          </div>
         </div>
 
-        <aside className={`lg:col-start-2 ${cinemaMode ? "" : "lg:row-start-1 lg:row-span-2"}`}>
-          <WatchNext currentVideoId={video.id} />
-        </aside>
+        {!cinemaMode && (
+          <aside className="lg:col-start-2 lg:row-start-1">
+            <WatchNext currentVideoId={video.id} />
+          </aside>
+        )}
+        {cinemaMode && (
+          <aside>
+            <WatchNext currentVideoId={video.id} />
+          </aside>
+        )}
       </div>
 
       <ShareDialog

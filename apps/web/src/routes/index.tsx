@@ -21,7 +21,6 @@ interface IndexSearchParams {
 
 const SORT_VALUES = new Set<SortOption>(["for-you", "trending", "newest", "popular", "oldest"]);
 const PAGE_SIZE = 24;
-const PERSONALIZED_SORTS = new Set<SortOption>(["for-you", "trending"]);
 
 interface FeedItem {
   id: string;
@@ -44,6 +43,14 @@ interface PaginatedFeedResponse {
 
 interface SimpleFeedResponse {
   items: FeedItem[];
+}
+
+interface TrendingFeedResponse {
+  items: FeedItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
 interface HistoryProgressResponse {
@@ -74,38 +81,68 @@ function HomePage() {
   const isAuthed = !!sessionData?.user;
 
   const sort: SortOption = sortParam ?? "for-you";
-  const isPersonalized = PERSONALIZED_SORTS.has(sort);
-  // Personalized feeds and category browsing don't share endpoints; reset page when switching.
-  const page = isPersonalized || category == null ? (pageParam ?? 1) : (pageParam ?? 1);
+  const page = pageParam ?? 1;
 
-  const personalizedEndpoint =
-    sort === "for-you" ? "/api/recommendations/feed" : "/api/recommendations/trending";
+  // For-you is only personalized on page 1; deeper pages fall back to "newest" catalog so users
+  // can browse beyond the curated batch. Trending paginates against its own endpoint. Category
+  // browsing always uses the catalog.
+  const useForYouPersonalized = sort === "for-you" && category == null && page === 1;
+  const useTrendingEndpoint = sort === "trending" && category == null;
 
+  const catalogSort: "popular" | "oldest" | "newest" =
+    sort === "popular" ? "popular" : sort === "oldest" ? "oldest" : "newest";
   const catalogParams = new URLSearchParams({
-    sort: sort === "popular" ? "popular" : sort === "oldest" ? "oldest" : "newest",
+    sort: catalogSort,
     page: String(page),
     limit: String(PAGE_SIZE),
   });
   if (category) catalogParams.set("category", category);
 
+  const useCatalog = !useForYouPersonalized && !useTrendingEndpoint;
+
   const { data: paginatedData, isLoading: paginatedLoading } = useQuery<PaginatedFeedResponse>({
-    queryKey: ["videos", "feed", sort, category ?? null, page],
+    queryKey: ["videos", "feed", catalogSort, category ?? null, page],
     queryFn: () => apiClient<PaginatedFeedResponse>(`/api/videos?${catalogParams.toString()}`),
     placeholderData: (prev) => prev,
-    enabled: !isPersonalized || category != null,
+    enabled: useCatalog,
   });
 
-  const { data: personalizedData, isLoading: personalizedLoading } = useQuery<SimpleFeedResponse>({
-    queryKey: ["recommendations", sort, isAuthed],
-    queryFn: () => apiClient<SimpleFeedResponse>(`${personalizedEndpoint}?limit=${PAGE_SIZE}`),
-    enabled: isPersonalized && category == null,
+  const { data: trendingData, isLoading: trendingLoading } = useQuery<TrendingFeedResponse>({
+    queryKey: ["recommendations", "trending", page],
+    queryFn: () =>
+      apiClient<TrendingFeedResponse>(
+        `/api/recommendations/trending?limit=${PAGE_SIZE}&page=${page}`,
+      ),
+    placeholderData: (prev) => prev,
+    enabled: useTrendingEndpoint,
   });
 
-  const usingPersonalized = isPersonalized && category == null;
-  const items: FeedItem[] = usingPersonalized
-    ? (personalizedData?.items ?? [])
-    : (paginatedData?.items ?? []);
-  const isLoading = usingPersonalized ? personalizedLoading : paginatedLoading;
+  const { data: forYouData, isLoading: forYouLoading } = useQuery<SimpleFeedResponse>({
+    queryKey: ["recommendations", "for-you", isAuthed],
+    queryFn: () =>
+      apiClient<SimpleFeedResponse>(`/api/recommendations/feed?limit=${PAGE_SIZE}`),
+    enabled: useForYouPersonalized,
+  });
+
+  // When showing the personalized for-you batch on page 1, separately fetch catalog totalPages
+  // so users can page past the curated picks into the newest catalog.
+  const { data: forYouTotalsData } = useQuery<PaginatedFeedResponse>({
+    queryKey: ["videos", "feed-totals", "newest"],
+    queryFn: () =>
+      apiClient<PaginatedFeedResponse>(`/api/videos?sort=newest&page=1&limit=${PAGE_SIZE}`),
+    enabled: useForYouPersonalized,
+  });
+
+  const items: FeedItem[] = useForYouPersonalized
+    ? (forYouData?.items ?? [])
+    : useTrendingEndpoint
+      ? (trendingData?.items ?? [])
+      : (paginatedData?.items ?? []);
+  const isLoading = useForYouPersonalized
+    ? forYouLoading
+    : useTrendingEndpoint
+      ? trendingLoading
+      : paginatedLoading;
 
   const { data: historyData } = useQuery<HistoryProgressResponse>({
     queryKey: ["history", "progress-map"],
@@ -131,7 +168,11 @@ function HomePage() {
     progressPercent: progressByVideoId.get(v.id),
   }));
 
-  const totalPages = usingPersonalized ? 0 : (paginatedData?.totalPages ?? 0);
+  const totalPages = useForYouPersonalized
+    ? (forYouTotalsData?.totalPages ?? 0)
+    : useTrendingEndpoint
+      ? (trendingData?.totalPages ?? 0)
+      : (paginatedData?.totalPages ?? 0);
 
   const sortOptions: {
     value: SortOption;
@@ -190,17 +231,15 @@ function HomePage() {
         ) : (
           <>
             <VideoGrid videos={videos} />
-            {!usingPersonalized && (
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                onChange={(next) =>
-                  navigate({
-                    search: (prev) => ({ ...prev, page: next === 1 ? undefined : next }),
-                  })
-                }
-              />
-            )}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onChange={(next) =>
+                navigate({
+                  search: (prev) => ({ ...prev, page: next === 1 ? undefined : next }),
+                })
+              }
+            />
           </>
         )}
       </div>

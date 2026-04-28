@@ -2,10 +2,13 @@ import { fileTypeFromBuffer, fileTypeFromFile } from "file-type";
 
 const ALLOWED_VIDEO_MIMES = new Set([
   "video/mp4",
+  "video/x-m4v",
   "video/quicktime",
   "video/webm",
   "video/x-matroska",
   "video/x-msvideo",
+  "video/vnd.avi",
+  "video/avi",
   "video/mpeg",
   "video/x-flv",
   "video/3gpp",

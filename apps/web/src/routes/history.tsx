@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Clock, History, Play, Trash2, X } from "lucide-react";
+import { useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
@@ -61,7 +63,7 @@ function HistoryPage() {
 
   const { data, isLoading, error } = useQuery<HistoryResponse>({
     queryKey: ["history"],
-    queryFn: () => apiClient<HistoryResponse>("/api/history?limit=50"),
+    queryFn: () => apiClient<HistoryResponse>("/api/history?limit=200"),
   });
 
   const removeMutation = useMutation({
@@ -165,17 +167,67 @@ function HistoryPage() {
           <Clock className="h-4 w-4" />
           All History
         </h2>
-        <div className="space-y-2">
-          {items.map((item) => (
-            <HistoryRow
-              key={`${item.videoId}-history`}
-              item={item}
-              onRemove={() => removeMutation.mutate(item.videoId)}
-              removing={removeMutation.isPending && removeMutation.variables === item.videoId}
-            />
-          ))}
-        </div>
+        <VirtualHistoryList
+          items={items}
+          onRemove={(id) => removeMutation.mutate(id)}
+          removingId={
+            removeMutation.isPending ? (removeMutation.variables as string | undefined) : undefined
+          }
+        />
       </section>
+    </div>
+  );
+}
+
+function VirtualHistoryList({
+  items,
+  onRemove,
+  removingId,
+}: {
+  items: HistoryItem[];
+  onRemove: (videoId: string) => void;
+  removingId: string | undefined;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const ROW_HEIGHT = 112;
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 6,
+  });
+
+  return (
+    <div ref={parentRef} className="max-h-[80vh] overflow-auto">
+      <div
+        style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}
+        className="w-full"
+      >
+        {virtualizer.getVirtualItems().map((vi) => {
+          const item = items[vi.index]!;
+          return (
+            <div
+              key={`${item.videoId}-history`}
+              ref={virtualizer.measureElement}
+              data-index={vi.index}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${vi.start}px)`,
+              }}
+              className="pb-2"
+            >
+              <HistoryRow
+                item={item}
+                onRemove={() => onRemove(item.videoId)}
+                removing={removingId === item.videoId}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

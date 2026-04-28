@@ -1,6 +1,6 @@
 import { db } from "@video-site/db";
 import { removedVideoHash, video } from "@video-site/db/schema/video";
-import { and, eq, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 
 import { AppError } from "./errors";
 
@@ -27,9 +27,19 @@ export async function assertHashAllowed(
     );
   }
 
+  const liveStatuses = ["uploaded", "processing", "ready"] as const;
   const conflictWhere = excludeVideoId
-    ? and(eq(video.fileHash, hash), isNull(video.deletedAt), ne(video.id, excludeVideoId))
-    : and(eq(video.fileHash, hash), isNull(video.deletedAt));
+    ? and(
+        eq(video.fileHash, hash),
+        isNull(video.deletedAt),
+        inArray(video.status, liveStatuses),
+        ne(video.id, excludeVideoId),
+      )
+    : and(
+        eq(video.fileHash, hash),
+        isNull(video.deletedAt),
+        inArray(video.status, liveStatuses),
+      );
 
   const [existing] = await db
     .select({

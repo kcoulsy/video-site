@@ -13,6 +13,7 @@
     "@tanstack/react-query": "^5.99.0",
     "@tanstack/react-router": "^1.168.22",
     "@tanstack/react-start": "^1.167.41",
+    "@tanstack/react-virtual": "^3.10.0",
     "@video-site/auth": "workspace:*",
     "@video-site/env": "workspace:*",
     "@video-site/ui": "workspace:*",

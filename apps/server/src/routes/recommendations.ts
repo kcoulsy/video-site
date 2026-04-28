@@ -6,19 +6,28 @@ import { z } from "zod";
 import { ValidationError } from "../lib/errors";
 import { requireAuth } from "../middleware/auth";
 import {
+  countTrendingCandidates,
   getContinueWatching,
   getHomeFeed,
   getRelated,
-  getTrending,
+  getTrendingPage,
 } from "../services/recommendations";
 import type { AppVariables } from "../types";
 
 const limitSchema = z.coerce.number().int().positive().max(50).default(20);
+const pageSchema = z.coerce.number().int().positive().default(1);
 
 function parseLimit(c: Context): number {
   const raw = new URL(c.req.url).searchParams.get("limit");
   const parsed = limitSchema.safeParse(raw ?? undefined);
   if (!parsed.success) throw new ValidationError("Invalid limit");
+  return parsed.data;
+}
+
+function parsePage(c: Context): number {
+  const raw = new URL(c.req.url).searchParams.get("page");
+  const parsed = pageSchema.safeParse(raw ?? undefined);
+  if (!parsed.success) throw new ValidationError("Invalid page");
   return parsed.data;
 }
 
@@ -32,8 +41,14 @@ recommendationsRoutes.get("/recommendations/feed", async (c) => {
 });
 
 recommendationsRoutes.get("/recommendations/trending", async (c) => {
-  const items = await getTrending(parseLimit(c));
-  return c.json({ items });
+  const limit = parseLimit(c);
+  const page = parsePage(c);
+  const [items, total] = await Promise.all([
+    getTrendingPage(limit, (page - 1) * limit),
+    countTrendingCandidates(),
+  ]);
+  const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
+  return c.json({ items, page, limit, total, totalPages });
 });
 
 recommendationsRoutes.get("/recommendations/continue-watching", requireAuth, async (c) => {

@@ -296,15 +296,23 @@ export async function getRelated(videoId: string, limit = 15): Promise<VideoCard
 }
 
 export async function getTrending(limit: number, exclude: string[] = []): Promise<VideoCard[]> {
+  return getTrendingPage(limit, 0, exclude);
+}
+
+export async function getTrendingPage(
+  limit: number,
+  offset: number,
+  exclude: string[] = [],
+): Promise<VideoCard[]> {
   const redis = getRedisClient();
   const ranked = await redis.zrevrange(
     TRENDING_KEY,
     0,
-    limit + exclude.length + TRENDING_OVERFETCH_BUFFER - 1,
+    offset + limit + exclude.length + TRENDING_OVERFETCH_BUFFER - 1,
   );
 
   if (ranked.length > 0) {
-    const filtered = ranked.filter((id) => !exclude.includes(id)).slice(0, limit);
+    const filtered = ranked.filter((id) => !exclude.includes(id)).slice(offset, offset + limit);
     if (filtered.length > 0) {
       const rows = await db
         .select(baseVideoSelect)
@@ -327,9 +335,19 @@ export async function getTrending(limit: number, exclude: string[] = []): Promis
     .innerJoin(user, eq(user.id, video.userId))
     .where(where)
     .orderBy(desc(video.viewCount), desc(video.createdAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
   return rows.map(rowToCard);
+}
+
+export async function countTrendingCandidates(): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(video)
+    .innerJoin(user, eq(user.id, video.userId))
+    .where(publicReadyWhere);
+  return rows[0]?.count ?? 0;
 }
 
 export async function getContinueWatching(

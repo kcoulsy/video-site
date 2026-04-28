@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp, ListVideo, Play, Share2, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
@@ -260,14 +261,77 @@ function PlaylistDetailPage() {
           <p className="mt-4 text-sm text-muted-foreground">No videos in this playlist yet.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {items.map((it, idx) => {
-            const thumbnail = absoluteUrl(it.video.thumbnailUrl);
-            return (
-              <div
-                key={it.videoId}
-                className="group flex items-center gap-4 rounded-xl p-3 transition-colors hover:bg-secondary/50"
-              >
+        <VirtualPlaylistList
+          items={items}
+          isOwner={data.isOwner}
+          onMove={(videoId, position) => reorderMutation.mutate({ videoId, position })}
+          onRemove={(videoId) => removeMutation.mutate(videoId)}
+          reorderPending={reorderMutation.isPending}
+          removePending={removeMutation.isPending}
+        />
+      )}
+
+      {data && (
+        <ShareDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          playlistId={data.id}
+          title={data.title}
+        />
+      )}
+    </div>
+  );
+}
+
+function VirtualPlaylistList({
+  items,
+  isOwner,
+  onMove,
+  onRemove,
+  reorderPending,
+  removePending,
+}: {
+  items: PlaylistItemRow[];
+  isOwner: boolean;
+  onMove: (videoId: string, position: number) => void;
+  onRemove: (videoId: string) => void;
+  reorderPending: boolean;
+  removePending: boolean;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const ROW_HEIGHT = 112;
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 6,
+  });
+
+  return (
+    <div ref={parentRef} className="max-h-[80vh] overflow-auto">
+      <div
+        style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}
+        className="w-full"
+      >
+        {virtualizer.getVirtualItems().map((vi) => {
+          const idx = vi.index;
+          const it = items[idx]!;
+          const thumbnail = absoluteUrl(it.video.thumbnailUrl);
+          return (
+            <div
+              key={it.videoId}
+              ref={virtualizer.measureElement}
+              data-index={idx}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${vi.start}px)`,
+              }}
+              className="pb-2"
+            >
+              <div className="group flex items-center gap-4 rounded-xl p-3 transition-colors hover:bg-secondary/50">
                 <span className="w-6 shrink-0 text-center text-xs text-muted-foreground">
                   {idx + 1}
                 </span>
@@ -306,15 +370,13 @@ function PlaylistDetailPage() {
                     </p>
                   </div>
                 </Link>
-                {data.isOwner && (
+                {isOwner && (
                   <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                     <button
                       type="button"
                       aria-label="Move up"
-                      disabled={idx === 0 || reorderMutation.isPending}
-                      onClick={() =>
-                        reorderMutation.mutate({ videoId: it.videoId, position: idx - 1 })
-                      }
+                      disabled={idx === 0 || reorderPending}
+                      onClick={() => onMove(it.videoId, idx - 1)}
                       className="rounded-full p-2 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30"
                     >
                       <ArrowUp className="h-4 w-4" />
@@ -322,10 +384,8 @@ function PlaylistDetailPage() {
                     <button
                       type="button"
                       aria-label="Move down"
-                      disabled={idx === items.length - 1 || reorderMutation.isPending}
-                      onClick={() =>
-                        reorderMutation.mutate({ videoId: it.videoId, position: idx + 1 })
-                      }
+                      disabled={idx === items.length - 1 || reorderPending}
+                      onClick={() => onMove(it.videoId, idx + 1)}
                       className="rounded-full p-2 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30"
                     >
                       <ArrowDown className="h-4 w-4" />
@@ -333,8 +393,8 @@ function PlaylistDetailPage() {
                     <button
                       type="button"
                       aria-label="Remove"
-                      disabled={removeMutation.isPending}
-                      onClick={() => removeMutation.mutate(it.videoId)}
+                      disabled={removePending}
+                      onClick={() => onRemove(it.videoId)}
                       className="rounded-full p-2 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
                     >
                       <X className="h-4 w-4" />
@@ -342,19 +402,10 @@ function PlaylistDetailPage() {
                   </div>
                 )}
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {data && (
-        <ShareDialog
-          open={shareOpen}
-          onClose={() => setShareOpen(false)}
-          playlistId={data.id}
-          title={data.title}
-        />
-      )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

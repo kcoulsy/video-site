@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Bookmark, Play, Trash2, X } from "lucide-react";
+import { useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
@@ -57,7 +59,7 @@ function WatchLaterPage() {
 
   const { data, isLoading, error } = useQuery<WatchLaterResponse>({
     queryKey: ["watch-later"],
-    queryFn: () => apiClient<WatchLaterResponse>("/api/watch-later?limit=50"),
+    queryFn: () => apiClient<WatchLaterResponse>("/api/watch-later?limit=200"),
   });
 
   const removeMutation = useMutation({
@@ -141,57 +143,101 @@ function WatchLaterPage() {
         </Button>
       </div>
 
-      <div className="space-y-2">
-        {items.map((item) => {
+      <VirtualWatchLaterList
+        items={items}
+        onRemove={(id) => removeMutation.mutate(id)}
+        removingPending={removeMutation.isPending}
+      />
+    </div>
+  );
+}
+
+function VirtualWatchLaterList({
+  items,
+  onRemove,
+  removingPending,
+}: {
+  items: WatchLaterItem[];
+  onRemove: (videoId: string) => void;
+  removingPending: boolean;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const ROW_HEIGHT = 112;
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 6,
+  });
+
+  return (
+    <div ref={parentRef} className="max-h-[80vh] overflow-auto">
+      <div
+        style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}
+        className="w-full"
+      >
+        {virtualizer.getVirtualItems().map((vi) => {
+          const item = items[vi.index]!;
           const thumbnail = absoluteUrl(item.video.thumbnailUrl);
           return (
             <div
               key={item.videoId}
-              className="group flex items-center gap-4 rounded-xl p-3 transition-colors hover:bg-secondary/50"
+              ref={virtualizer.measureElement}
+              data-index={vi.index}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${vi.start}px)`,
+              }}
+              className="pb-2"
             >
-              <Link
-                to="/watch/$videoId"
-                params={{ videoId: item.videoId }}
-                className="flex min-w-0 flex-1 items-center gap-4"
-              >
-                <div className="relative aspect-video w-40 shrink-0 overflow-hidden bg-secondary">
-                  {thumbnail ? (
-                    <img
-                      src={thumbnail}
-                      alt={item.video.title}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
-                      <Play className="h-6 w-6 text-muted-foreground/30" />
-                    </div>
-                  )}
-                  {item.video.duration != null && (
-                    <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">
-                      {formatDuration(item.video.duration)}
-                    </span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="line-clamp-1 text-sm font-medium transition-colors group-hover:text-primary">
-                    {item.video.title}
-                  </h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{item.video.user.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Saved {formatRelativeTime(item.addedAt)}
-                  </p>
-                </div>
-              </Link>
-              <button
-                type="button"
-                aria-label="Remove from Watch Later"
-                disabled={removeMutation.isPending}
-                onClick={() => removeMutation.mutate(item.videoId)}
-                className="rounded-full p-2 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-secondary hover:text-foreground disabled:opacity-50"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="group flex items-center gap-4 rounded-xl p-3 transition-colors hover:bg-secondary/50">
+                <Link
+                  to="/watch/$videoId"
+                  params={{ videoId: item.videoId }}
+                  className="flex min-w-0 flex-1 items-center gap-4"
+                >
+                  <div className="relative aspect-video w-40 shrink-0 overflow-hidden bg-secondary">
+                    {thumbnail ? (
+                      <img
+                        src={thumbnail}
+                        alt={item.video.title}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">
+                        <Play className="h-6 w-6 text-muted-foreground/30" />
+                      </div>
+                    )}
+                    {item.video.duration != null && (
+                      <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">
+                        {formatDuration(item.video.duration)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="line-clamp-1 text-sm font-medium transition-colors group-hover:text-primary">
+                      {item.video.title}
+                    </h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{item.video.user.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Saved {formatRelativeTime(item.addedAt)}
+                    </p>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  aria-label="Remove from Watch Later"
+                  disabled={removingPending}
+                  onClick={() => onRemove(item.videoId)}
+                  className="rounded-full p-2 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           );
         })}

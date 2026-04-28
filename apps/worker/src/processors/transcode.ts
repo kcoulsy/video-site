@@ -48,21 +48,43 @@ function probe(filePath: string): Promise<ffmpeg.FfprobeData> {
   });
 }
 
+// Attach uniform diagnostics: log start command and capture stderr tail so the
+// rejection includes the actual reason ffmpeg gave us.
+function attachDiagnostics(
+  cmd: ffmpeg.FfmpegCommand,
+  label: string,
+): { stderrLines: string[] } {
+  const stderrLines: string[] = [];
+  cmd
+    .on("start", (cmdline: string) => {
+      console.log(`[${label}] ffmpeg start: ${cmdline}`);
+    })
+    .on("stderr", (line: string) => {
+      stderrLines.push(line);
+      if (stderrLines.length > 200) stderrLines.shift();
+    });
+  return { stderrLines };
+}
+
+function ffmpegError(err: Error, stderrLines: string[]): Error {
+  const tail = stderrLines.slice(-30).join("\n");
+  return new Error(`${err.message}\n--- ffmpeg stderr (last 30 lines) ---\n${tail}`);
+}
+
 function extractThumbnail(
   inputPath: string,
   outputPath: string,
   timestampSeconds: number,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
+    const cmd = ffmpeg(inputPath)
       .seekInput(timestampSeconds)
       .frames(1)
       .videoFilter("scale=640:-2")
       .outputOptions("-q:v", "2")
-      .output(outputPath)
-      .on("end", () => resolve())
-      .on("error", reject)
-      .run();
+      .output(outputPath);
+    const { stderrLines } = attachDiagnostics(cmd, "thumbnail");
+    cmd.on("end", () => resolve()).on("error", (err: Error) => reject(ffmpegError(err, stderrLines))).run();
   });
 }
 
@@ -98,7 +120,7 @@ function generateStoryboard(
   layout: StoryboardLayout,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
+    const cmd = ffmpeg(inputPath)
       .outputOptions(
         "-vf",
         `fps=1/${layout.interval},scale=${layout.tileWidth}:${layout.tileHeight}:force_original_aspect_ratio=decrease,pad=${layout.tileWidth}:${layout.tileHeight}:(ow-iw)/2:(oh-ih)/2:black,tile=${layout.cols}x${layout.rows}`,
@@ -107,10 +129,9 @@ function generateStoryboard(
         "-q:v",
         "4",
       )
-      .output(outputPath)
-      .on("end", () => resolve())
-      .on("error", reject)
-      .run();
+      .output(outputPath);
+    const { stderrLines } = attachDiagnostics(cmd, "storyboard");
+    cmd.on("end", () => resolve()).on("error", (err: Error) => reject(ffmpegError(err, stderrLines))).run();
   });
 }
 
@@ -143,15 +164,16 @@ function transcodeToMp4(
       cmd = cmd.outputOptions("-map", "0:a?", "-c:a", "aac", "-b:a", "128k", "-ar", "44100");
     }
 
+    cmd.output(outputPath);
+    const { stderrLines } = attachDiagnostics(cmd, "transcode-mp4");
     cmd
-      .output(outputPath)
       .on("progress", (p) => {
         if (typeof p.percent === "number" && Number.isFinite(p.percent)) {
           onProgress(Math.max(0, Math.min(100, p.percent)));
         }
       })
       .on("end", () => resolve())
-      .on("error", (err) => reject(err))
+      .on("error", (err: Error) => reject(ffmpegError(err, stderrLines)))
       .run();
   });
 }
@@ -213,15 +235,16 @@ function transcodeToDash(
       adaptationSets,
     );
 
+    cmd.output(manifestPath);
+    const { stderrLines } = attachDiagnostics(cmd, "transcode-dash");
     cmd
-      .output(manifestPath)
       .on("progress", (p) => {
         if (typeof p.percent === "number" && Number.isFinite(p.percent)) {
           onProgress(Math.max(0, Math.min(100, p.percent)));
         }
       })
       .on("end", () => resolve(manifestPath))
-      .on("error", (err) => reject(err))
+      .on("error", (err: Error) => reject(ffmpegError(err, stderrLines)))
       .run();
   });
 }

@@ -81,7 +81,7 @@ const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/dashboard.lazy').then((d) => d.Route))
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -96,7 +96,7 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() => import('./routes/admin.index.lazy').then((d) => d.Route))
 const WatchVideoIdRoute = WatchVideoIdRouteImport.update({
   id: '/watch/$videoId',
   path: '/watch/$videoId',
@@ -126,42 +126,46 @@ const AdminVideosRoute = AdminVideosRouteImport.update({
   id: '/videos',
   path: '/videos',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() => import('./routes/admin.videos.lazy').then((d) => d.Route))
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() => import('./routes/admin.users.lazy').then((d) => d.Route))
 const AdminTagsRoute = AdminTagsRouteImport.update({
   id: '/tags',
   path: '/tags',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() => import('./routes/admin.tags.lazy').then((d) => d.Route))
 const AdminReportsRoute = AdminReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() => import('./routes/admin.reports.lazy').then((d) => d.Route))
 const AdminQueueRoute = AdminQueueRouteImport.update({
   id: '/queue',
   path: '/queue',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() => import('./routes/admin.queue.lazy').then((d) => d.Route))
 const AdminCommentsRoute = AdminCommentsRouteImport.update({
   id: '/comments',
   path: '/comments',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() =>
+  import('./routes/admin.comments.lazy').then((d) => d.Route),
+)
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() =>
+  import('./routes/admin.categories.lazy').then((d) => d.Route),
+)
 const AdminAuditRoute = AdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
   getParentRoute: () => AdminRoute,
-} as any)
+} as any).lazy(() => import('./routes/admin.audit.lazy').then((d) => d.Route))
 const VideosVideoIdEditRoute = VideosVideoIdEditRouteImport.update({
   id: '/videos/$videoId/edit',
   path: '/videos/$videoId/edit',
@@ -171,7 +175,9 @@ const VideosVideoIdAnalyticsRoute = VideosVideoIdAnalyticsRouteImport.update({
   id: '/videos/$videoId/analytics',
   path: '/videos/$videoId/analytics',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() =>
+  import('./routes/videos.$videoId.analytics.lazy').then((d) => d.Route),
+)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute

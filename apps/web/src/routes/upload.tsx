@@ -5,7 +5,7 @@ import { Button } from "@video-site/ui/components/button";
 import { Input } from "@video-site/ui/components/input";
 import { Label } from "@video-site/ui/components/label";
 import { ArrowLeft, Eye, EyeOff, Film, Loader2, Upload, X } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import * as tus from "tus-js-client";
 
@@ -99,17 +99,28 @@ function UploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<tus.Upload | null>(null);
 
+  const acceptDroppedFile = useCallback(
+    (dropped: File | undefined) => {
+      if (!dropped) return;
+      const looksLikeVideo =
+        dropped.type.startsWith("video/") || /\.(mp4|mov|mkv|webm|avi|m4v|flv|3gp|mpg|mpeg|ts)$/i.test(dropped.name);
+      if (!looksLikeVideo) {
+        toast.error("That doesn't look like a video file.");
+        return;
+      }
+      setFile(dropped);
+      if (!title) setTitle(dropped.name.replace(/\.[^.]+$/, ""));
+    },
+    [title],
+  );
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setDragOver(false);
-      const dropped = e.dataTransfer.files[0];
-      if (dropped?.type.startsWith("video/")) {
-        setFile(dropped);
-        if (!title) setTitle(dropped.name.replace(/\.[^.]+$/, ""));
-      }
+      acceptDroppedFile(e.dataTransfer.files[0]);
     },
-    [title],
+    [acceptDroppedFile],
   );
 
   const handleFileSelect = useCallback(
@@ -220,8 +231,55 @@ function UploadPage() {
   const isProcessing = phase === "processing";
   const isBusy = isHashing || isUploading || isProcessing;
 
+  // Page-wide drag-and-drop. We also have to swallow drops outside the dropzone
+  // so the browser doesn't navigate to the file when a stray drop misses.
+  const dragDepthRef = useRef(0);
+  useEffect(() => {
+    if (isBusy) return;
+    const onDragEnter = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      e.preventDefault();
+      dragDepthRef.current += 1;
+      setDragOver(true);
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      e.preventDefault();
+    };
+    const onDragLeave = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+      if (dragDepthRef.current === 0) setDragOver(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!e.dataTransfer?.types?.includes("Files")) return;
+      e.preventDefault();
+      dragDepthRef.current = 0;
+      setDragOver(false);
+      acceptDroppedFile(e.dataTransfer.files[0]);
+    };
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [acceptDroppedFile, isBusy]);
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8">
+    <div className="relative mx-auto w-full max-w-6xl px-4 py-8">
+      {dragOver && !isBusy && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="rounded-2xl border-2 border-dashed border-primary bg-primary/10 px-12 py-10 text-center">
+            <Upload className="mx-auto mb-3 h-12 w-12 text-primary" />
+            <p className="text-lg font-medium">Drop video to upload</p>
+          </div>
+        </div>
+      )}
       <button
         type="button"
         onClick={() => navigate({ to: "/dashboard" })}
@@ -244,26 +302,16 @@ function UploadPage() {
         <div className="space-y-6 lg:sticky lg:top-8 lg:self-start">
           {!file ? (
             <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
-              className={`flex aspect-video cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 transition-colors ${
-                dragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-muted-foreground"
-              }`}
+              className="flex aspect-video cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-12 transition-colors hover:border-muted-foreground"
             >
-              <Upload
-                className={`mb-4 h-12 w-12 ${dragOver ? "text-primary" : "text-muted-foreground"}`}
-              />
-              <p className="text-base font-medium">
-                {dragOver ? "Drop video here" : "Drag & drop a video file"}
+              <Upload className="mb-4 h-12 w-12 text-muted-foreground" />
+              <p className="text-base font-medium">Drag & drop a video file</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                or click to browse — anywhere on this page works
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">or click to browse</p>
               <input
                 ref={fileInputRef}
                 type="file"
