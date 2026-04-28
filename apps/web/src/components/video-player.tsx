@@ -574,7 +574,7 @@ export function VideoPlayer({
             className="rounded p-1.5 hover:bg-white/10"
             aria-label={playing ? "Pause" : "Play"}
           >
-            {playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
           </button>
 
           <div className="group/vol flex items-center">
