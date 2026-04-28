@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { Layers, Loader2, Plus, Tag as TagIcon, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers, Loader2, Plus, Tag as TagIcon, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
@@ -48,7 +48,6 @@ const emptyForm = {
   name: "",
   slug: "",
   mode: "any" as "any" | "all",
-  sortOrder: 0,
   tagIds: [] as string[],
 };
 
@@ -86,7 +85,6 @@ function AdminCategories() {
         name: form.name.trim(),
         slug: form.slug.trim(),
         mode: form.mode,
-        sortOrder: form.sortOrder,
         tagIds: form.tagIds,
       };
       if (editingId) {
@@ -129,6 +127,19 @@ function AdminCategories() {
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed"),
   });
 
+  const moveMutation = useMutation({
+    mutationFn: ({ id, direction }: { id: string; direction: "up" | "down" }) =>
+      apiClient(`/api/admin/categories/${id}/move`, {
+        method: "POST",
+        body: JSON.stringify({ direction }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+      void queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed"),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiClient(`/api/admin/categories/${id}`, { method: "DELETE" }),
     onSuccess: () => {
@@ -145,7 +156,6 @@ function AdminCategories() {
       name: cat.name,
       slug: cat.slug,
       mode: cat.mode,
-      sortOrder: cat.sortOrder,
       tagIds: cat.tagIds,
     });
     setSlugDirty(true);
@@ -211,18 +221,6 @@ function AdminCategories() {
               }}
               placeholder="racing"
               className="w-48"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cat-sort">Sort order</Label>
-            <Input
-              id="cat-sort"
-              type="number"
-              value={form.sortOrder}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, sortOrder: Number(e.target.value) || 0 }))
-              }
-              className="w-24"
             />
           </div>
         </div>
@@ -336,11 +334,33 @@ function AdminCategories() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {items.map((c) => (
+            {items.map((c, idx) => (
               <div
                 key={c.id}
                 className="flex items-start gap-4 px-4 py-3 transition-colors hover:bg-secondary/30"
               >
+                <div className="flex flex-col">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={idx === 0 || moveMutation.isPending}
+                    onClick={() => moveMutation.mutate({ id: c.id, direction: "up" })}
+                    aria-label="Move up"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    disabled={idx === items.length - 1 || moveMutation.isPending}
+                    onClick={() => moveMutation.mutate({ id: c.id, direction: "down" })}
+                    aria-label="Move down"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-medium">{c.name}</p>
@@ -348,9 +368,7 @@ function AdminCategories() {
                       {c.mode === "all" ? "all" : "any"}
                     </span>
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {c.slug} · sort {c.sortOrder}
-                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{c.slug}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {c.tagIds.length === 0 ? (
                       <span className="text-xs text-muted-foreground">no tags</span>

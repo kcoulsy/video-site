@@ -528,12 +528,16 @@ adminRoutes.post("/categories", async (c) => {
 
   const id = generateId();
   await db.transaction(async (tx) => {
+    const [maxRow] = await tx
+      .select({ max: sql<number>`COALESCE(MAX(${category.sortOrder}), -1)` })
+      .from(category);
+    const nextSort = (maxRow?.max ?? -1) + 1;
     await tx.insert(category).values({
       id,
       slug: parsed.data.slug,
       name: parsed.data.name,
       mode: parsed.data.mode,
-      sortOrder: parsed.data.sortOrder,
+      sortOrder: nextSort,
     });
     if (uniqueTagIds.length > 0) {
       await tx.insert(categoryTag).values(uniqueTagIds.map((tagId) => ({ categoryId: id, tagId })));
@@ -541,6 +545,31 @@ adminRoutes.post("/categories", async (c) => {
   });
 
   return c.json({ id }, 201);
+});
+
+adminRoutes.post("/categories/:id/move", async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({ direction: z.enum(["up", "down"]) }).safeParse(body);
+  if (!parsed.success) throw new ValidationError("direction must be 'up' or 'down'");
+
+  await db.transaction(async (tx) => {
+    const all = await tx
+      .select({ id: category.id, name: category.name })
+      .from(category)
+      .orderBy(asc(category.sortOrder), asc(category.name));
+    const idx = all.findIndex((r) => r.id === id);
+    if (idx === -1) throw new NotFoundError("Category");
+    const neighborIdx = parsed.data.direction === "up" ? idx - 1 : idx + 1;
+    if (neighborIdx < 0 || neighborIdx >= all.length) return;
+    [all[idx], all[neighborIdx]] = [all[neighborIdx]!, all[idx]!];
+
+    for (let i = 0; i < all.length; i++) {
+      await tx.update(category).set({ sortOrder: i }).where(eq(category.id, all[i]!.id));
+    }
+  });
+
+  return c.json({ ok: true });
 });
 
 adminRoutes.patch("/categories/:id", async (c) => {
