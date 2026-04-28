@@ -38,9 +38,7 @@ export function CategorySidebar({ selected }: CategorySidebarProps) {
         </div>
 
         <nav className="flex flex-col">
-          {/* "All" — chapter 00 */}
           <ChapterLink
-            index={0}
             label="All Videos"
             active={allActive}
             search={(prev: Record<string, unknown>) => ({
@@ -51,17 +49,16 @@ export function CategorySidebar({ selected }: CategorySidebarProps) {
           />
 
           {isLoading && items.length === 0 ? (
-            <div className="mt-2 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60">
-              Loading reel…
+            <div className="mt-2 px-4 py-1.5 text-xs text-muted-foreground/60">
+              Loading…
             </div>
           ) : null}
 
-          {items.map((cat, i) => {
+          {items.map((cat) => {
             const active = selected === cat.slug;
             return (
               <ChapterLink
                 key={cat.id}
-                index={i + 1}
                 label={cat.name}
                 active={active}
                 title={cat.tags
@@ -76,30 +73,19 @@ export function CategorySidebar({ selected }: CategorySidebarProps) {
             );
           })}
         </nav>
-
-        {/* Sprocket footer — purely decorative film-strip flourish */}
-        <div className="mt-5 flex gap-1.5 border-t border-border/60 pt-4 opacity-60">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <span
-              key={i}
-              className="h-1 w-1 rounded-full bg-muted-foreground/40"
-            />
-          ))}
-        </div>
       </div>
     </aside>
   );
 }
 
 interface ChapterLinkProps {
-  index: number;
   label: string;
   active: boolean;
   title?: string;
   search: (prev: Record<string, unknown>) => Record<string, unknown>;
 }
 
-function ChapterLink({ index, label, active, title, search }: ChapterLinkProps) {
+function ChapterLink({ label, active, title, search }: ChapterLinkProps) {
   return (
     <Link
       to="/"
@@ -118,15 +104,6 @@ function ChapterLink({ index, label, active, title, search }: ChapterLinkProps) 
             : "h-3 w-px bg-border group-hover:h-5 group-hover:bg-foreground/40"
         }`}
       />
-
-      {/* Chapter number */}
-      <span
-        className={`font-mono text-[10px] tabular-nums tracking-tight transition-colors ${
-          active ? "text-primary" : "text-muted-foreground/60 group-hover:text-muted-foreground"
-        }`}
-      >
-        {String(index).padStart(2, "0")}
-      </span>
 
       <span
         className={`min-w-0 flex-1 truncate text-sm transition-transform duration-200 group-hover:translate-x-0.5 ${
