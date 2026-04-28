@@ -262,6 +262,7 @@ function PlaylistDetailPage() {
         </div>
       ) : (
         <VirtualPlaylistList
+          playlistId={playlistId}
           items={items}
           isOwner={data.isOwner}
           onMove={(videoId, position) => reorderMutation.mutate({ videoId, position })}
@@ -284,6 +285,7 @@ function PlaylistDetailPage() {
 }
 
 function VirtualPlaylistList({
+  playlistId,
   items,
   isOwner,
   onMove,
@@ -291,6 +293,7 @@ function VirtualPlaylistList({
   reorderPending,
   removePending,
 }: {
+  playlistId: string;
   items: PlaylistItemRow[];
   isOwner: boolean;
   onMove: (videoId: string, position: number) => void;
@@ -338,6 +341,7 @@ function VirtualPlaylistList({
                 <Link
                   to="/watch/$videoId"
                   params={{ videoId: it.videoId }}
+                  search={{ list: playlistId }}
                   className="flex min-w-0 flex-1 items-center gap-4"
                 >
                   <div className="relative aspect-video w-40 shrink-0 overflow-hidden bg-secondary">

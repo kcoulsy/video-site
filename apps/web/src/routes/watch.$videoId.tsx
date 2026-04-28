@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Share2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -15,19 +15,26 @@ import { SaveToPlaylistMenu } from "@/components/save-to-playlist-menu";
 import { ShareDialog } from "@/components/share-dialog";
 import { WatchLaterButton } from "@/components/watch-later-button";
 import { WatchNext } from "@/components/watch-next";
+import { WatchPlaylist } from "@/components/watch-playlist";
 import { ApiError, apiClient } from "@/lib/api-client";
 import { authClient } from "@/lib/auth-client";
 import { formatDate, formatViewCount } from "@/lib/format";
+import { useAutoplay } from "@/hooks/use-autoplay";
 
 interface WatchSearchParams {
   t?: number;
+  list?: string;
 }
 
 export const Route = createFileRoute("/watch/$videoId")({
   component: WatchPage,
   validateSearch: (search: Record<string, unknown>): WatchSearchParams => {
     const t = Number(search.t);
-    return { t: Number.isFinite(t) && t > 0 ? Math.floor(t) : undefined };
+    const list = typeof search.list === "string" && search.list.length > 0 ? search.list : undefined;
+    return {
+      t: Number.isFinite(t) && t > 0 ? Math.floor(t) : undefined,
+      list,
+    };
   },
   loader: async ({ params }) => {
     try {
@@ -114,9 +121,15 @@ function absoluteUrl(path: string | null): string | undefined {
   return `${env.VITE_SERVER_URL}${path}`;
 }
 
+interface PlaylistForAutoplay {
+  items: Array<{ videoId: string }>;
+}
+
 function WatchPage() {
   const { videoId } = Route.useParams();
-  const { t: tParam } = Route.useSearch();
+  const { t: tParam, list: playlistId } = Route.useSearch();
+  const navigate = useNavigate();
+  const [autoplay] = useAutoplay();
   const [cinemaMode, setCinemaMode] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -143,6 +156,27 @@ function WatchPage() {
     enabled: isAuthenticated,
     staleTime: Infinity,
   });
+
+  const { data: playlistForAutoplay } = useQuery<PlaylistForAutoplay>({
+    queryKey: ["playlist", playlistId],
+    queryFn: () => apiClient<PlaylistForAutoplay>(`/api/playlists/${playlistId}`),
+    enabled: !!playlistId,
+    retry: false,
+  });
+
+  const handleEnded = () => {
+    if (!playlistId || !autoplay) return;
+    const items = playlistForAutoplay?.items ?? [];
+    const idx = items.findIndex((it) => it.videoId === videoId);
+    const next = idx >= 0 ? items[idx + 1] : undefined;
+    if (next) {
+      navigate({
+        to: "/watch/$videoId",
+        params: { videoId: next.videoId },
+        search: { list: playlistId },
+      });
+    }
+  };
 
   useEffect(() => {
     videoIdRef.current = videoId;
@@ -295,7 +329,9 @@ function WatchPage() {
                 : null
             }
             initialTime={initialTime}
+            autoPlay
             onTimeUpdate={handleTimeUpdate}
+            onEnded={handleEnded}
             cinemaMode={cinemaMode}
             onToggleCinema={() => setCinemaMode((c) => !c)}
           />
@@ -405,11 +441,17 @@ function WatchPage() {
 
         {!cinemaMode && (
           <aside className="lg:col-start-2 lg:row-start-1">
+            {playlistId && (
+              <WatchPlaylist playlistId={playlistId} currentVideoId={video.id} />
+            )}
             <WatchNext currentVideoId={video.id} />
           </aside>
         )}
         {cinemaMode && (
           <aside>
+            {playlistId && (
+              <WatchPlaylist playlistId={playlistId} currentVideoId={video.id} />
+            )}
             <WatchNext currentVideoId={video.id} />
           </aside>
         )}

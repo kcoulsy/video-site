@@ -123,6 +123,16 @@ export function VideoPlayer({
           const t = initialTimeRef.current;
           if (t && t > 0) player.seek(t);
           seeked = true;
+          if (autoPlay && videoRef.current) {
+            const v = videoRef.current;
+            const tryPlay = v.play();
+            if (tryPlay && typeof tryPlay.catch === "function") {
+              tryPlay.catch(() => {
+                v.muted = true;
+                v.play().catch(() => {});
+              });
+            }
+          }
         });
 
         const refreshQualities = () => {
