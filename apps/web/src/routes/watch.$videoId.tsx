@@ -53,16 +53,16 @@ export const Route = createFileRoute("/watch/$videoId")({
 
     const pageUrl = `${env.VITE_WEB_URL}/watch/${video.id}`;
     const image = video.thumbnailUrl ? `${env.VITE_SERVER_URL}${video.thumbnailUrl}` : undefined;
-    const title = `${video.title} — Watchbox`;
+    const title = `${video.title} — ${env.VITE_APP_NAME}`;
     const description = video.description?.trim()
       ? video.description.slice(0, 200)
-      : `Watch ${video.title} on Watchbox.`;
+      : `Watch ${video.title} on ${env.VITE_APP_NAME}.`;
 
     const meta: Array<Record<string, string>> = [
       { title },
       { name: "description", content: description },
       { property: "og:type", content: "video.other" },
-      { property: "og:site_name", content: "Watchbox" },
+      { property: "og:site_name", content: env.VITE_APP_NAME },
       { property: "og:title", content: video.title },
       { property: "og:description", content: description },
       { property: "og:url", content: pageUrl },
@@ -198,7 +198,7 @@ function WatchPage() {
   useEffect(() => {
     if (video?.title) {
       const previous = document.title;
-      document.title = `${video.title} — Watchbox`;
+      document.title = `${video.title} — ${env.VITE_APP_NAME}`;
       return () => {
         document.title = previous;
       };

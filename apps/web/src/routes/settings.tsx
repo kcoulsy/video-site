@@ -12,7 +12,7 @@ import { ApiError, apiClient } from "@/lib/api-client";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
-  head: () => ({ meta: [{ title: "Settings — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Settings — ${env.VITE_APP_NAME}` }] }),
   beforeLoad: async () => {
     const session = await getUser();
     return { session };

@@ -34,7 +34,7 @@ interface FeedSearchParams {
 
 export const Route = createFileRoute("/subscriptions")({
   component: SubscriptionsPage,
-  head: () => ({ meta: [{ title: "Subscriptions — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Subscriptions — ${env.VITE_APP_NAME}` }] }),
   validateSearch: (search: Record<string, unknown>): FeedSearchParams => {
     const pageNum = Number(search.page);
     return { page: Number.isFinite(pageNum) && pageNum > 0 ? Math.floor(pageNum) : 1 };

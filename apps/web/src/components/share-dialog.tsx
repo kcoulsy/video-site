@@ -1,5 +1,6 @@
 import { Check, Copy, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@video-site/ui/components/button";
 import { Checkbox } from "@video-site/ui/components/checkbox";
 import { env } from "@video-site/env/web";
@@ -43,7 +44,7 @@ export function ShareDialog({ open, onClose, videoId, playlistId, title, current
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const base = videoId
     ? `${env.VITE_WEB_URL}/watch/${videoId}`
@@ -71,10 +72,14 @@ export function ShareDialog({ open, onClose, videoId, playlistId, title, current
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <div
         className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl"
@@ -161,6 +166,7 @@ export function ShareDialog({ open, onClose, videoId, playlistId, title, current
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

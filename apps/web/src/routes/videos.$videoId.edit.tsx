@@ -78,7 +78,9 @@ function EditVideoPage() {
 
   useEffect(() => {
     const previous = document.title;
-    document.title = video?.title ? `Edit: ${video.title} — Watchbox` : "Edit video — Watchbox";
+    document.title = video?.title
+      ? `Edit: ${video.title} — ${env.VITE_APP_NAME}`
+      : `Edit video — ${env.VITE_APP_NAME}`;
     return () => {
       document.title = previous;
     };

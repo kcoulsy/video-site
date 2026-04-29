@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { env } from "@video-site/env/web";
 import { getUser } from "@/functions/get-user";
 
 interface DashboardSearchParams {
@@ -6,7 +7,7 @@ interface DashboardSearchParams {
 }
 
 export const Route = createFileRoute("/dashboard")({
-  head: () => ({ meta: [{ title: "Your videos — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Your videos — ${env.VITE_APP_NAME}` }] }),
   beforeLoad: async () => {
     const session = await getUser();
     return { session };

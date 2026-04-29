@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { env } from "@video-site/env/web";
 import { ListVideo, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -12,7 +13,7 @@ import { apiClient } from "@/lib/api-client";
 
 export const Route = createFileRoute("/playlists/mine")({
   component: MyPlaylistsPage,
-  head: () => ({ meta: [{ title: "Your Playlists — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Your Playlists — ${env.VITE_APP_NAME}` }] }),
   beforeLoad: async () => {
     const session = await getUser();
     return { session };

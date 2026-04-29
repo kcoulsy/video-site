@@ -1,5 +1,6 @@
 import { db } from "@video-site/db";
 import { user } from "@video-site/db/schema/auth";
+import { hiddenVideo } from "@video-site/db/schema/hidden-video";
 import { videoLike } from "@video-site/db/schema/like";
 import { userRecs, videoSimilarity } from "@video-site/db/schema/recommendations";
 import { video } from "@video-site/db/schema/video";
@@ -55,6 +56,13 @@ const RELATED_VIEWER_TAG_BONUS = 0.15;
 
 // Trending fetch overfetch — pull extra in case excluded ids cluster at the top.
 const TRENDING_OVERFETCH_BUFFER = 20;
+
+// "Not interested" soft penalty: when a video shares an author or any tag with
+// something the user recently dismissed, multiply its score by this. Only the
+// videos hidden within HIDDEN_PENALTY_WINDOW_DAYS contribute to the penalty
+// signal, so the effect fades naturally.
+const HIDDEN_PENALTY_MULTIPLIER = 0.4;
+const HIDDEN_PENALTY_WINDOW_DAYS = 30;
 
 // Home feed: continue-watching items merged into the top of the feed.
 const HOME_CONTINUE_WATCHING_LIMIT = 8;
@@ -189,6 +197,58 @@ function mmrSimilarity(a: CandidateRow, b: CandidateRow): number {
   return tagJaccard(a.tags, b.tags);
 }
 
+interface HiddenSignals {
+  hiddenIds: Set<string>;
+  penalAuthors: Set<string>;
+  penalTags: Set<string>;
+}
+
+const EMPTY_HIDDEN_SIGNALS: HiddenSignals = {
+  hiddenIds: new Set(),
+  penalAuthors: new Set(),
+  penalTags: new Set(),
+};
+
+async function loadHiddenSignals(userId: string | null): Promise<HiddenSignals> {
+  if (!userId) return EMPTY_HIDDEN_SIGNALS;
+
+  const rows = await db
+    .select({
+      videoId: hiddenVideo.videoId,
+      hiddenAt: hiddenVideo.hiddenAt,
+      authorId: video.userId,
+      tags: video.tags,
+    })
+    .from(hiddenVideo)
+    .leftJoin(video, eq(video.id, hiddenVideo.videoId))
+    .where(eq(hiddenVideo.userId, userId));
+
+  if (rows.length === 0) return EMPTY_HIDDEN_SIGNALS;
+
+  const hiddenIds = new Set<string>();
+  const penalAuthors = new Set<string>();
+  const penalTags = new Set<string>();
+  const cutoff = Date.now() - HIDDEN_PENALTY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+  for (const r of rows) {
+    hiddenIds.add(r.videoId);
+    if (r.hiddenAt.getTime() < cutoff) continue;
+    if (r.authorId) penalAuthors.add(r.authorId);
+    if (r.tags) for (const t of r.tags) penalTags.add(t);
+  }
+
+  return { hiddenIds, penalAuthors, penalTags };
+}
+
+function hiddenPenalty(row: CandidateRow, signals: HiddenSignals): number {
+  if (signals.penalAuthors.size === 0 && signals.penalTags.size === 0) return 1;
+  if (signals.penalAuthors.has(row.userId)) return HIDDEN_PENALTY_MULTIPLIER;
+  if (row.tags) {
+    for (const t of row.tags) if (signals.penalTags.has(t)) return HIDDEN_PENALTY_MULTIPLIER;
+  }
+  return 1;
+}
+
 type ScoredCandidate = { row: CandidateRow; baseScore: number };
 
 function mmrRerank(candidates: ScoredCandidate[], limit: number): CandidateRow[] {
@@ -293,7 +353,7 @@ export async function getRelated(
   limit = 15,
   userId: string | null = null,
 ): Promise<VideoCard[]> {
-  const [currentRows, sims] = await Promise.all([
+  const [currentRows, sims, hiddenSignals] = await Promise.all([
     db
       .select({
         id: video.id,
@@ -313,9 +373,10 @@ export async function getRelated(
       .where(eq(videoSimilarity.videoId, videoId))
       .orderBy(desc(videoSimilarity.score))
       .limit(limit * RELATED_SIM_OVERFETCH),
+    loadHiddenSignals(userId),
   ]);
   const current = currentRows[0];
-  if (!current) return getTrending(limit, [videoId]);
+  if (!current) return getTrending(limit, [videoId], userId);
 
   const currentTitleTokens = titleTokens(current.title);
   const currentTags = current.tags ?? [];
@@ -354,8 +415,12 @@ export async function getRelated(
           .where(and(publicReadyWhere, inArray(video.id, cfMissingIds), ne(video.id, videoId)))
       : [];
 
-  const allRows: CandidateRow[] = [...contentRows, ...cfRows];
-  if (allRows.length === 0) return getTrending(limit, [videoId]);
+  const allRowsRaw: CandidateRow[] = [...contentRows, ...cfRows];
+  const allRows: CandidateRow[] =
+    hiddenSignals.hiddenIds.size > 0
+      ? allRowsRaw.filter((r) => !hiddenSignals.hiddenIds.has(r.id))
+      : allRowsRaw;
+  if (allRows.length === 0) return getTrending(limit, [videoId], userId);
 
   // Viewer personalization signals.
   let viewerAuthorIds = new Set<string>();
@@ -406,40 +471,56 @@ export async function getRelated(
       if (r.tags && r.tags.some((t) => viewerTags.has(t))) base += RELATED_VIEWER_TAG_BONUS;
     }
 
+    base *= hiddenPenalty(r, hiddenSignals);
+
     if (base > 0) scored.push({ row: r, baseScore: base });
   }
 
-  if (scored.length === 0) return getTrending(limit, [videoId]);
+  if (scored.length === 0) return getTrending(limit, [videoId], userId);
 
   scored.sort((a, b) => b.baseScore - a.baseScore);
   const diversified = mmrRerank(scored, limit);
 
   if (diversified.length >= limit) return diversified.map(rowToCard);
-  const fallback = await getTrending(limit - diversified.length, [
-    videoId,
-    ...diversified.map((r) => r.id),
-  ]);
+  const fallback = await getTrending(
+    limit - diversified.length,
+    [videoId, ...diversified.map((r) => r.id)],
+    userId,
+  );
   return [...diversified.map(rowToCard), ...fallback];
 }
 
-export async function getTrending(limit: number, exclude: string[] = []): Promise<VideoCard[]> {
-  return getTrendingPage(limit, 0, exclude);
+export async function getTrending(
+  limit: number,
+  exclude: string[] = [],
+  userId: string | null = null,
+): Promise<VideoCard[]> {
+  return getTrendingPage(limit, 0, exclude, userId);
 }
 
 export async function getTrendingPage(
   limit: number,
   offset: number,
   exclude: string[] = [],
+  userId: string | null = null,
 ): Promise<VideoCard[]> {
+  const hiddenSignals = await loadHiddenSignals(userId);
+  const effectiveExclude =
+    hiddenSignals.hiddenIds.size > 0
+      ? Array.from(new Set([...exclude, ...hiddenSignals.hiddenIds]))
+      : exclude;
+
   const redis = getRedisClient();
   const ranked = await redis.zrevrange(
     TRENDING_KEY,
     0,
-    offset + limit + exclude.length + TRENDING_OVERFETCH_BUFFER - 1,
+    offset + limit + effectiveExclude.length + TRENDING_OVERFETCH_BUFFER - 1,
   );
 
   if (ranked.length > 0) {
-    const filtered = ranked.filter((id) => !exclude.includes(id)).slice(offset, offset + limit);
+    const filtered = ranked
+      .filter((id) => !effectiveExclude.includes(id))
+      .slice(offset, offset + limit);
     if (filtered.length > 0) {
       const rows = await db
         .select(baseVideoSelect)
@@ -454,7 +535,9 @@ export async function getTrendingPage(
   }
 
   const where =
-    exclude.length > 0 ? and(publicReadyWhere, notInArray(video.id, exclude)) : publicReadyWhere;
+    effectiveExclude.length > 0
+      ? and(publicReadyWhere, notInArray(video.id, effectiveExclude))
+      : publicReadyWhere;
 
   const rows = await db
     .select(baseVideoSelect)
@@ -481,6 +564,19 @@ export async function getContinueWatching(
   userId: string,
   limit = 10,
 ): Promise<ContinueWatchingCard[]> {
+  const hiddenSignals = await loadHiddenSignals(userId);
+  const conditions = [
+    eq(watchHistory.userId, userId),
+    sql`${watchHistory.progressPercent} BETWEEN ${CONTINUE_PROGRESS_MIN} AND ${CONTINUE_PROGRESS_MAX}`,
+    isNull(watchHistory.completedAt),
+    eq(video.status, "ready"),
+    or(eq(video.visibility, "public"), eq(video.visibility, "unlisted")),
+    visibleVideoWhere(),
+    activeAuthorWhere(),
+  ];
+  if (hiddenSignals.hiddenIds.size > 0) {
+    conditions.push(notInArray(video.id, [...hiddenSignals.hiddenIds]));
+  }
   const rows = await db
     .select({
       ...baseVideoSelect,
@@ -491,17 +587,7 @@ export async function getContinueWatching(
     .from(watchHistory)
     .innerJoin(video, eq(video.id, watchHistory.videoId))
     .innerJoin(user, eq(user.id, video.userId))
-    .where(
-      and(
-        eq(watchHistory.userId, userId),
-        sql`${watchHistory.progressPercent} BETWEEN ${CONTINUE_PROGRESS_MIN} AND ${CONTINUE_PROGRESS_MAX}`,
-        isNull(watchHistory.completedAt),
-        eq(video.status, "ready"),
-        or(eq(video.visibility, "public"), eq(video.visibility, "unlisted")),
-        visibleVideoWhere(),
-        activeAuthorWhere(),
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(desc(watchHistory.lastWatchedAt))
     .limit(limit);
 
@@ -528,7 +614,15 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
     return shuffleTop(pool, HOME_SHUFFLE_TOP_N).slice(0, limit);
   }
 
+  const hiddenSignals = await loadHiddenSignals(userId);
+  const hiddenIdList = [...hiddenSignals.hiddenIds];
+
   const targetCount = limit * HOME_CANDIDATE_OVERFETCH;
+
+  const userCfWhere =
+    hiddenIdList.length > 0
+      ? and(eq(userRecs.userId, userId), publicReadyWhere, notInArray(video.id, hiddenIdList))
+      : and(eq(userRecs.userId, userId), publicReadyWhere);
 
   const [continueWatching, userCfRows, itemCfScores] = await Promise.all([
     getContinueWatching(userId, HOME_CONTINUE_WATCHING_LIMIT),
@@ -545,7 +639,7 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
         watchHistory,
         and(eq(watchHistory.userId, userId), eq(watchHistory.videoId, video.id)),
       )
-      .where(and(eq(userRecs.userId, userId), publicReadyWhere))
+      .where(userCfWhere)
       .orderBy(desc(userRecs.score))
       .limit(targetCount),
     getItemCfCandidates(userId),
@@ -558,7 +652,10 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
     if (r.completedAt) continue;
     if (cwIds.has(r.id)) continue;
     const base =
-      r.cfScore * freshnessBoost(r.createdAt) * qualityMultiplier(r.likeCount, r.dislikeCount);
+      r.cfScore *
+      freshnessBoost(r.createdAt) *
+      qualityMultiplier(r.likeCount, r.dislikeCount) *
+      hiddenPenalty(r, hiddenSignals);
     const itemBonus = itemCfScores.get(r.id);
     const withBonus = itemBonus ? base + itemBonus * HOME_USER_CF_OVERLAP_BONUS : base;
     entries.set(r.id, { row: r, baseScore: withBonus, fromUserCf: true });
@@ -566,7 +663,9 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
 
   // Pull row data for item-CF candidates that user-CF didn't already provide.
   if (itemCfScores.size > 0) {
-    const missingIds = [...itemCfScores.keys()].filter((id) => !entries.has(id));
+    const missingIds = [...itemCfScores.keys()].filter(
+      (id) => !entries.has(id) && !hiddenSignals.hiddenIds.has(id),
+    );
     if (missingIds.length > 0) {
       const missingRows = await db
         .select({ ...baseVideoSelect, completedAt: watchHistory.completedAt })
@@ -586,7 +685,8 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
           itemScore *
           HOME_FRESH_ITEM_CF_WEIGHT *
           freshnessBoost(r.createdAt) *
-          qualityMultiplier(r.likeCount, r.dislikeCount);
+          qualityMultiplier(r.likeCount, r.dislikeCount) *
+          hiddenPenalty(r, hiddenSignals);
         const { completedAt: _ignored, ...rest } = r;
         void _ignored;
         entries.set(r.id, { row: rest, baseScore: base, fromUserCf: false });
@@ -604,16 +704,17 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
 
   let recommended: VideoCard[];
   if (entries.size === 0) {
-    recommended = await getTrending(limit, [...cwIds]);
+    recommended = await getTrending(limit, [...cwIds], userId);
   } else {
     const sorted = [...entries.values()].sort((a, b) => b.baseScore - a.baseScore);
     const diversified = mmrRerank(sorted, limit);
     recommended = diversified.map(rowToCard);
     if (recommended.length < limit) {
-      const fallback = await getTrending(limit - recommended.length, [
-        ...cwIds,
-        ...recommended.map((r) => r.id),
-      ]);
+      const fallback = await getTrending(
+        limit - recommended.length,
+        [...cwIds, ...recommended.map((r) => r.id)],
+        userId,
+      );
       recommended = [...recommended, ...fallback];
     }
   }

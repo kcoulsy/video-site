@@ -59,7 +59,7 @@ interface HistoryProgressResponse {
 
 export const Route = createFileRoute("/")({
   component: HomePage,
-  head: () => ({ meta: [{ title: "Watchbox — Watch and share videos" }] }),
+  head: () => ({ meta: [{ title: `${env.VITE_APP_NAME} — Watch and share videos` }] }),
   validateSearch: (search: Record<string, unknown>): IndexSearchParams => {
     const sortRaw = typeof search.sort === "string" ? (search.sort as SortOption) : undefined;
     const sort: SortOption | undefined = sortRaw && SORT_VALUES.has(sortRaw) ? sortRaw : undefined;

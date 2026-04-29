@@ -1,4 +1,5 @@
 import { Link, Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+import { env } from "@video-site/env/web";
 import {
   FileClock,
   Flag,
@@ -16,7 +17,7 @@ import { getUser } from "@/functions/get-user";
 
 export const Route = createFileRoute("/admin")({
   component: AdminLayout,
-  head: () => ({ meta: [{ title: "Admin — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Admin — ${env.VITE_APP_NAME}` }] }),
   beforeLoad: async () => {
     const session = await getUser();
     if (!session) throw redirect({ to: "/login" });

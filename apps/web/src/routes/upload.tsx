@@ -15,7 +15,7 @@ import { formatFileSize } from "@/lib/format";
 
 export const Route = createFileRoute("/upload")({
   component: UploadPage,
-  head: () => ({ meta: [{ title: "Upload video — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Upload video — ${env.VITE_APP_NAME}` }] }),
   beforeLoad: async () => {
     const session = await getUser();
     return { session };

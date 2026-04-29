@@ -92,7 +92,9 @@ function SearchPage() {
 
   useEffect(() => {
     const previous = document.title;
-    document.title = trimmed ? `Search: ${trimmed} — Watchbox` : "Search — Watchbox";
+    document.title = trimmed
+      ? `Search: ${trimmed} — ${env.VITE_APP_NAME}`
+      : `Search — ${env.VITE_APP_NAME}`;
     return () => {
       document.title = previous;
     };

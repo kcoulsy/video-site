@@ -1,6 +1,5 @@
 import { env } from "@video-site/env/server";
 import type { Context } from "hono";
-import { getConnInfo } from "hono/adapter/bun/conninfo";
 import { createMiddleware } from "hono/factory";
 
 import { AppError } from "../lib/errors";
@@ -30,11 +29,16 @@ function clientIdent(c: Context): string {
     const ip = fwd?.split(",")[0]?.trim() || c.req.header("x-real-ip");
     if (ip) return `ip:${ip}`;
   }
+  // Bun-specific: the underlying server is reachable via the request's `server`
+  // binding when running under `Bun.serve`. Fall back to "anon" if unavailable.
   try {
-    const info = getConnInfo(c);
-    if (info.remote.address) return `ip:${info.remote.address}`;
+    const server = (globalThis as { Bun?: { serve?: unknown } }).Bun
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((c.env as any)?.requestIP?.(c.req.raw) as { address?: string } | undefined)
+      : undefined;
+    if (server?.address) return `ip:${server.address}`;
   } catch {
-    // adapter not available (e.g. tests) — fall through
+    // ignore
   }
   return "ip:anon";
 }

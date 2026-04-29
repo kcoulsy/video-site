@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { formatDuration, formatViewCount, formatRelativeTime } from "@/lib/format";
 
 import { HoverPreview } from "./hover-preview";
+import { VideoCardMenu } from "./video-card-menu";
 import { VideoCardWatchLater } from "./video-card-watch-later";
 import { WatchProgressBar } from "./watch-progress-bar";
 
@@ -49,14 +50,17 @@ export function VideoCard({
       </div>
 
       {/* Info */}
-      <div className="mt-3 min-w-0">
-        <h3 className="line-clamp-2 text-sm font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
-          {title}
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">{user.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {formatViewCount(viewCount)} views &middot; {formatRelativeTime(createdAt)}
-        </p>
+      <div className="mt-3 flex min-w-0 items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="line-clamp-2 text-sm font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
+            {title}
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">{user.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatViewCount(viewCount)} views &middot; {formatRelativeTime(createdAt)}
+          </p>
+        </div>
+        <VideoCardMenu videoId={id} videoTitle={title} />
       </div>
     </Link>
   );

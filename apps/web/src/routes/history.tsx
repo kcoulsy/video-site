@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, redirect } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Clock, History, Play, Trash2, X } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@video-site/ui/components/button";
 import { env } from "@video-site/env/web";
@@ -15,7 +15,7 @@ import { formatDuration, formatRelativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/history")({
   component: HistoryPage,
-  head: () => ({ meta: [{ title: "Watch history — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Watch history — ${env.VITE_APP_NAME}` }] }),
   beforeLoad: async () => {
     const session = await getUser();
     return { session };
@@ -58,13 +58,19 @@ function absoluteUrl(path: string | null): string | undefined {
   return `${env.VITE_SERVER_URL}${path}`;
 }
 
+const PAGE_LIMIT = 50;
+
 function HistoryPage() {
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery<HistoryResponse>({
-    queryKey: ["history"],
-    queryFn: () => apiClient<HistoryResponse>("/api/history?limit=200"),
-  });
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery<HistoryResponse, Error, { pages: HistoryResponse[]; pageParams: number[] }, ["history"], number>({
+      queryKey: ["history"],
+      initialPageParam: 1,
+      queryFn: ({ pageParam }) =>
+        apiClient<HistoryResponse>(`/api/history?limit=${PAGE_LIMIT}&page=${pageParam}`),
+      getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    });
 
   const removeMutation = useMutation({
     mutationFn: (videoId: string) => apiClient(`/api/history/${videoId}`, { method: "DELETE" }),
@@ -104,7 +110,7 @@ function HistoryPage() {
     );
   }
 
-  const items = data?.items ?? [];
+  const items = data?.pages.flatMap((p) => p.items) ?? [];
   const continueItems = items.filter((it) => it.progressPercent < 0.9);
 
   if (items.length === 0) {
@@ -154,7 +160,7 @@ function HistoryPage() {
             <Play className="h-4 w-4" />
             Continue Watching
           </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {continueItems.map((item) => (
               <ContinueCard key={`continue-${item.videoId}`} item={item} />
             ))}
@@ -173,6 +179,9 @@ function HistoryPage() {
           removingId={
             removeMutation.isPending ? (removeMutation.variables as string | undefined) : undefined
           }
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          onLoadMore={fetchNextPage}
         />
       </section>
     </div>
@@ -183,10 +192,16 @@ function VirtualHistoryList({
   items,
   onRemove,
   removingId,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
 }: {
   items: HistoryItem[];
   onRemove: (videoId: string) => void;
   removingId: string | undefined;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  onLoadMore: () => void;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const ROW_HEIGHT = 112;
@@ -197,13 +212,21 @@ function VirtualHistoryList({
     overscan: 6,
   });
 
+  const virtualItems = virtualizer.getVirtualItems();
+  const lastIndex = virtualItems.at(-1)?.index ?? 0;
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && lastIndex >= items.length - 5) {
+      onLoadMore();
+    }
+  }, [hasNextPage, isFetchingNextPage, lastIndex, items.length, onLoadMore]);
+
   return (
     <div ref={parentRef} className="max-h-[80vh] overflow-auto">
       <div
         style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}
         className="w-full"
       >
-        {virtualizer.getVirtualItems().map((vi) => {
+        {virtualItems.map((vi) => {
           const item = items[vi.index]!;
           return (
             <div
@@ -228,6 +251,11 @@ function VirtualHistoryList({
           );
         })}
       </div>
+      {isFetchingNextPage && (
+        <div className="flex items-center justify-center py-4">
+          <Loader />
+        </div>
+      )}
     </div>
   );
 }

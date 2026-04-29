@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { env } from "@video-site/env/web";
 import { useState } from "react";
 
 import SignInForm from "@/components/sign-in-form";
@@ -6,7 +7,7 @@ import SignUpForm from "@/components/sign-up-form";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Sign in — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Sign in — ${env.VITE_APP_NAME}` }] }),
 });
 
 function LoginPage() {

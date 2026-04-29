@@ -44,12 +44,14 @@ recommendationsRoutes.get("/recommendations/feed", async (c) => {
 recommendationsRoutes.get("/recommendations/trending", async (c) => {
   const limit = parseLimit(c);
   const page = parsePage(c);
+  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const userId = session?.user.id ?? null;
   const [items, total] = await Promise.all([
-    getTrendingPage(limit, (page - 1) * limit),
+    getTrendingPage(limit, (page - 1) * limit, [], userId),
     countTrendingCandidates(),
   ]);
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
-  c.header("Cache-Control", "public, max-age=60");
+  c.header("Cache-Control", userId ? "private, max-age=30" : "public, max-age=60");
   return c.json({ items, page, limit, total, totalPages });
 });
 

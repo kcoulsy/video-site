@@ -14,7 +14,7 @@ import { formatDuration, formatRelativeTime } from "@/lib/format";
 
 export const Route = createFileRoute("/watch-later")({
   component: WatchLaterPage,
-  head: () => ({ meta: [{ title: "Watch Later — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Watch Later — ${env.VITE_APP_NAME}` }] }),
   beforeLoad: async () => {
     const session = await getUser();
     return { session };

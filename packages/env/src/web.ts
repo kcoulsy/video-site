@@ -6,6 +6,7 @@ export const env = createEnv({
   client: {
     VITE_SERVER_URL: z.url(),
     VITE_WEB_URL: z.url(),
+    VITE_APP_NAME: z.string().min(1).default("Watchbox"),
   },
   runtimeEnv: (import.meta as any).env,
   emptyStringAsUndefined: true,

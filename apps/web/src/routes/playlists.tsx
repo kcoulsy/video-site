@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { env } from "@video-site/env/web";
 import { ListVideo } from "lucide-react";
 
 import Loader from "@/components/loader";
@@ -24,7 +25,7 @@ interface BrowseSearchParams {
 
 export const Route = createFileRoute("/playlists")({
   component: BrowsePlaylistsPage,
-  head: () => ({ meta: [{ title: "Browse Playlists — Watchbox" }] }),
+  head: () => ({ meta: [{ title: `Browse Playlists — ${env.VITE_APP_NAME}` }] }),
   validateSearch: (search: Record<string, unknown>): BrowseSearchParams => {
     const pageNum = Number(search.page);
     return {

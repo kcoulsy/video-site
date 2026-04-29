@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { env } from "@video-site/env/web";
 import { Toaster } from "@video-site/ui/components/sonner";
 import { useState } from "react";
 
@@ -15,7 +16,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Watchbox" },
+      { title: env.VITE_APP_NAME },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },

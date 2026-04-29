@@ -5,6 +5,7 @@ export * from "./comment-like";
 export * from "./like";
 export * from "./watch-history";
 export * from "./watch-later";
+export * from "./hidden-video";
 export * from "./playlist";
 export * from "./subscription";
 export * from "./notification";

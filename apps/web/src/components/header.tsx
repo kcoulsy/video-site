@@ -1,9 +1,11 @@
 import { Link, useLocation, useSearch } from "@tanstack/react-router";
-import { Film, Menu, Upload, X } from "lucide-react";
+import { env } from "@video-site/env/web";
+import { Menu, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@video-site/ui/components/button";
 
 import { CategoryDrawerContent } from "./category-sidebar";
+import { Logo } from "./logo";
 import { NotificationBell } from "./notification-bell";
 import { SearchBar } from "./search-bar";
 import UserMenu from "./user-menu";
@@ -51,13 +53,8 @@ export default function Header() {
             </button>
           )}
 
-          <Link to="/" className="flex shrink-0 items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Film className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="hidden font-display text-xl italic tracking-tight sm:block">
-              Watchbox
-            </span>
+          <Link to="/">
+            <Logo />
           </Link>
 
           <SearchBar />
@@ -101,7 +98,7 @@ export default function Header() {
             className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r border-border bg-background pb-6 shadow-xl"
           >
             <div className="flex items-center justify-between px-3 py-3">
-              <span className="font-display text-lg italic tracking-tight">Watchbox</span>
+              <span className="font-display text-lg italic tracking-tight">{env.VITE_APP_NAME}</span>
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}

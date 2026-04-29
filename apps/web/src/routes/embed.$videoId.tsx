@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { env } from "@video-site/env/web";
+import { useEffect } from "react";
 
+import { Logo } from "@/components/logo";
 import { VideoPlayer } from "@/components/video-player";
 import { ApiError, apiClient } from "@/lib/api-client";
 
@@ -39,9 +41,30 @@ function abs(path: string | null): string | undefined {
   return `${env.VITE_SERVER_URL}${path}`;
 }
 
+function useLockBodyScroll() {
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.cssText;
+    const prevBody = body.style.cssText;
+    html.style.margin = "0";
+    html.style.height = "100%";
+    html.style.overflow = "hidden";
+    body.style.margin = "0";
+    body.style.height = "100%";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.cssText = prevHtml;
+      body.style.cssText = prevBody;
+    };
+  }, []);
+}
+
 function EmbedPage() {
   const { videoId } = Route.useParams();
   const { t: tParam } = Route.useSearch();
+
+  useLockBodyScroll();
 
   const { data: video, error } = useQuery<VideoResponse>({
     queryKey: ["embed-video", videoId],
@@ -51,14 +74,16 @@ function EmbedPage() {
   if (error || !video) {
     const status = error instanceof ApiError ? error.status : 0;
     return (
-      <div className="flex h-svh items-center justify-center bg-black text-sm text-white/70">
+      <div className="fixed inset-0 flex items-center justify-center bg-black text-sm text-white/70">
         {status === 404 ? "Video not available" : "Failed to load"}
       </div>
     );
   }
 
+  const watchUrl = `${env.VITE_WEB_URL}/watch/${video.id}`;
+
   return (
-    <div className="h-svh w-full bg-black">
+    <div className="fixed inset-0 overflow-hidden bg-black">
       <VideoPlayer
         manifestUrl={abs(video.streamUrl)}
         thumbnailUrl={abs(video.thumbnailUrl) ?? null}
@@ -76,6 +101,15 @@ function EmbedPage() {
         }
         initialTime={tParam ?? 0}
       />
+      <a
+        href={watchUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Watch on ${env.VITE_APP_NAME}`}
+        className="pointer-events-auto absolute left-3 top-3 z-10 rounded-lg bg-black/40 px-2 py-1.5 backdrop-blur-sm transition-opacity hover:bg-black/60"
+      >
+        <Logo />
+      </a>
     </div>
   );
 }
