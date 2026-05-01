@@ -1,16 +1,19 @@
 import { db } from "@video-site/db";
 import { user } from "@video-site/db/schema/auth";
 import { hiddenVideo } from "@video-site/db/schema/hidden-video";
-import { videoLike } from "@video-site/db/schema/like";
 import { userRecs, videoSimilarity } from "@video-site/db/schema/recommendations";
 import { video } from "@video-site/db/schema/video";
 import { watchHistory } from "@video-site/db/schema/watch-history";
-import { and, desc, eq, gt, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 
 import { activeAuthorWhere, visibleVideoWhere } from "../lib/moderation-filters";
 import { getRedisClient } from "../lib/redis";
 
 export const TRENDING_KEY = "trending:global";
+const TRENDING_COUNT_KEY = "trending:count";
+const TRENDING_COUNT_TTL_SECONDS = 60;
+const HOME_FEED_CACHE_TTL_SECONDS = 30;
+const homeFeedCacheKey = (userId: string, limit: number) => `home:${userId}:${limit}`;
 
 // ---------- ranking constants ----------
 
@@ -279,33 +282,31 @@ function mmrRerank(candidates: ScoredCandidate[], limit: number): CandidateRow[]
 // ---------- candidate gathering ----------
 
 async function getUserSeedVideos(userId: string): Promise<string[]> {
-  // User's most recent positive interactions: likes + high-progress watches.
+  // Likes (source=0) ranked above high-progress watches (source=1); within each
+  // source the most recent comes first. Single round trip via UNION ALL.
+  const rows = (
+    await db.execute(sql`
+      SELECT video_id, source FROM (
+        SELECT video_id, created_at AS sort_at, 0 AS source
+        FROM video_like
+        WHERE user_id = ${userId} AND type = 'like'
+        UNION ALL
+        SELECT video_id, last_watched_at AS sort_at, 1 AS source
+        FROM watch_history
+        WHERE user_id = ${userId} AND progress_percent > ${SEED_PROGRESS_MIN}
+      ) t
+      ORDER BY source ASC, sort_at DESC
+    `)
+  ).rows as Array<{ video_id: string; source: number }>;
+
   const seeds: string[] = [];
-
-  const likes = await db
-    .select({ videoId: videoLike.videoId, createdAt: videoLike.createdAt })
-    .from(videoLike)
-    .where(and(eq(videoLike.userId, userId), eq(videoLike.type, "like")))
-    .orderBy(desc(videoLike.createdAt))
-    .limit(ITEM_CF_SEED_COUNT);
-  for (const l of likes) seeds.push(l.videoId);
-
-  if (seeds.length < ITEM_CF_SEED_COUNT) {
-    const watches = await db
-      .select({ videoId: watchHistory.videoId })
-      .from(watchHistory)
-      .where(
-        and(
-          eq(watchHistory.userId, userId),
-          gt(watchHistory.progressPercent, SEED_PROGRESS_MIN),
-          seeds.length > 0 ? notInArray(watchHistory.videoId, seeds) : undefined,
-        ),
-      )
-      .orderBy(desc(watchHistory.lastWatchedAt))
-      .limit(ITEM_CF_SEED_COUNT - seeds.length);
-    for (const w of watches) seeds.push(w.videoId);
+  const seen = new Set<string>();
+  for (const r of rows) {
+    if (seen.has(r.video_id)) continue;
+    seen.add(r.video_id);
+    seeds.push(r.video_id);
+    if (seeds.length >= ITEM_CF_SEED_COUNT) break;
   }
-
   return seeds;
 }
 
@@ -353,7 +354,10 @@ export async function getRelated(
   limit = 15,
   userId: string | null = null,
 ): Promise<VideoCard[]> {
-  const [currentRows, sims, hiddenSignals] = await Promise.all([
+  // Wave 1: everything we can fetch knowing only the videoId/userId. Pulling
+  // the seeds and completed-watches up here means the viewer-signal block no
+  // longer adds round trips after the candidate fetch.
+  const [currentRows, sims, hiddenSignals, seeds, completed] = await Promise.all([
     db
       .select({
         id: video.id,
@@ -374,9 +378,16 @@ export async function getRelated(
       .orderBy(desc(videoSimilarity.score))
       .limit(limit * RELATED_SIM_OVERFETCH),
     loadHiddenSignals(userId),
+    userId ? getUserSeedVideos(userId) : Promise.resolve<string[]>([]),
+    userId
+      ? db
+          .select({ videoId: watchHistory.videoId })
+          .from(watchHistory)
+          .where(and(eq(watchHistory.userId, userId), sql`${watchHistory.completedAt} IS NOT NULL`))
+      : Promise.resolve<{ videoId: string }[]>([]),
   ]);
   const current = currentRows[0];
-  if (!current) return getTrending(limit, [videoId], userId);
+  if (!current) return getTrending(limit, [videoId], userId, hiddenSignals);
 
   const currentTitleTokens = titleTokens(current.title);
   const currentTags = current.tags ?? [];
@@ -384,11 +395,12 @@ export async function getRelated(
   const cfScoreById = new Map(sims.map((s) => [s.otherVideoId, s.score]));
   const maxCfScore = sims.reduce((m, s) => (s.score > m ? s.score : m), 0);
 
-  // Content candidates: videos that share at least one tag with the current
-  // video. Cheap when `tags` has a GIN index; degrades gracefully without one.
-  const contentRows =
+  // Wave 2: candidate rows + seed metadata in parallel. Content candidates
+  // share a tag with the current video; seedRows feeds viewer-personalization
+  // signals.
+  const [contentRows, seedRows] = await Promise.all([
     currentTags.length > 0
-      ? await db
+      ? db
           .select(baseVideoSelect)
           .from(video)
           .innerJoin(user, eq(user.id, video.userId))
@@ -401,9 +413,16 @@ export async function getRelated(
           )
           .orderBy(desc(video.viewCount))
           .limit(RELATED_CONTENT_CANDIDATES)
-      : [];
+      : Promise.resolve<CandidateRow[]>([]),
+    seeds.length > 0
+      ? db
+          .select({ tags: video.tags, userId: video.userId })
+          .from(video)
+          .where(inArray(video.id, seeds))
+      : Promise.resolve<{ tags: string[] | null; userId: string }[]>([]),
+  ]);
 
-  // Pull rows for any CF candidate not already covered by content fetch.
+  // Wave 3: pull rows for any CF candidate not already covered by content fetch.
   const haveIds = new Set(contentRows.map((r) => r.id));
   const cfMissingIds = [...cfScoreById.keys()].filter((id) => !haveIds.has(id));
   const cfRows =
@@ -420,32 +439,16 @@ export async function getRelated(
     hiddenSignals.hiddenIds.size > 0
       ? allRowsRaw.filter((r) => !hiddenSignals.hiddenIds.has(r.id))
       : allRowsRaw;
-  if (allRows.length === 0) return getTrending(limit, [videoId], userId);
+  if (allRows.length === 0) return getTrending(limit, [videoId], userId, hiddenSignals);
 
-  // Viewer personalization signals.
-  let viewerAuthorIds = new Set<string>();
-  let viewerTags = new Set<string>();
-  let viewerCompletedIds = new Set<string>();
-  if (userId) {
-    const [seeds, completed] = await Promise.all([
-      getUserSeedVideos(userId),
-      db
-        .select({ videoId: watchHistory.videoId })
-        .from(watchHistory)
-        .where(and(eq(watchHistory.userId, userId), sql`${watchHistory.completedAt} IS NOT NULL`)),
-    ]);
-    if (seeds.length > 0) {
-      const seedRows = await db
-        .select({ tags: video.tags, userId: video.userId })
-        .from(video)
-        .where(inArray(video.id, seeds));
-      for (const s of seedRows) {
-        viewerAuthorIds.add(s.userId);
-        for (const t of s.tags ?? []) viewerTags.add(t);
-      }
-    }
-    viewerCompletedIds = new Set(completed.map((r) => r.videoId));
+  // Viewer personalization signals derived from wave 1/2 results.
+  const viewerAuthorIds = new Set<string>();
+  const viewerTags = new Set<string>();
+  for (const s of seedRows) {
+    viewerAuthorIds.add(s.userId);
+    for (const t of s.tags ?? []) viewerTags.add(t);
   }
+  const viewerCompletedIds = new Set(completed.map((r) => r.videoId));
 
   const scored: ScoredCandidate[] = [];
   for (const r of allRows) {
@@ -476,7 +479,7 @@ export async function getRelated(
     if (base > 0) scored.push({ row: r, baseScore: base });
   }
 
-  if (scored.length === 0) return getTrending(limit, [videoId], userId);
+  if (scored.length === 0) return getTrending(limit, [videoId], userId, hiddenSignals);
 
   scored.sort((a, b) => b.baseScore - a.baseScore);
   const diversified = mmrRerank(scored, limit);
@@ -486,6 +489,7 @@ export async function getRelated(
     limit - diversified.length,
     [videoId, ...diversified.map((r) => r.id)],
     userId,
+    hiddenSignals,
   );
   return [...diversified.map(rowToCard), ...fallback];
 }
@@ -494,8 +498,9 @@ export async function getTrending(
   limit: number,
   exclude: string[] = [],
   userId: string | null = null,
+  hiddenSignals?: HiddenSignals,
 ): Promise<VideoCard[]> {
-  return getTrendingPage(limit, 0, exclude, userId);
+  return getTrendingPage(limit, 0, exclude, userId, hiddenSignals);
 }
 
 export async function getTrendingPage(
@@ -503,8 +508,9 @@ export async function getTrendingPage(
   offset: number,
   exclude: string[] = [],
   userId: string | null = null,
+  preloadedSignals?: HiddenSignals,
 ): Promise<VideoCard[]> {
-  const hiddenSignals = await loadHiddenSignals(userId);
+  const hiddenSignals = preloadedSignals ?? (await loadHiddenSignals(userId));
   const effectiveExclude =
     hiddenSignals.hiddenIds.size > 0
       ? Array.from(new Set([...exclude, ...hiddenSignals.hiddenIds]))
@@ -552,19 +558,28 @@ export async function getTrendingPage(
 }
 
 export async function countTrendingCandidates(): Promise<number> {
+  const redis = getRedisClient();
+  const cached = await redis.get(TRENDING_COUNT_KEY);
+  if (cached !== null) {
+    const parsed = Number(cached);
+    if (Number.isFinite(parsed)) return parsed;
+  }
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(video)
     .innerJoin(user, eq(user.id, video.userId))
     .where(publicReadyWhere);
-  return rows[0]?.count ?? 0;
+  const count = rows[0]?.count ?? 0;
+  await redis.set(TRENDING_COUNT_KEY, String(count), "EX", TRENDING_COUNT_TTL_SECONDS);
+  return count;
 }
 
 export async function getContinueWatching(
   userId: string,
   limit = 10,
+  preloadedSignals?: HiddenSignals,
 ): Promise<ContinueWatchingCard[]> {
-  const hiddenSignals = await loadHiddenSignals(userId);
+  const hiddenSignals = preloadedSignals ?? (await loadHiddenSignals(userId));
   const conditions = [
     eq(watchHistory.userId, userId),
     sql`${watchHistory.progressPercent} BETWEEN ${CONTINUE_PROGRESS_MIN} AND ${CONTINUE_PROGRESS_MAX}`,
@@ -614,6 +629,21 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
     return shuffleTop(pool, HOME_SHUFFLE_TOP_N).slice(0, limit);
   }
 
+  const redis = getRedisClient();
+  const cacheKey = homeFeedCacheKey(userId, limit);
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    const parsed = JSON.parse(cached) as Array<Omit<VideoCard, "createdAt"> & { createdAt: string }>;
+    const hydrated: VideoCard[] = parsed.map((c) => ({ ...c, createdAt: new Date(c.createdAt) }));
+    return shuffleTop(hydrated, HOME_SHUFFLE_TOP_N);
+  }
+
+  const combined = await computeHomeFeed(userId, limit);
+  await redis.set(cacheKey, JSON.stringify(combined), "EX", HOME_FEED_CACHE_TTL_SECONDS);
+  return shuffleTop(combined, HOME_SHUFFLE_TOP_N);
+}
+
+async function computeHomeFeed(userId: string, limit: number): Promise<VideoCard[]> {
   const hiddenSignals = await loadHiddenSignals(userId);
   const hiddenIdList = [...hiddenSignals.hiddenIds];
 
@@ -625,7 +655,7 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
       : and(eq(userRecs.userId, userId), publicReadyWhere);
 
   const [continueWatching, userCfRows, itemCfScores] = await Promise.all([
-    getContinueWatching(userId, HOME_CONTINUE_WATCHING_LIMIT),
+    getContinueWatching(userId, HOME_CONTINUE_WATCHING_LIMIT, hiddenSignals),
     db
       .select({
         ...baseVideoSelect,
@@ -704,7 +734,7 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
 
   let recommended: VideoCard[];
   if (entries.size === 0) {
-    recommended = await getTrending(limit, [...cwIds], userId);
+    recommended = await getTrending(limit, [...cwIds], userId, hiddenSignals);
   } else {
     const sorted = [...entries.values()].sort((a, b) => b.baseScore - a.baseScore);
     const diversified = mmrRerank(sorted, limit);
@@ -714,11 +744,11 @@ export async function getHomeFeed(userId: string | null, limit: number): Promise
         limit - recommended.length,
         [...cwIds, ...recommended.map((r) => r.id)],
         userId,
+        hiddenSignals,
       );
       recommended = [...recommended, ...fallback];
     }
   }
 
-  const combined = [...cwCards, ...recommended].slice(0, limit);
-  return shuffleTop(combined, HOME_SHUFFLE_TOP_N);
+  return [...cwCards, ...recommended].slice(0, limit);
 }
