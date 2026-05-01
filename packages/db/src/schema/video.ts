@@ -87,6 +87,7 @@ export const video = pgTable(
     index("video_user_status_created_idx")
       .on(table.userId, table.status, table.createdAt.desc())
       .where(sql`${table.deletedAt} IS NULL`),
+    index("video_tags_gin_idx").using("gin", table.tags),
   ],
 );
 
