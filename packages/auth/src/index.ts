@@ -102,6 +102,7 @@ export function createAuth() {
         sameSite: "none",
         secure: true,
         httpOnly: true,
+        ...(env.AUTH_COOKIE_DOMAIN ? { domain: env.AUTH_COOKIE_DOMAIN } : {}),
       },
     },
     plugins: [],

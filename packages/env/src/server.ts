@@ -8,6 +8,7 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
     CORS_ORIGIN: z.url(),
+    AUTH_COOKIE_DOMAIN: z.string().min(1).optional(),
     REDIS_URL: z.string().default("redis://localhost:6379"),
     STORAGE_PATH: z.string().min(1),
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
