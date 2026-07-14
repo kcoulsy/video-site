@@ -94,4 +94,12 @@ app.get("/", (c) => {
   return c.text("OK");
 });
 
-export default app;
+const port = Number.parseInt(process.env.PORT ?? "3000", 10);
+
+Bun.serve({
+  fetch: app.fetch,
+  hostname: "0.0.0.0",
+  port: Number.isFinite(port) ? port : 3000,
+});
+
+export { app };
