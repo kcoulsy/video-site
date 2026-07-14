@@ -7,6 +7,9 @@ export default defineConfig({
   server: {
     port: 3001,
   },
+  preview: {
+    allowedHosts: ["videos.coulsy.dev"],
+  },
   resolve: {
     tsconfigPaths: true,
   },
