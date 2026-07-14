@@ -25,6 +25,7 @@ services:
       retries: 12
 
   migrate:
+    restart: "no"
     build:
       context: .
       target: migrate
