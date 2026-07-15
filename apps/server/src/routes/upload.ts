@@ -86,6 +86,8 @@ const tusServer = new Server({
       throw { status_code: 400, body: "Invalid videoId" };
     }
 
+    console.log(`[upload] finalizing video ${videoId}`);
+
     const tusFilePath = path.posix.join(storage.getTusDir(), upload.id);
 
     try {
@@ -150,6 +152,7 @@ const tusServer = new Server({
         { videoId, rawPath, userId: updated.userId },
         { jobId: videoId },
       );
+      console.log(`[upload] queued transcode for video ${videoId}`);
     }
 
     return {};
