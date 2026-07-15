@@ -76,6 +76,8 @@ export function VideoPlayer({
   const progressFillRef = useRef<HTMLDivElement>(null);
   const progressThumbRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
+  const scrubbingRef = useRef(false);
+  const wasPlayingRef = useRef(false);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -171,8 +173,14 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
 
-    const onPlay = () => setPlaying(true);
-    const onPause = () => setPlaying(false);
+    const onPlay = () => {
+      wasPlayingRef.current = true;
+      setPlaying(true);
+    };
+    const onPause = () => {
+      wasPlayingRef.current = false;
+      setPlaying(false);
+    };
     const onTime = () => {
       setCurrentTime(v.currentTime);
       onTimeUpdate?.(v.currentTime);
@@ -247,6 +255,23 @@ export function VideoPlayer({
     const onFs = () => setFullscreen(document.fullscreenElement === containerRef.current);
     document.addEventListener("fullscreenchange", onFs);
     return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
+  // Some mobile browsers pause media while resizing the fullscreen viewport on rotation.
+  useEffect(() => {
+    let resumeTimer: number | null = null;
+    const resumeAfterRotation = () => {
+      const shouldResume = wasPlayingRef.current || !videoRef.current?.paused;
+      if (!shouldResume) return;
+      if (resumeTimer !== null) window.clearTimeout(resumeTimer);
+      resumeTimer = window.setTimeout(() => videoRef.current?.play().catch(() => {}), 400);
+    };
+
+    window.addEventListener("orientationchange", resumeAfterRotation);
+    return () => {
+      window.removeEventListener("orientationchange", resumeAfterRotation);
+      if (resumeTimer !== null) window.clearTimeout(resumeTimer);
+    };
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -453,22 +478,35 @@ export function VideoPlayer({
     return ratio * duration;
   };
 
-  const onScrubMove = (e: MouseEvent) => {
-    const t = timeFromEvent(e.clientX);
+  const scrubToClientX = (clientX: number) => {
+    const t = timeFromEvent(clientX);
     if (videoRef.current) videoRef.current.currentTime = t;
     setCurrentTime(t);
-  };
-  const onScrubUp = () => {
-    window.removeEventListener("mousemove", onScrubMove);
-    window.removeEventListener("mouseup", onScrubUp);
   };
 
-  const beginScrub = (e: React.MouseEvent) => {
-    const t = timeFromEvent(e.clientX);
-    if (videoRef.current) videoRef.current.currentTime = t;
-    setCurrentTime(t);
-    window.addEventListener("mousemove", onScrubMove);
-    window.addEventListener("mouseup", onScrubUp);
+  const beginScrub = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    scrubbingRef.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    scrubToClientX(e.clientX);
+  };
+
+  const moveScrub = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!scrubbingRef.current) return;
+    scrubToClientX(e.clientX);
+  };
+
+  const endScrub = (e: React.PointerEvent<HTMLDivElement>) => {
+    scrubbingRef.current = false;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  const showScrubPreview = (clientX: number) => {
+    if (scrubbingRef.current) return;
+    const t = timeFromEvent(clientX);
+    setHoverTime(t);
   };
 
   if (!manifestUrl) {
@@ -511,9 +549,29 @@ export function VideoPlayer({
         autoPlay={autoPlay}
         poster={thumbnailUrl || undefined}
         playsInline
-        onClick={togglePlay}
-        onDoubleClick={toggleFullscreen}
       />
+
+      <div className="absolute inset-0 flex">
+        <button
+          type="button"
+          className="h-full w-1/3"
+          onClick={() => seekBy(-10)}
+          aria-label="Rewind 10 seconds"
+        />
+        <button
+          type="button"
+          className="h-full flex-1"
+          onClick={togglePlay}
+          onDoubleClick={toggleFullscreen}
+          aria-label={playing ? "Pause" : "Play"}
+        />
+        <button
+          type="button"
+          className="h-full w-1/3"
+          onClick={() => seekBy(10)}
+          aria-label="Forward 10 seconds"
+        />
+      </div>
 
       {/* Loading spinner */}
       {waiting && (
@@ -524,16 +582,16 @@ export function VideoPlayer({
 
       {/* Big center play button when paused */}
       {!playing && !waiting && (
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity"
-          aria-label="Play"
-        >
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-black/60">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity">
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="pointer-events-auto flex h-20 w-20 items-center justify-center rounded-full bg-black/60"
+            aria-label="Play"
+          >
             <Play className="ml-1 h-10 w-10 fill-white text-white" />
-          </div>
-        </button>
+          </button>
+        </div>
       )}
 
       {/* Controls overlay */}
@@ -545,9 +603,12 @@ export function VideoPlayer({
         {/* Scrubber */}
         <div
           ref={scrubberRef}
-          className="pointer-events-auto group/scrub relative mx-3 h-4 cursor-pointer"
-          onMouseDown={beginScrub}
-          onMouseMove={(e) => setHoverTime(timeFromEvent(e.clientX))}
+          className="pointer-events-auto group/scrub relative mx-3 h-6 cursor-pointer touch-none"
+          onPointerDown={beginScrub}
+          onPointerMove={moveScrub}
+          onPointerUp={endScrub}
+          onPointerCancel={endScrub}
+          onMouseMove={(e) => showScrubPreview(e.clientX)}
           onMouseLeave={() => setHoverTime(null)}
         >
           <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded bg-white/25 transition-[height] group-hover/scrub:h-1.5">
