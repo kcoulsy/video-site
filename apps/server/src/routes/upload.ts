@@ -90,8 +90,9 @@ const tusServer = new Server({
 
     const tusFilePath = path.posix.join(storage.getTusDir(), upload.id);
 
+    let detected: Awaited<ReturnType<typeof detectVideoFile>>;
     try {
-      await detectVideoFile(tusFilePath);
+      detected = await detectVideoFile(tusFilePath);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid video file";
       await db
@@ -102,8 +103,9 @@ const tusServer = new Server({
       throw { status_code: 415, body: message };
     }
 
-    const filename = upload.metadata?.filename ?? `${videoId}.bin`;
-    const rawPath = await storage.saveRawUpload(videoId, tusFilePath, filename);
+    // The original filename is retained in the video record. Use a generated
+    // storage name so ordinary spaces and punctuation cannot break local paths.
+    const rawPath = await storage.saveRawUpload(videoId, tusFilePath, `source.${detected.ext}`);
 
     const [row] = await db
       .select({ fileHash: video.fileHash, userId: video.userId })
