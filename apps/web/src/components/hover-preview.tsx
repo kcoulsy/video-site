@@ -19,7 +19,7 @@ interface HoverPreviewProps {
   duration: number | null;
 }
 
-const HOVER_DELAY_MS = 900;
+const HOVER_DELAY_MS = 400;
 
 let activeStop: (() => void) | null = null;
 
