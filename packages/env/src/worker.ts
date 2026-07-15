@@ -12,7 +12,7 @@ export const env = createEnv({
     STORAGE_PATH: z.string().min(1),
     FFMPEG_PATH: z.string().default("ffmpeg"),
     FFPROBE_PATH: z.string().default("ffprobe"),
-    CONCURRENCY: z.coerce.number().default(2),
+    CONCURRENCY: z.coerce.number().default(1),
     DELETE_RAW_AFTER_TRANSCODE: z
       .enum(["true", "false"])
       .default("false")

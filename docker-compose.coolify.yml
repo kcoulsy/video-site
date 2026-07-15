@@ -67,6 +67,7 @@ services:
         condition: service_completed_successfully
 
   worker:
+    restart: unless-stopped
     build:
       context: .
       target: worker
@@ -84,7 +85,7 @@ services:
       CORS_ORIGIN: ${VITE_WEB_URL:?Set VITE_WEB_URL in Coolify}
       FFMPEG_PATH: ffmpeg
       FFPROBE_PATH: ffprobe
-      CONCURRENCY: ${CONCURRENCY:-2}
+      CONCURRENCY: ${CONCURRENCY:-1}
       DELETE_RAW_AFTER_TRANSCODE: ${DELETE_RAW_AFTER_TRANSCODE:-false}
     volumes:
       - media-data:/data
