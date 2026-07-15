@@ -159,7 +159,6 @@ function SearchPage() {
     duration: r.duration,
     viewCount: r.viewCount,
     createdAt: r.createdAt,
-    user: { name: r.user.name, image: r.user.image },
   }));
 
   const activeCount = type === "videos" ? total : playlistTotal;

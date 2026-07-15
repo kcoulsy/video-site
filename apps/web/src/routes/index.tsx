@@ -163,7 +163,6 @@ function HomePage() {
     duration: v.duration,
     viewCount: v.viewCount,
     createdAt: v.createdAt,
-    user: { name: v.user.name, image: v.user.image },
     progressPercent: progressByVideoId.get(v.id),
   }));
 
@@ -188,7 +187,7 @@ function HomePage() {
   const visibleSortOptions = sortOptions;
 
   return (
-    <div className="mx-auto flex max-w-[1400px] gap-6 px-3 py-4 sm:px-4 sm:py-6">
+    <div className="flex w-full gap-6 px-3 py-4 sm:px-4 sm:py-6">
       <CategorySidebar selected={category} />
 
       <div className="min-w-0 flex-1">

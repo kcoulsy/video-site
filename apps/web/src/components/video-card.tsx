@@ -14,7 +14,6 @@ export interface VideoCardProps {
   duration: number | null;
   viewCount: number;
   createdAt: string;
-  user: { name: string };
   progressPercent?: number;
 }
 
@@ -25,7 +24,6 @@ export function VideoCard({
   duration,
   viewCount,
   createdAt,
-  user,
   progressPercent,
 }: VideoCardProps) {
   return (
@@ -55,7 +53,6 @@ export function VideoCard({
           <h3 className="line-clamp-2 text-sm font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
             {title}
           </h3>
-          <p className="mt-1 text-xs text-muted-foreground">{user.name}</p>
           <p className="text-xs text-muted-foreground">
             {formatViewCount(viewCount)} views &middot; {formatRelativeTime(createdAt)}
           </p>
