@@ -38,6 +38,9 @@ const VIDEO_ID_RE = /^[A-Za-z0-9_-]{21}$/;
 const tusServer = new Server({
   path: "/api/uploads",
   datastore: new FileStore({ directory: storage.getTusDir() }),
+  // The API runs behind Coolify and Cloudflare, where the container sees HTTP.
+  // Relative URLs keep tus-js-client on the public HTTPS origin when resuming.
+  relativeLocation: true,
   maxSize: MAX_UPLOAD_SIZE,
   namingFunction(_req, metadata) {
     const videoId = metadata?.videoId;
