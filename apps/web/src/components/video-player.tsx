@@ -6,6 +6,8 @@ import {
   PictureInPicture2,
   Play,
   RectangleHorizontal,
+  RotateCcw,
+  RotateCw,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -78,6 +80,7 @@ export function VideoPlayer({
   const rafRef = useRef<number | null>(null);
   const scrubbingRef = useRef(false);
   const wasPlayingRef = useRef(false);
+  const seekFeedbackTimerRef = useRef<number | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -93,6 +96,7 @@ export function VideoPlayer({
   const [currentQuality, setCurrentQuality] = useState<string | null>(null); // null = auto
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pipActive, setPipActive] = useState(false);
+  const [seekFeedback, setSeekFeedback] = useState<"backward" | "forward" | null>(null);
 
   useEffect(() => {
     initialTimeRef.current = initialTime;
@@ -294,6 +298,12 @@ export function VideoPlayer({
     v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + delta));
   }, []);
 
+  const showSeekFeedback = useCallback((direction: "backward" | "forward") => {
+    setSeekFeedback(direction);
+    if (seekFeedbackTimerRef.current !== null) window.clearTimeout(seekFeedbackTimerRef.current);
+    seekFeedbackTimerRef.current = window.setTimeout(() => setSeekFeedback(null), 800);
+  }, []);
+
   const seekToPercent = useCallback((pct: number) => {
     const v = videoRef.current;
     if (!v || !v.duration) return;
@@ -464,6 +474,7 @@ export function VideoPlayer({
   useEffect(() => {
     return () => {
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+      if (seekFeedbackTimerRef.current !== null) window.clearTimeout(seekFeedbackTimerRef.current);
     };
   }, []);
 
@@ -555,23 +566,48 @@ export function VideoPlayer({
         <button
           type="button"
           className="h-full w-1/3"
-          onClick={() => seekBy(-10)}
+          onClick={showControls}
+          onDoubleClick={() => {
+            seekBy(-10);
+            showSeekFeedback("backward");
+          }}
           aria-label="Rewind 10 seconds"
         />
         <button
           type="button"
           className="h-full flex-1"
-          onClick={togglePlay}
+          onClick={showControls}
           onDoubleClick={toggleFullscreen}
-          aria-label={playing ? "Pause" : "Play"}
+          aria-label="Show controls"
         />
         <button
           type="button"
           className="h-full w-1/3"
-          onClick={() => seekBy(10)}
+          onClick={showControls}
+          onDoubleClick={() => {
+            seekBy(10);
+            showSeekFeedback("forward");
+          }}
           aria-label="Forward 10 seconds"
         />
       </div>
+
+      {seekFeedback && (
+        <div
+          className={`pointer-events-none absolute inset-y-0 flex w-1/3 items-center justify-center text-white ${
+            seekFeedback === "backward" ? "left-0" : "right-0"
+          }`}
+        >
+          <div className="flex items-center gap-1 rounded-full bg-black/60 px-3 py-2 text-sm font-semibold animate-[bounce_0.45s_ease-out]">
+            {seekFeedback === "backward" ? (
+              <RotateCcw className="h-5 w-5" />
+            ) : (
+              <RotateCw className="h-5 w-5" />
+            )}
+            {seekFeedback === "backward" ? "-10s" : "+10s"}
+          </div>
+        </div>
+      )}
 
       {/* Loading spinner */}
       {waiting && (
