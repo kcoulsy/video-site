@@ -58,7 +58,7 @@ function EditVideoPage() {
     error: videoError,
   } = useQuery<VideoDetailResponse>({
     queryKey: ["video", videoId],
-    queryFn: () => apiClient<VideoDetailResponse>(`/api/videos/${videoId}`),
+    queryFn: () => apiClient<VideoDetailResponse>(`/api/videos/${videoId}`, { cache: "no-store" }),
   });
 
   const { data: tagData } = useQuery<TagsResponse>({

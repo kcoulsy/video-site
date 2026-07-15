@@ -1,3 +1,4 @@
+import { auth } from "@video-site/auth";
 import { env } from "@video-site/env/server";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -45,6 +46,15 @@ function clientIdent(c: Context): string {
 
 export function rateLimit(opts: RateLimitOptions) {
   return createMiddleware(async (c, next) => {
+    const currentUser = c.get("user") as AppUser | undefined;
+    const session = currentUser
+      ? null
+      : await auth.api.getSession({ headers: c.req.raw.headers });
+    if (currentUser?.role === "admin" || session?.user.role === "admin") {
+      await next();
+      return;
+    }
+
     const redis = getRedisClient();
     const key = `rl:${opts.name}:${clientIdent(c)}`;
     const count = await redis.incr(key);

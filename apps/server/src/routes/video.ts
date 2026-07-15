@@ -620,5 +620,6 @@ videoRoutes.post("/:id/thumbnail/select", requireAuth, async (c) => {
     .set({ thumbnailPath: stillPath, thumbnailStillIndex: index })
     .where(eq(video.id, id));
 
+  await invalidateStreamableVideoMeta(id);
   return c.json({ ok: true });
 });
