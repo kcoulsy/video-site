@@ -47,7 +47,10 @@ function RootDocument() {
   );
 
   return (
-    <html lang="en" className={`dark${env.VITE_IS_ADULT_SITE ? " adult-site" : ""}`}>
+    <html
+      lang="en"
+      className={`dark${env.VITE_IS_ADULT_SITE ? " adult-site adult-site-unverified" : ""}`}
+    >
       <head>
         <HeadContent />
       </head>

@@ -2,17 +2,23 @@ import { Button } from "@video-site/ui/components/button";
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "watchbox:adult-site-age-confirmed";
+const UNVERIFIED_CLASS = "adult-site-unverified";
 
 export function AgeGate() {
   const [confirmed, setConfirmed] = useState(false);
   const [declined, setDeclined] = useState(false);
 
   useEffect(() => {
-    setConfirmed(window.localStorage.getItem(STORAGE_KEY) === "true");
+    const isConfirmed = window.localStorage.getItem(STORAGE_KEY) === "true";
+    setConfirmed(isConfirmed);
+    if (isConfirmed) {
+      document.documentElement.classList.remove(UNVERIFIED_CLASS);
+    }
   }, []);
 
   const confirm = () => {
     window.localStorage.setItem(STORAGE_KEY, "true");
+    document.documentElement.classList.remove(UNVERIFIED_CLASS);
     setConfirmed(true);
   };
 
