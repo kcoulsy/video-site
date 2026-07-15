@@ -73,3 +73,9 @@ body::after {
 .animate-fade-in {
   animation: fade-in 0.3s ease-out both;
 }
+
+/* Applied by the reusable thumbnail component when VITE_IS_ADULT_SITE is enabled. */
+.adult-site .adult-thumbnail {
+  filter: blur(18px);
+  transform: scale(1.04);
+}

@@ -269,7 +269,7 @@ function ContinueCard({ item }: { item: HistoryItem }) {
           <img
             src={thumbnail}
             alt={item.video.title}
-            className="h-full w-full object-cover"
+            className="adult-thumbnail h-full w-full object-cover"
             loading="lazy"
           />
         ) : (
@@ -328,7 +328,7 @@ function HistoryRow({
             <img
               src={thumbnail}
               alt={item.video.title}
-              className="h-full w-full object-cover"
+              className="adult-thumbnail h-full w-full object-cover"
               loading="lazy"
             />
           ) : (

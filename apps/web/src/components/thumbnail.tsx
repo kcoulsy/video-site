@@ -38,7 +38,7 @@ export function Thumbnail({
       srcSet={srcSet}
       sizes={sizes}
       alt={alt}
-      className={className}
+      className={`adult-thumbnail ${className ?? ""}`}
       loading={eager ? "eager" : "lazy"}
       decoding={decoding}
       draggable={draggable}

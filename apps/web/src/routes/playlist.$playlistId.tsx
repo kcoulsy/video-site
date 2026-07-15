@@ -159,7 +159,7 @@ function PlaylistDetailPage() {
             <img
               src={absoluteUrl(items[0].video.thumbnailUrl)}
               alt={data.title}
-              className="h-full w-full object-cover"
+              className="adult-thumbnail h-full w-full object-cover"
             />
           ) : (
             <ListVideo className="h-16 w-16 text-muted-foreground/30" />
@@ -349,7 +349,7 @@ function VirtualPlaylistList({
                       <img
                         src={thumbnail}
                         alt={it.video.title}
-                        className="h-full w-full object-cover"
+                        className="adult-thumbnail h-full w-full object-cover"
                         loading="lazy"
                       />
                     ) : (

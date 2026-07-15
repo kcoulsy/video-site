@@ -75,6 +75,7 @@ These Compose environment variables are passed as build arguments and embedded i
 VITE_SERVER_URL=https://api.example.com
 VITE_WEB_URL=https://watch.example.com
 VITE_APP_NAME=Watchbox
+VITE_IS_ADULT_SITE=false
 ```
 
 ### Required secrets

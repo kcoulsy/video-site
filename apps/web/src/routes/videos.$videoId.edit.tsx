@@ -216,7 +216,7 @@ function EditVideoPage() {
                   <img
                     src={`${env.VITE_SERVER_URL}/api/stream/${videoId}/thumbnail/still/${i}`}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="adult-thumbnail h-full w-full object-cover"
                   />
                   {isPending ? (
                     <div className="absolute inset-0 flex items-center justify-center bg-background/60">
@@ -237,7 +237,7 @@ function EditVideoPage() {
             <img
               src={`${env.VITE_SERVER_URL}${video.thumbnailUrl}`}
               alt=""
-              className="h-full w-full object-cover"
+              className="adult-thumbnail h-full w-full object-cover"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-secondary to-muted">

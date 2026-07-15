@@ -187,7 +187,7 @@ function AdminVideos() {
                     <img
                       src={`${env.VITE_SERVER_URL}${video.thumbnailUrl}`}
                       alt=""
-                      className="h-full w-full object-cover"
+                      className="adult-thumbnail h-full w-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center">

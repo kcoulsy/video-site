@@ -204,7 +204,7 @@ function VirtualWatchLaterList({
                       <img
                         src={thumbnail}
                         alt={item.video.title}
-                        className="h-full w-full object-cover"
+                        className="adult-thumbnail h-full w-full object-cover"
                         loading="lazy"
                       />
                     ) : (

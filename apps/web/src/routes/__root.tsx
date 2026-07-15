@@ -6,6 +6,7 @@ import { Toaster } from "@video-site/ui/components/sonner";
 import { useState } from "react";
 
 import Header from "../components/header";
+import { AgeGate } from "../components/age-gate";
 
 import appCss from "../index.css?url";
 
@@ -46,7 +47,7 @@ function RootDocument() {
   );
 
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={`dark${env.VITE_IS_ADULT_SITE ? " adult-site" : ""}`}>
       <head>
         <HeadContent />
       </head>
@@ -58,6 +59,7 @@ function RootDocument() {
               <Outlet />
             </main>
           </div>
+          {env.VITE_IS_ADULT_SITE && <AgeGate />}
           <Toaster richColors />
           <TanStackRouterDevtools position="bottom-left" />
         </QueryClientProvider>

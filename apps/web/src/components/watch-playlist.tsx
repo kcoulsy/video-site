@@ -147,7 +147,7 @@ export function WatchPlaylist({ playlistId, currentVideoId }: WatchPlaylistProps
                         <img
                           src={`${thumb}?w=320`}
                           alt={it.video.title}
-                          className="h-full w-full object-cover"
+                          className="adult-thumbnail h-full w-full object-cover"
                           loading="lazy"
                           decoding="async"
                         />
