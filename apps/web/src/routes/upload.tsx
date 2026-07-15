@@ -185,6 +185,10 @@ function UploadPage() {
           endpoint: `${env.VITE_SERVER_URL}/api/uploads`,
           retryDelays: [0, 1000, 3000, 5000],
           chunkSize: 8 * 1024 * 1024,
+          // Keep stale resumable-upload URLs from a previous API deployment
+          // (for example, an old HTTP Location header) out of this upload.
+          fingerprint: async () =>
+            `watchbox:${env.VITE_SERVER_URL}:${file.name}:${file.size}:${file.lastModified}`,
           onBeforeRequest: (req) => {
             const xhr = req.getUnderlyingObject() as XMLHttpRequest;
             xhr.withCredentials = true;
