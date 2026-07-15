@@ -418,11 +418,11 @@ export async function processTranscode(job: Job<TranscodeJobData>) {
     await connection.del(STREAM_META_CACHE_KEY(videoId));
 
     const [readyVideo] = await db
-      .select({ visibility: video.visibility, userId: video.userId })
+      .select({ visibility: video.visibility, isDraft: video.isDraft, userId: video.userId })
       .from(video)
       .where(eq(video.id, videoId))
       .limit(1);
-    if (readyVideo && readyVideo.visibility === "public") {
+    if (readyVideo && readyVideo.visibility === "public" && readyVideo.isDraft === 0) {
       await notificationsQueue
         .add("fanout-new-upload", {
           type: "fanout-new-upload",

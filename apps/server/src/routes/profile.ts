@@ -230,6 +230,7 @@ profileRoutes.get("/profile/:handle", async (c) => {
           eq(video.userId, row.id),
           eq(video.status, "ready"),
           eq(video.visibility, "public"),
+          eq(video.isDraft, 0),
           visibleVideoWhere(),
         ),
       )
@@ -244,6 +245,7 @@ profileRoutes.get("/profile/:handle", async (c) => {
           eq(video.userId, row.id),
           eq(video.status, "ready"),
           eq(video.visibility, "public"),
+          eq(video.isDraft, 0),
           visibleVideoWhere(),
           activeAuthorWhere(),
         ),

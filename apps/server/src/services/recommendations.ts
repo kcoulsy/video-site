@@ -149,6 +149,7 @@ const baseVideoSelect = {
 const publicReadyWhere = and(
   eq(video.status, "ready"),
   eq(video.visibility, "public"),
+  eq(video.isDraft, 0),
   visibleVideoWhere(),
   activeAuthorWhere(),
 );
@@ -571,6 +572,7 @@ export async function getContinueWatching(
     isNull(watchHistory.completedAt),
     eq(video.status, "ready"),
     or(eq(video.visibility, "public"), eq(video.visibility, "unlisted")),
+    eq(video.isDraft, 0),
     visibleVideoWhere(),
     activeAuthorWhere(),
   ];

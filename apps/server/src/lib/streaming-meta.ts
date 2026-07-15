@@ -19,6 +19,7 @@ export interface StreamableVideoMeta {
   thumbnailStillsCount: number;
   visibility: "public" | "unlisted" | "private";
   status: "uploading" | "uploaded" | "processing" | "ready" | "failed";
+  isDraft: boolean;
   userId: string;
   // true if author is banned, suspended, or video is soft-deleted — caller should 404
   blocked: boolean;
@@ -42,6 +43,7 @@ export async function getStreamableVideoMeta(videoId: string): Promise<Streamabl
       thumbnailStillsCount: video.thumbnailStillsCount,
       visibility: video.visibility,
       status: video.status,
+      isDraft: video.isDraft,
       userId: video.userId,
       deletedAt: video.deletedAt,
       authorBannedAt: user.bannedAt,
@@ -69,6 +71,7 @@ export async function getStreamableVideoMeta(videoId: string): Promise<Streamabl
     thumbnailStillsCount: row.thumbnailStillsCount,
     visibility: row.visibility,
     status: row.status,
+    isDraft: row.isDraft === 1,
     userId: row.userId,
     blocked,
   };

@@ -64,7 +64,7 @@ function handleRangeRequest(file: BunFile, rangeHeader: string, contentType: str
 }
 
 async function authorizePrivate(meta: StreamableVideoMeta, headers: Headers): Promise<boolean> {
-  if (meta.visibility !== "private") return true;
+  if (meta.visibility !== "private" && !meta.isDraft) return true;
   const session = await auth.api.getSession({ headers });
   return Boolean(session && session.user.id === meta.userId);
 }
@@ -212,6 +212,10 @@ streamingRoutes.get("/:videoId/:filename", async (c) => {
   if (!SEGMENT_FILENAME_RE.test(filename)) {
     return c.json({ error: "Invalid filename" }, 400);
   }
+
+  const meta = await getStreamableVideoMeta(videoId);
+  if (!meta || meta.blocked || meta.status !== "ready") return c.notFound();
+  if (!(await authorizePrivate(meta, c.req.raw.headers))) return c.notFound();
 
   const filePath = storage.resolve("videos", videoId, "transcoded", filename);
   if (!(await storage.fileExists(filePath))) return c.notFound();

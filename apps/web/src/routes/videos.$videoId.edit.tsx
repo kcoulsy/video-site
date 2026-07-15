@@ -34,6 +34,7 @@ interface VideoDetailResponse {
   userId: string;
   thumbnailStillsCount: number;
   thumbnailStillIndex: number | null;
+  isDraft: number;
 }
 
 interface TagOption {
@@ -105,10 +106,11 @@ function EditVideoPage() {
           description: description.trim(),
           visibility,
           tagIds: selectedTagIds,
+          isDraft: false,
         }),
       }),
     onSuccess: () => {
-      toast.success("Changes saved");
+      toast.success(video?.isDraft === 1 ? "Video published" : "Changes saved");
       void queryClient.invalidateQueries({ queryKey: ["videos", "my"] });
       void queryClient.invalidateQueries({ queryKey: ["video", videoId] });
       void navigate({ to: "/dashboard" });
@@ -357,7 +359,7 @@ function EditVideoPage() {
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Save changes
+                {video.isDraft === 1 ? "Publish video" : "Save changes"}
               </>
             )}
           </Button>

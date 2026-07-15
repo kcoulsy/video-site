@@ -148,6 +148,7 @@ searchRoutes.get("/", async (c) => {
     WHERE
       v.status = 'ready'
       AND v.visibility = 'public'
+      AND v.is_draft = 0
       AND v.deleted_at IS NULL
       AND u.banned_at IS NULL
       AND (u.suspended_until IS NULL OR u.suspended_until < NOW())
@@ -243,6 +244,7 @@ searchRoutes.get("/suggest", async (c) => {
       WHERE
         v.status = 'ready'
         AND v.visibility = 'public'
+        AND v.is_draft = 0
         AND v.deleted_at IS NULL
         AND u.banned_at IS NULL
         AND (u.suspended_until IS NULL OR u.suspended_until < NOW())

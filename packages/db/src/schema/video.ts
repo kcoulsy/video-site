@@ -25,6 +25,7 @@ export const video = pgTable(
 
     status: videoStatusEnum("status").default("uploading").notNull(),
     visibility: videoVisibilityEnum("visibility").default("public").notNull(),
+    isDraft: integer("is_draft").default(0).notNull(),
 
     originalFilename: text("original_filename"),
     mimeType: text("mime_type"),

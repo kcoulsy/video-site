@@ -115,6 +115,7 @@ subscriptionRoutes.get("/me/subscriptions/feed", requireAuth, async (c) => {
         eq(subscription.subscriberId, me),
         eq(video.visibility, "public"),
         eq(video.status, "ready"),
+        eq(video.isDraft, 0),
         visibleVideoWhere(),
         activeAuthorWhere(),
       ),

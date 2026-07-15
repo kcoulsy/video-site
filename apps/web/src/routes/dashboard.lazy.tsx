@@ -12,9 +12,11 @@ import {
   MoreHorizontal,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import * as tus from "tus-js-client";
 import { Button } from "@video-site/ui/components/button";
 import {
   DropdownMenu,
@@ -27,7 +29,7 @@ import { Pagination } from "@/components/pagination";
 import { VideoStatusBadge, type VideoStatus } from "@/components/video-status-badge";
 import { ViewsBarChart } from "@/components/views-bar-chart";
 import { ApiError, apiClient } from "@/lib/api-client";
-import { formatDuration, formatRelativeTime, formatViewCount } from "@/lib/format";
+import { formatDuration, formatFileSize, formatRelativeTime, formatViewCount } from "@/lib/format";
 
 const PAGE_SIZE = 24;
 
@@ -47,6 +49,7 @@ interface DashboardVideo {
   likeCount: number;
   createdAt: string;
   processingError: string | null;
+  isDraft: number;
 }
 
 interface MyVideosResponse {
@@ -116,6 +119,12 @@ function DashboardPage() {
 
       <CreatorAnalyticsSection />
 
+      <DashboardUploadDropzone
+        onUploadStarted={() => {
+          void queryClient.invalidateQueries({ queryKey: ["videos", "my"] });
+        }}
+      />
+
       <div className="overflow-hidden rounded-xl border border-border">
         <div className="border-b border-border bg-card/50 px-4 py-3">
           <h2 className="text-sm font-medium">Your Videos</h2>
@@ -161,6 +170,193 @@ function DashboardPage() {
         }
       />
     </div>
+  );
+}
+
+interface CreateVideoResponse {
+  id: string;
+}
+
+interface DraftUpload {
+  id: string;
+  name: string;
+  size: number;
+  phase: "hashing" | "uploading" | "processing" | "failed";
+  progress: number;
+}
+
+async function hashFileSha256(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function isVideoFile(file: File): boolean {
+  return (
+    file.type.startsWith("video/") ||
+    /\.(mp4|mov|mkv|webm|avi|m4v|flv|3gp|mpg|mpeg|ts)$/i.test(file.name)
+  );
+}
+
+function DashboardUploadDropzone({ onUploadStarted }: { onUploadStarted: () => void }) {
+  const [dragOver, setDragOver] = useState(false);
+  const [uploads, setUploads] = useState<DraftUpload[]>([]);
+  const dragDepth = useRef(0);
+
+  const updateUpload = useCallback((id: string, update: Partial<DraftUpload>) => {
+    setUploads((current) =>
+      current.map((upload) => (upload.id === id ? { ...upload, ...update } : upload)),
+    );
+  }, []);
+
+  const uploadDraft = useCallback(
+    async (file: File) => {
+      const id = crypto.randomUUID();
+      setUploads((current) => [
+        ...current,
+        { id, name: file.name, size: file.size, phase: "hashing", progress: 0 },
+      ]);
+
+      try {
+        const fileHash = await hashFileSha256(file);
+        updateUpload(id, { phase: "uploading" });
+        const created = await apiClient<CreateVideoResponse>("/api/videos", {
+          method: "POST",
+          body: JSON.stringify({
+            title: file.name.replace(/\.[^.]+$/, "") || "Untitled video",
+            filename: file.name,
+            mimeType: file.type || "video/mp4",
+            fileSize: file.size,
+            fileHash,
+            isDraft: true,
+          }),
+        });
+        onUploadStarted();
+
+        await new Promise<void>((resolve, reject) => {
+          const upload = new tus.Upload(file, {
+            endpoint: `${env.VITE_SERVER_URL}/api/uploads`,
+            retryDelays: [0, 1000, 3000, 5000],
+            chunkSize: 8 * 1024 * 1024,
+            fingerprint: async () =>
+              `watchbox:${env.VITE_SERVER_URL}:${file.name}:${file.size}:${file.lastModified}`,
+            onBeforeRequest: (request) => {
+              (request.getUnderlyingObject() as XMLHttpRequest).withCredentials = true;
+            },
+            metadata: {
+              videoId: created.id,
+              filename: file.name,
+              filetype: file.type || "video/mp4",
+            },
+            onError: reject,
+            onProgress: (uploaded, total) => {
+              const progress = Math.round((uploaded / total) * 100);
+              updateUpload(id, { phase: progress >= 100 ? "processing" : "uploading", progress });
+            },
+            onSuccess: () => resolve(),
+          });
+          upload.start();
+        });
+        updateUpload(id, { phase: "processing", progress: 100 });
+        toast.success(`${file.name} uploaded as a draft`);
+      } catch (error) {
+        const message = error instanceof ApiError ? error.message : `Failed to upload ${file.name}`;
+        updateUpload(id, { phase: "failed" });
+        toast.error(message);
+      }
+    },
+    [onUploadStarted, updateUpload],
+  );
+
+  const acceptFiles = useCallback(
+    (files: FileList | File[]) => {
+      const videoFiles = Array.from(files).filter(isVideoFile);
+      if (videoFiles.length === 0) {
+        toast.error("Drop one or more video files to upload.");
+        return;
+      }
+      if (videoFiles.length !== Array.from(files).length)
+        toast.error("Non-video files were skipped.");
+      void Promise.all(videoFiles.map(uploadDraft));
+    },
+    [uploadDraft],
+  );
+
+  useEffect(() => {
+    const onDragEnter = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      dragDepth.current += 1;
+      setDragOver(true);
+    };
+    const onDragOver = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    };
+    const onDragLeave = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      dragDepth.current = Math.max(0, dragDepth.current - 1);
+      if (dragDepth.current === 0) setDragOver(false);
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+      dragDepth.current = 0;
+      setDragOver(false);
+      acceptFiles(event.dataTransfer.files);
+    };
+    window.addEventListener("dragenter", onDragEnter);
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("dragleave", onDragLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter);
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("dragleave", onDragLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [acceptFiles]);
+
+  return (
+    <>
+      {dragOver ? (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="rounded-2xl border-2 border-dashed border-primary bg-primary/10 px-12 py-10 text-center">
+            <Upload className="mx-auto mb-3 h-12 w-12 text-primary" />
+            <p className="text-lg font-medium">Drop videos to upload as drafts</p>
+          </div>
+        </div>
+      ) : null}
+      {uploads.length > 0 ? (
+        <div className="mb-8 overflow-hidden rounded-xl border border-border">
+          <div className="border-b border-border bg-card/50 px-4 py-3">
+            <h2 className="text-sm font-medium">Draft uploads</h2>
+          </div>
+          <div className="divide-y divide-border">
+            {uploads.map((upload) => (
+              <div key={upload.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                {upload.phase === "failed" ? (
+                  <X className="h-4 w-4 text-red-400" />
+                ) : (
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{upload.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatFileSize(upload.size)}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {upload.phase === "hashing"
+                    ? "Checking file"
+                    : upload.phase === "processing"
+                      ? "Processing"
+                      : upload.phase === "failed"
+                        ? "Failed"
+                        : `${upload.progress}%`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -268,6 +464,7 @@ function VideoRow({ video, onDeleted }: { video: DashboardVideo; onDeleted: () =
         )}
         <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
           <VideoStatusBadge status={status} progressPercent={progress} />
+          {video.isDraft === 1 ? <span>Draft</span> : null}
           <span className="capitalize">{video.visibility}</span>
           <span>{formatRelativeTime(video.createdAt)}</span>
         </div>

@@ -98,6 +98,7 @@ const createVideoSchema = z.object({
     .positive()
     .max(MAX_FILE_SIZE, `File size must be <= ${MAX_FILE_SIZE} bytes`),
   fileHash: z.string().regex(/^[a-f0-9]{64}$/, "fileHash must be a 64-char lowercase hex SHA-256"),
+  isDraft: z.boolean().default(false),
 });
 
 const updateVideoSchema = z.object({
@@ -105,6 +106,7 @@ const updateVideoSchema = z.object({
   description: z.string().max(5000).optional(),
   visibility: visibilitySchema.optional(),
   tagIds: tagIdsSchema.optional(),
+  isDraft: z.boolean().optional(),
 });
 
 async function resolveTagSlugs(tagIds: string[]): Promise<string[]> {
@@ -165,6 +167,7 @@ videoRoutes.post(
         fileHash: parsed.data.fileHash,
         userId: currentUser.id,
         status: "uploading",
+        isDraft: parsed.data.isDraft ? 1 : 0,
       });
       if (uniqueTagIds.length > 0) {
         await tx.insert(videoTag).values(uniqueTagIds.map((tagId) => ({ videoId: id, tagId })));
@@ -255,6 +258,7 @@ videoRoutes.get("/", async (c) => {
   const baseConditions = [
     eq(video.status, "ready"),
     eq(video.visibility, "public"),
+    eq(video.isDraft, 0),
     visibleVideoWhere(),
     activeAuthorWhere(),
   ];
@@ -326,6 +330,9 @@ videoRoutes.get("/:id", async (c) => {
   }
 
   const isOwner = currentUserId === row.v.userId;
+  if (row.v.isDraft && !isOwner) {
+    throw new NotFoundError("Video");
+  }
   if (row.v.visibility === "private" && !isOwner) {
     throw new NotFoundError("Video");
   }
@@ -371,6 +378,7 @@ videoRoutes.post(
       .select({
         visibility: video.visibility,
         status: video.status,
+        isDraft: video.isDraft,
         userId: video.userId,
         deletedAt: video.deletedAt,
         authorBannedAt: user.bannedAt,
@@ -381,7 +389,7 @@ videoRoutes.post(
       .where(eq(video.id, videoId))
       .limit(1);
 
-    if (!row || row.status !== "ready") {
+    if (!row || row.status !== "ready" || row.isDraft) {
       throw new NotFoundError("Video");
     }
 
@@ -454,6 +462,7 @@ videoRoutes.patch("/:id", requireAuth, async (c) => {
   if (parsed.data.title !== undefined) fields.title = parsed.data.title;
   if (parsed.data.description !== undefined) fields.description = parsed.data.description;
   if (parsed.data.visibility !== undefined) fields.visibility = parsed.data.visibility;
+  if (parsed.data.isDraft !== undefined) fields.isDraft = parsed.data.isDraft ? 1 : 0;
   if (slugs !== undefined) fields.tags = slugs.length > 0 ? slugs : null;
 
   await db.transaction(async (tx) => {
